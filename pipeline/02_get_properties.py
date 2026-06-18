@@ -33,17 +33,19 @@ out center {limit};
 
     try:
         response = requests.post(
-            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
             data={'data': query},
-            timeout=120
+            timeout=120,
+            headers={'User-Agent': 'AltisMVP/1.0'}
         )
     except requests.exceptions.Timeout:
         print("  Overpass API timed out. Retrying in 15 seconds...")
         time.sleep(15)
         response = requests.post(
-            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
             data={'data': query},
-            timeout=120
+            timeout=120,
+            headers={'User-Agent': 'AltisMVP/1.0'}
         )
 
     if response.status_code != 200:
@@ -114,9 +116,10 @@ out geom {needed * 3};
 
     try:
         response = requests.post(
-            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
             data={'data': query},
-            timeout=120
+            timeout=120,
+            headers={'User-Agent': 'AltisMVP/1.0'}
         )
     except Exception:
         return []
@@ -205,18 +208,7 @@ def build_property_list(event_config, target=1000):
 if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Harvey
-    harvey_df = build_property_list(HARVEY, target=1000)
-    harvey_path = os.path.join(OUTPUT_DIR, 'harvey_properties.csv')
-    harvey_df.to_csv(harvey_path, index=False)
-    print(f"\n✓ Harvey properties saved → {harvey_path}")
-    print(harvey_df.head(3).to_string(index=False))
-
-    # Wait between API calls
-    print("\nWaiting 12 seconds before Ian query (Overpass rate limit)...")
-    time.sleep(12)
-
-    # Ian
+    # Ian only (Harvey already done)
     ian_df = build_property_list(IAN, target=1000)
     ian_path = os.path.join(OUTPUT_DIR, 'ian_properties.csv')
     ian_df.to_csv(ian_path, index=False)
