@@ -1,0 +1,121 @@
+/* ── Altis Design System ─────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  /* Colors */
+  --teal:           #A8D4E6;
+  --teal-dim:       rgba(168, 212, 230, 0.12);
+  --teal-border:    rgba(168, 212, 230, 0.2);
+  --dispatch:       #FF4444;
+  --dispatch-dim:   rgba(255, 68, 68, 0.12);
+  --approve:        #4CAF82;
+  --approve-dim:    rgba(76, 175, 130, 0.12);
+  --deny:           #6B8FA3;
+  --deny-dim:       rgba(107, 143, 163, 0.12);
+  --review:         #FFB347;
+  --review-dim:     rgba(255, 179, 71, 0.12);
+  --bg:             #000004;
+  --surface:        rgba(6, 8, 14, 0.88);
+  --surface-hover:  rgba(10, 14, 22, 0.92);
+  --border:         rgba(255, 255, 255, 0.055);
+  --border-focus:   rgba(168, 212, 230, 0.3);
+  --text-primary:   #FFFFFF;
+  --text-secondary: #8B9AA3;
+  --text-muted:     #3A5060;
+  --text-disabled:  #1E2E38;
+
+  /* Typography */
+  --font:        'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:        'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing */
+  --r-sm:  4px;
+  --r-md:  8px;
+  --r-lg:  12px;
+  --r-xl:  16px;
+
+  /* Z-index layers */
+  --z-globe:  0;
+  --z-ui:     10;
+  --z-drawer: 20;
+  --z-modal:  30;
+  --z-header: 40;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin:     0;
+  padding:    0;
+}
+
+html, body, #root {
+  width:      100%;
+  height:     100%;
+  overflow:   hidden;
+  background: var(--bg);
+  font-family: var(--font);
+  color:       var(--text-primary);
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Triage badges ───────────────────────────────────────────────────── */
+.badge {
+  display:        inline-flex;
+  align-items:    center;
+  padding:        3px 9px;
+  border-radius:  var(--r-sm);
+  font-size:      0.7rem;
+  font-weight:    700;
+  letter-spacing: 0.05em;
+  white-space:    nowrap;
+  border:         1px solid;
+}
+.badge-Dispatch       { color: var(--dispatch); background: var(--dispatch-dim); border-color: rgba(255,68,68,0.25); }
+.badge-Remote-Approve { color: var(--approve);  background: var(--approve-dim);  border-color: rgba(76,175,130,0.25); }
+.badge-Remote-Deny    { color: var(--deny);     background: var(--deny-dim);     border-color: rgba(107,143,163,0.25); }
+.badge-Review         { color: var(--review);   background: var(--review-dim);   border-color: rgba(255,179,71,0.25); }
+
+/* ── Glass surface ───────────────────────────────────────────────────── */
+.glass {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(168,212,230,0.15); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(168,212,230,0.3); }
+
+/* ── Animations ──────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.anim-fade-in        { animation: fadeIn      0.3s ease forwards; }
+.anim-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.16,1,0.3,1) forwards; }
+.anim-slide-in-up    { animation: slideInUp   0.3s ease forwards; }
+
+/* ── Mapbox overrides ────────────────────────────────────────────────── */
+.mapboxgl-canvas { outline: none; }
+.mapboxgl-ctrl-attrib { display: none !important; }
+.mapboxgl-ctrl-logo   { display: none !important; }

@@ -1,0 +1,219 @@
+"""
+database.py — In-memory event data + SQLite for carrier portfolios.
+
+Event data (Harvey / Ian) loads from outputs/*.csv at startup.
+Portfolio data lives in SQLite so it persists across server restarts.
+"""
+import os
+import sqlite3
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+BASE_DIR    = Path(__file__).parent.parent
+OUTPUT_DIR  = BASE_DIR / 'outputs'
+DB_PATH     = BASE_DIR / 'altis.db'
+CACHE_DIR   = BASE_DIR / 'cache' / 'sar'
+
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── In-memory event data (loaded once at startup) ────────────────────────────
+
+_event_cache: dict = {}
+
+def load_event_data(event_id: str) -> pd.DataFrame | None:
+    """
+    Load and merge final triage + lat/lon for an event.
+    Cached in memory after first load.
+    """
+    if event_id in _event_cache:
+        return _event_cache[event_id]
+
+    final_path = OUTPUT_DIR / f"{event_id}_final.csv"
+    props_path = OUTPUT_DIR / f"{event_id}_properties.csv"
+
+    if not final_path.exists():
+        return None
+
+    df = pd.read_csv(final_path)
+
+    # Merge lat/lon from properties CSV if available and not already in final
+    if props_path.exists() and 'latitude' not in df.columns:
+        props = pd.read_csv(props_path)[['property_id', 'latitude', 'longitude']]
+        df = df.merge(props, on='property_id', how='left')
+
+    # Assign pin colors
+    COLOR_MAP = {
+        'Dispatch':       '#FF4444',
+        'Remote-Approve': '#4CAF82',
+        'Remote-Deny':    '#6B8FA3',
+        'Review':         '#FFB347',
+    }
+    df['color'] = df['impact_class'].map(COLOR_MAP).fillna('#6B8FA3')
+
+    # Drop rows without coordinates
+    df = df.dropna(subset=['latitude', 'longitude'])
+
+    _event_cache[event_id] = df
+    return df
+
+
+def get_event_stats(df: pd.DataFrame) -> dict:
+    total         = len(df)
+    dispatch      = int((df['impact_class'] == 'Dispatch').sum())
+    remote_approve = int((df['impact_class'] == 'Remote-Approve').sum())
+    remote_deny   = int((df['impact_class'] == 'Remote-Deny').sum())
+    review        = int((df['impact_class'] == 'Review').sum())
+    remote_total  = remote_approve + remote_deny
+    return {
+        'total':            total,
+        'dispatch':         dispatch,
+        'remote_approve':   remote_approve,
+        'remote_deny':      remote_deny,
+        'review':           review,
+        'remote_total':     remote_total,
+        'estimated_savings': remote_total * 750,
+        'pct_remote':       round(remote_total / total * 100, 1) if total > 0 else 0,
+    }
+
+
+# ── SQLite: portfolios ────────────────────────────────────────────────────────
+
+def init_db():
+    """Create tables if they don't exist."""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS portfolios (
+            id TEXT PRIMARY KEY,
+            created_at TEXT DEFAULT (datetime('now')),
+            total_count INTEGER,
+            geocoded_count INTEGER,
+            center_lat REAL,
+            center_lon REAL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS portfolio_properties (
+            portfolio_id TEXT,
+            property_id TEXT,
+            policy_number TEXT,
+            address TEXT,
+            coverage_amount REAL,
+            latitude REAL,
+            longitude REAL,
+            matched_address TEXT,
+            PRIMARY KEY (portfolio_id, property_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_results (
+            portfolio_id TEXT,
+            event_id TEXT,
+            property_id TEXT,
+            impact_class TEXT,
+            max_depth_ft REAL,
+            pct_flooded REAL,
+            confidence_score INTEGER,
+            adjuster_note TEXT,
+            PRIMARY KEY (portfolio_id, event_id, property_id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def save_portfolio(portfolio_id: str, properties: list, center: dict,
+                   geocoded_count: int):
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("""
+        INSERT OR REPLACE INTO portfolios
+        (id, total_count, geocoded_count, center_lat, center_lon)
+        VALUES (?, ?, ?, ?, ?)
+    """, (portfolio_id, len(properties), geocoded_count,
+          center['lat'], center['lon']))
+
+    conn.executemany("""
+        INSERT OR REPLACE INTO portfolio_properties
+        (portfolio_id, property_id, policy_number, address,
+         coverage_amount, latitude, longitude, matched_address)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, [(portfolio_id, p['property_id'], p.get('policy_number', ''),
+           p['address'], p.get('coverage_amount', 0),
+           p['latitude'], p['longitude'], p.get('matched_address', ''))
+          for p in properties])
+
+    conn.commit()
+    conn.close()
+
+
+def list_portfolios() -> list:
+    """Return summary metadata for every saved portfolio, newest first."""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT id, created_at, total_count, geocoded_count, center_lat, center_lon
+        FROM portfolios
+        ORDER BY created_at DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_portfolio(portfolio_id: str) -> list | None:
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM portfolio_properties WHERE portfolio_id = ?",
+        (portfolio_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows] if rows else None
+
+
+def save_analysis_results(portfolio_id: str, event_id: str, results: list):
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.executemany("""
+        INSERT OR REPLACE INTO analysis_results
+        (portfolio_id, event_id, property_id, impact_class,
+         max_depth_ft, pct_flooded, confidence_score, adjuster_note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, [(portfolio_id, event_id,
+           r['property_id'], r['impact_class'], r['max_depth_ft'],
+           r['pct_flooded'], r['confidence_score'], r['adjuster_note'])
+          for r in results])
+    conn.commit()
+    conn.close()
+
+
+def get_analysis_results(portfolio_id: str, event_id: str) -> list | None:
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT pp.*, ar.impact_class, ar.max_depth_ft, ar.pct_flooded,
+               ar.confidence_score, ar.adjuster_note
+        FROM portfolio_properties pp
+        LEFT JOIN analysis_results ar
+          ON ar.portfolio_id = pp.portfolio_id
+          AND ar.event_id = ?
+          AND ar.property_id = pp.property_id
+        WHERE pp.portfolio_id = ?
+    """, (event_id, portfolio_id)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows] if rows else None
+
+
+# ── SAR thumbnail helpers ─────────────────────────────────────────────────────
+
+def get_cached_thumbnail(property_id: str, is_post: bool) -> str | None:
+    """Return cached GEE thumbnail base64 if it exists."""
+    label = 'post' if is_post else 'pre'
+    path  = CACHE_DIR / f"{property_id}_{label}.b64"
+    if path.exists():
+        return path.read_text()
+    return None
+
+
+def save_thumbnail_cache(property_id: str, is_post: bool, data_url: str):
+    label = 'post' if is_post else 'pre'
+    path  = CACHE_DIR / f"{property_id}_{label}.b64"
+    path.write_text(data_url)
