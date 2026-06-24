@@ -8,8 +8,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
 from openai import OpenAI
 import json
+import math
 import time
-from config import OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR, PIPELINE_VERSION, OPTICAL
+from config import (OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR,
+                    PIPELINE_VERSION, OPTICAL, ENSEMBLE)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
 
@@ -173,6 +175,68 @@ def classify_triage(row, thresholds):
     return 'Review', 'Flag for manual review — borderline measurements or low confidence'
 
 
+def ensemble_votes(row, cfg=ENSEMBLE):
+    """
+    Independent flood votes from each available sensor/model.
+    Each member returns 'flood', 'dry', or 'abstain' (no usable data).
+    """
+    pct = float(row.get('pct_flooded', 0.0) or 0.0)
+
+    # SAR member — always votes.
+    sar = 'flood' if pct >= cfg['sar_flood_pct'] else 'dry'
+
+    # Optical member — only when a cloud-free observation exists.
+    if int(row.get('optical_available', 0)) == 1:
+        ow = float(row.get('optical_water_pct', 0.0) or 0.0)
+        if ow >= cfg['optical_water_pct']:
+            optical = 'flood'
+        elif ow < cfg['optical_dry_pct']:
+            optical = 'dry'
+        else:
+            optical = 'abstain'
+    else:
+        optical = 'abstain'
+
+    # DEM-hydrology member — height above local drainage. Abstains if unknown.
+    rel = row.get('rel_elev_ft', None)
+    try:
+        rel = float(rel)
+        rel_known = not (isinstance(rel, float) and math.isnan(rel))
+    except (TypeError, ValueError):
+        rel_known = False
+    if rel_known:
+        if rel <= cfg['dem_plausible_rel_ft']:
+            dem = 'flood'          # low-lying: flooding plausible
+        elif rel >= cfg['dem_implausible_rel_ft']:
+            dem = 'dry'            # perched high above drainage: flood implausible
+        else:
+            dem = 'abstain'
+    else:
+        dem = 'abstain'
+
+    return {'sar': sar, 'optical': optical, 'dem_hydrology': dem}
+
+
+def ensemble_disagreement(row, cfg=ENSEMBLE):
+    """
+    Returns (disagree: bool, reason: str, votes: dict).
+    Disagreement = at least one member votes 'flood' and at least one votes
+    'dry' among the members that did not abstain. Such a property should go to
+    manual Review rather than receive a confident automated remote decision.
+    """
+    votes = ensemble_votes(row, cfg)
+    floods = [m for m, v in votes.items() if v == 'flood']
+    drys   = [m for m, v in votes.items() if v == 'dry']
+
+    if floods and drys:
+        label = {'sar': 'SAR', 'optical': 'optical', 'dem_hydrology': 'DEM-hydrology'}
+        reason = (f"Sensors disagree: {', '.join(label[m] for m in floods)} indicate "
+                  f"flooding while {', '.join(label[m] for m in drys)} indicate dry/"
+                  f"implausible — routed to manual review.")
+        return True, reason, votes
+    return False, '', votes
+
+
 def generate_notes_batch(batch_rows):
     """
     Generate adjuster notes for up to 20 properties via Claude API.
@@ -320,6 +384,24 @@ def run_triage_pipeline(event_config):
     df['impact_class']       = results.apply(lambda x: x[0])
     df['recommended_action'] = results.apply(lambda x: x[1])
 
+    # Step 2b: ensemble disagreement override. When independent members
+    # (SAR / optical / DEM-hydrology) genuinely conflict, downgrade a confident
+    # automated decision to manual Review — we never auto-resolve a contested
+    # signal. Recorded in dedicated columns for the Reports panel.
+    ens = df.apply(lambda r: ensemble_disagreement(r, ENSEMBLE), axis=1)
+    df['ensemble_disagreement'] = [int(e[0]) for e in ens]
+    df['ensemble_note']         = [e[1] for e in ens]
+    df['ensemble_votes']        = [json.dumps(e[2]) for e in ens]
+
+    if ENSEMBLE['downgrade_to_review']:
+        mask = (df['ensemble_disagreement'] == 1) & (df['impact_class'] != 'Review')
+        downgraded = int(mask.sum())
+        df.loc[mask, 'recommended_action'] = (
+            'Flag for manual review — independent sensors (SAR/optical/DEM) disagree')
+        df.loc[mask, 'impact_class'] = 'Review'
+        if downgraded:
+            print(f"  Ensemble disagreement downgraded {downgraded} decision(s) to Review")
+
     counts = df['impact_class'].value_counts()
     for cat in ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review']:
         n = counts.get(cat, 0)
@@ -341,7 +423,8 @@ def run_triage_pipeline(event_config):
         'depth_lower_ft', 'depth_upper_ft', 'depth_ci_ft',
         'impact_class', 'confidence_score', 'recommended_action',
         'adjuster_note', 'urban_flag', 'optical_available', 'optical_water_pct',
-        'confidence_factors'
+        'confidence_factors', 'ensemble_disagreement', 'ensemble_note',
+        'ensemble_votes'
     ]
     final_df = df[[c for c in final_cols if c in df.columns]].copy()
 

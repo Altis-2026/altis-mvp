@@ -165,3 +165,25 @@ UNCERTAINTY = {
     'k_sigma':              1.0,
     'min_ci_ft':            0.3,
 }
+
+# ─── ENSEMBLE DISAGREEMENT PARAMETERS (Round 3) ──────────────────────────────
+# Three independent members vote on whether a property flooded:
+#   - SAR        (Sentinel-1 backscatter / coverage)  — always votes
+#   - Optical    (Sentinel-2 MNDWI)                    — votes only when cloud-free
+#   - DEM-hydrology (height above local drainage)      — votes on plausibility
+# When the members genuinely conflict (one says flooded, another says dry/
+# implausible), the safe, defensible action is to send the property to manual
+# Review rather than make a confident automated remote decision on a contested
+# signal. This is a hard override, complementary to the softer Round-2 optical
+# confidence nudge.
+ENSEMBLE = {
+    'sar_flood_pct':            0.10,  # SAR votes FLOOD when coverage >= this
+    'optical_water_pct':        0.10,  # Optical votes FLOOD (water) above this
+    'optical_dry_pct':          0.05,  # Optical votes DRY below this (else abstains)
+    # DEM-hydrology: relative elevation above the local neighborhood minimum.
+    # Near the local low/drainage -> flooding plausible; perched well above it
+    # -> flooding implausible (a confident SAR "flood" there is suspect).
+    'dem_plausible_rel_ft':     6.0,   # <= this ft above local min: flood plausible
+    'dem_implausible_rel_ft':   15.0,  # >= this ft above local min: flood implausible
+    'downgrade_to_review':      True,
+}

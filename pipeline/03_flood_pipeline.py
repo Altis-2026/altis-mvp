@@ -284,6 +284,21 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
                      .multiply(3.28084)
                      .rename('wse_spread_ft'))
 
+    # Round 3: DEM-hydrology signal — height above the local drainage, i.e. the
+    # ground elevation minus the minimum elevation in the neighborhood, in feet.
+    # Near 0 means the property sits in/near the local low (flooding plausible);
+    # a large value means it is perched well above any drainage (a confident SAR
+    # "flood" there is suspect). Independent of SAR/optical — a third ensemble
+    # vote. Uses the building-masked DEM so building roofs don't bias the min.
+    neigh_min = (dem.reduceNeighborhood(
+                     reducer=ee.Reducer.min(),
+                     kernel=ee.Kernel.circle(radius=wse_radius_m, units='meters'),
+                 )
+                 .reproject(crs='EPSG:4326', scale=30))
+    rel_elev_ft = (dem.subtract(neigh_min)
+                      .multiply(3.28084)
+                      .rename('rel_elev_ft'))
+
     # Urban density: GHS built surface > 1000 m2 per cell (2020 epoch, 100m res)
     urban = (ee.Image("JRC/GHSL/P2023A/GHS_BUILT_S/2020")
                .select('built_surface').gt(1000)
@@ -293,7 +308,8 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
     combined = (flood_mask.float().unmask(0)
                 .addBands(depth_ft.unmask(0))
                 .addBands(urban.float().unmask(0))
-                .addBands(wse_spread_ft.unmask(0)))
+                .addBands(wse_spread_ft.unmask(0))
+                .addBands(rel_elev_ft.unmask(0)))
 
     # Round 2: Sentinel-2 optical cross-check bands, if a cloud-free
     # observation was available in the post-event window. Both default to
@@ -354,6 +370,7 @@ def sample_properties(combined_image, properties_df, batch_size=100):
                         float(p.get('optical_valid_mean') or 0) >= OPTICAL['min_valid_fraction']),
                     'optical_water_pct': round(max(0.0, float(p.get('optical_water_mean') or 0)), 4),
                     'wse_spread_ft': round(max(0.0, float(p.get('wse_spread_ft_mean') or 0)), 3),
+                    'rel_elev_ft': round(max(0.0, float(p.get('rel_elev_ft_mean') or 0)), 3),
                 })
 
         except Exception as e:
@@ -377,6 +394,7 @@ def sample_properties(combined_image, properties_df, batch_size=100):
                             float(result.get('optical_valid_mean') or 0) >= OPTICAL['min_valid_fraction']),
                         'optical_water_pct': round(max(0.0, float(result.get('optical_water_mean') or 0)), 4),
                         'wse_spread_ft': round(max(0.0, float(result.get('wse_spread_ft_mean') or 0)), 3),
+                        'rel_elev_ft': round(max(0.0, float(result.get('rel_elev_ft_mean') or 0)), 3),
                     })
                     time.sleep(0.3)
                 except Exception:
@@ -385,7 +403,7 @@ def sample_properties(combined_image, properties_df, batch_size=100):
                         'address':     str(row['address']),
                         'pct_flooded': 0.0, 'max_depth_ft': 0.0, 'urban_flag': 0,
                         'optical_available': 0, 'optical_water_pct': 0.0,
-                        'wse_spread_ft': 0.0,
+                        'wse_spread_ft': 0.0, 'rel_elev_ft': 0.0,
                     })
 
         processed = min(batch_start + batch_size, len(properties_df))
@@ -438,7 +456,8 @@ def run_flood_pipeline(event_config):
 
     result_df = properties_df.merge(
         flood_df[['property_id', 'pct_flooded', 'max_depth_ft', 'urban_flag',
-                  'optical_available', 'optical_water_pct', 'wse_spread_ft']],
+                  'optical_available', 'optical_water_pct', 'wse_spread_ft',
+                  'rel_elev_ft']],
         on='property_id', how='left'
     )
     result_df['pct_flooded']         = result_df['pct_flooded'].fillna(0.0)
@@ -447,6 +466,7 @@ def run_flood_pipeline(event_config):
     result_df['optical_available']   = result_df['optical_available'].fillna(0).astype(int)
     result_df['optical_water_pct']   = result_df['optical_water_pct'].fillna(0.0)
     result_df['wse_spread_ft']       = result_df['wse_spread_ft'].fillna(0.0)
+    result_df['rel_elev_ft']         = result_df['rel_elev_ft'].fillna(0.0)
     result_df['dem_resolution_m']    = dem_res
 
     # Round 3: per-depth ±1σ uncertainty interval, from DEM vertical accuracy

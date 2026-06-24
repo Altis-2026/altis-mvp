@@ -7,6 +7,8 @@ triage_notes = load_pipeline_module("04_triage_notes.py")
 calculate_confidence = triage_notes.calculate_confidence
 confidence_breakdown = triage_notes.confidence_breakdown
 classify_triage = triage_notes.classify_triage
+ensemble_votes = triage_notes.ensemble_votes
+ensemble_disagreement = triage_notes.ensemble_disagreement
 
 
 def test_confidence_score_is_clamped_to_30_97():
@@ -129,6 +131,55 @@ def test_breakdown_surfaces_named_factors_with_reasons():
     for f in b['factors']:
         assert f['reason'] and isinstance(f['reason'], str)
         assert f['delta'] != 0
+
+
+# ── Ensemble disagreement → Review ───────────────────────────────────────────
+
+def test_ensemble_sar_only_never_disagrees():
+    # No optical, no DEM signal -> SAR is the only voter -> cannot disagree.
+    row = {"pct_flooded": 0.5}
+    disagree, _reason, votes = ensemble_disagreement(row)
+    assert votes["optical"] == "abstain"
+    assert votes["dem_hydrology"] == "abstain"
+    assert disagree is False
+
+
+def test_ensemble_sar_flood_optical_dry_disagrees():
+    row = {"pct_flooded": 0.5, "optical_available": 1, "optical_water_pct": 0.0}
+    disagree, reason, votes = ensemble_disagreement(row)
+    assert votes["sar"] == "flood" and votes["optical"] == "dry"
+    assert disagree is True
+    assert "disagree" in reason.lower()
+
+
+def test_ensemble_sar_flood_on_high_ground_disagrees():
+    # SAR says flooded but property is perched well above local drainage.
+    row = {"pct_flooded": 0.5, "rel_elev_ft": 25.0}
+    disagree, _reason, votes = ensemble_disagreement(row)
+    assert votes["dem_hydrology"] == "dry"
+    assert disagree is True
+
+
+def test_ensemble_all_agree_flood_no_disagreement():
+    row = {"pct_flooded": 0.5, "optical_available": 1, "optical_water_pct": 0.5,
+           "rel_elev_ft": 1.0}
+    disagree, _reason, votes = ensemble_disagreement(row)
+    assert set(votes.values()) == {"flood"}
+    assert disagree is False
+
+
+def test_ensemble_sar_dry_optical_flood_disagrees():
+    row = {"pct_flooded": 0.0, "optical_available": 1, "optical_water_pct": 0.4}
+    disagree, _reason, votes = ensemble_disagreement(row)
+    assert votes["sar"] == "dry" and votes["optical"] == "flood"
+    assert disagree is True
+
+
+def test_ensemble_dem_abstains_in_ambiguous_band():
+    # rel_elev between plausible and implausible thresholds -> abstain.
+    row = {"pct_flooded": 0.5, "rel_elev_ft": 10.0}
+    _disagree, _reason, votes = ensemble_disagreement(row)
+    assert votes["dem_hydrology"] == "abstain"
 
 
 # Note: pct_flooded is a 0-1 fraction here too — classify_triage runs before
