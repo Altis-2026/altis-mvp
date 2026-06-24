@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Bump when triage logic, confidence scoring, or the flood-detection algorithm
+# changes meaningfully — recorded in each run's manifest for audit/lineage.
+PIPELINE_VERSION = '1.0.0'
+
 # ─── GOOGLE EARTH ENGINE ─────────────────────────────────────────────────────
 GEE_PROJECT = 'altis-mvp'  # <-- change this to your project ID
 
@@ -18,6 +22,8 @@ OUTPUT_DIR = os.path.join(BASE_DIR, 'outputs')
 HARVEY = {
     'event_name':         'Hurricane Harvey',
     'event_id':           'harvey',
+    'label':              'Hurricane Harvey',
+    'sub':                'Harris County, TX  •  August 2017',
     'county':             'Harris County, TX',
     'pre_start':          '2017-08-01',
     'pre_end':            '2017-08-24',
@@ -29,12 +35,17 @@ HARVEY = {
     'days_since_event':   3,
     'wse_radius_m':       300,    # Water surface elevation focal radius — tighter for rainfall flooding
     'cost_per_inspection': 750,
+    'lat':                29.700,
+    'lon':               -95.500,
+    'zoom':               10,
 }
 
 # ─── HURRICANE IAN CONFIGURATION ─────────────────────────────────────────────
 IAN = {
     'event_name':         'Hurricane Ian',
     'event_id':           'ian',
+    'label':              'Hurricane Ian',
+    'sub':                'Charlotte County, FL  •  September 2022',
     'county':             'Charlotte County, FL',
     'pre_start':          '2022-09-01',
     'pre_end':            '2022-09-25',
@@ -46,6 +57,24 @@ IAN = {
     'days_since_event':   2,
     'wse_radius_m':       600,    # Wider for storm surge (more spatially uniform WSE)
     'cost_per_inspection': 750,
+    'lat':                26.970,
+    'lon':               -82.050,
+    'zoom':               10,
+}
+
+# ─── EVENT REGISTRY ───────────────────────────────────────────────────────────
+# Single source of truth for which events the backend/frontend can serve.
+# Add a new storm by adding its config dict above and registering it here.
+EVENTS = {
+    cfg['event_id']: {
+        'id':    cfg['event_id'],
+        'label': cfg['label'],
+        'sub':   cfg['sub'],
+        'lat':   cfg['lat'],
+        'lon':   cfg['lon'],
+        'zoom':  cfg['zoom'],
+    }
+    for cfg in (HARVEY, IAN)
 }
 
 # ─── TRIAGE THRESHOLDS ────────────────────────────────────────────────────────

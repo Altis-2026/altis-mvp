@@ -9,7 +9,8 @@ import pandas as pd
 from openai import OpenAI
 import json
 import time
-from config import OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR
+from config import OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR, PIPELINE_VERSION
+from provenance import write_manifest
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -251,6 +252,17 @@ def run_triage_pipeline(event_config):
     out = os.path.join(OUTPUT_DIR, f"{event_id}_final.csv")
     final_df.to_csv(out, index=False)
     print(f"\n✓ Saved → {out}")
+
+    write_manifest(event_id, 'triage', {
+        'pipeline_version':  PIPELINE_VERSION,
+        'triage_thresholds': TRIAGE,
+        'category_counts':   {cat: int(counts.get(cat, 0))
+                               for cat in ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review']},
+        'estimated_savings_usd': savings,
+        'remote_resolution_count': remote_count,
+        'cost_per_inspection_usd': event_config['cost_per_inspection'],
+    })
+
     return final_df
 
 

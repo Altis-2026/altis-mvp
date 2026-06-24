@@ -36,6 +36,7 @@ from backend.database import (
 )
 from backend.geocoder import geocode_batch
 from backend.gee_service import get_flood_tile_url, get_sar_thumbnails
+from pipeline.config import EVENTS
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
@@ -47,26 +48,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Event metadata
-EVENTS = {
-    "harvey": {
-        "id":    "harvey",
-        "label": "Hurricane Harvey",
-        "sub":   "Harris County, TX  •  August 2017",
-        "lat":   29.700,
-        "lon":  -95.500,
-        "zoom":  10,
-    },
-    "ian": {
-        "id":    "ian",
-        "label": "Hurricane Ian",
-        "sub":   "Charlotte County, FL  •  September 2022",
-        "lat":   26.970,
-        "lon":  -82.050,
-        "zoom":  10,
-    },
-}
 
 # GEE tile URL cache (generated once per server start if GEE available)
 _tile_cache: dict = {}

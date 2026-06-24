@@ -8,6 +8,7 @@ import pandas as pd
 import random
 import time
 from config import HARVEY, IAN, OUTPUT_DIR
+from provenance import write_manifest
 
 random.seed(42)
 
@@ -202,6 +203,15 @@ def build_property_list(event_config, target=1000):
     df = df[['property_id', 'address', 'latitude', 'longitude']]
 
     print(f"  Final: {len(df)} unique properties")
+
+    write_manifest(event_id, 'properties', {
+        'study_name':       event_config['study_name'],
+        'bbox':             bbox,
+        'target_count':     target,
+        'property_count':   len(df),
+        'source':           'OpenStreetMap Overpass API',
+    })
+
     return df
 
 

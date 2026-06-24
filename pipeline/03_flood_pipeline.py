@@ -14,6 +14,7 @@ import pandas as pd
 import time
 from collections import Counter
 from config import GEE_PROJECT, HARVEY, IAN, OUTPUT_DIR
+from provenance import write_manifest
 
 ee.Initialize(project=GEE_PROJECT)
 
@@ -317,6 +318,24 @@ def run_flood_pipeline(event_config):
     out = os.path.join(OUTPUT_DIR, f"{event_id}_raw.csv")
     result_df.to_csv(out, index=False)
     print(f"\n✓ Saved → {out}")
+
+    write_manifest(event_id, 'flood_detection', {
+        'dem_resolution_m':      dem_res,
+        'sar_orbit_pass':        orbit,
+        'pre_event_scene_count': pre_count,
+        'post_event_scene_count': post_count,
+        'pre_event_window':      [event_config['pre_start'], event_config['pre_end']],
+        'post_event_window':     [event_config['post_start'], event_config['post_end']],
+        'wse_radius_m':          event_config['wse_radius_m'],
+        'threshold_method':      'Otsu adaptive',
+        'slope_mask_max_degrees': 5,
+        'permanent_water_dataset': 'JRC/GSW1_4/GlobalSurfaceWater (seasonality >= 8mo)',
+        'building_mask_dataset': 'GOOGLE/Research/open-buildings/v3',
+        'urban_density_dataset': 'JRC/GHSL/P2023A/GHS_BUILT_S/10',
+        'flooded_property_count': int(flooded),
+        'urban_property_count':  int(urban),
+    })
+
     return result_df
 
 
