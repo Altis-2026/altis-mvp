@@ -118,3 +118,22 @@ SAR = {
     # single-family home never reports a 40-foot flood.
     'max_plausible_depth_ft': 20.0,
 }
+
+# ─── OPTICAL CROSS-CHECK PARAMETERS (Round 2) ────────────────────────────────
+# Sentinel-2 MNDWI is used as an independent second sensor to confirm or
+# contradict the SAR flood call. SAR alone is prone to false positives in
+# urban canyons (radar shadow/double-bounce looks like water) and on smooth
+# surfaces (runways, wet pavement). Optical is advisory only — clouds are the
+# norm right after a hurricane, so this never blocks detection, it only
+# refines confidence in Step 4 when a cloud-free observation exists.
+OPTICAL = {
+    'max_cloud_pct':       40,    # Skip S2 scenes cloudier than this (CLOUDY_PIXEL_PERCENTAGE)
+    'water_mndwi_min':      0.0,  # MNDWI > 0 indicates open water
+    'min_valid_fraction':   0.5,  # Min cloud-free fraction of a property buffer to trust optical
+    'sar_flood_pct':        0.10, # pct_flooded above which SAR is considered to say "flooded"
+    'water_confirm_pct':    0.10, # optical_water_pct above which optical is considered to say "water"
+    'water_contradict_pct': 0.05, # optical_water_pct below which optical is considered to say "dry"
+    'confirm_bonus':        10,   # Confidence bonus when SAR + optical agree on flood
+    'confirm_dry_bonus':     6,   # Confidence bonus when SAR + optical agree on dry
+    'contradict_penalty':  -12,   # Confidence penalty when optical contradicts a SAR flood call
+}

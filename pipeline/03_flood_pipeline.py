@@ -13,7 +13,7 @@ import ee
 import pandas as pd
 import time
 from collections import Counter
-from config import GEE_PROJECT, HARVEY, IAN, OUTPUT_DIR, SAR
+from config import GEE_PROJECT, HARVEY, IAN, OUTPUT_DIR, SAR, OPTICAL
 from provenance import write_manifest
 
 ee.Initialize(project=GEE_PROJECT)
@@ -164,7 +164,50 @@ def load_sar_composite(bbox_coords, start_date, end_date, orbit_pass=None,
     return composite, count, orbit_pass
 
 
-def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_m):
+def load_optical_water_mask(bbox_coords, start_date, end_date):
+    """
+    Sentinel-2 MNDWI water mask — an independent second sensor used to
+    confirm or contradict the SAR flood call (Round 2 multi-sensor fusion).
+    SAR alone is prone to false positives in urban canyons (radar shadow and
+    double-bounce return look like water) and on smooth surfaces (runways,
+    wet pavement, bare soil). Optical confirmation catches those.
+
+    This is advisory only: cloud cover is the norm in the days right after a
+    hurricane, so most properties will have no usable optical observation.
+    Returns (water_mask, valid_mask, scene_count); water_mask/valid_mask are
+    None if no scene in the window passes the cloud filter at all.
+    """
+    bbox = ee.Geometry.Rectangle(bbox_coords)
+    collection = (ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        .filterBounds(bbox)
+        .filterDate(start_date, end_date)
+        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', OPTICAL['max_cloud_pct'])))
+
+    count = collection.size().getInfo()
+    if count == 0:
+        return None, None, 0
+
+    # SCL classes: 3=cloud shadow, 8/9=cloud medium/high prob, 10=thin cirrus,
+    # 11=snow/ice. Mask all of them out before computing MNDWI.
+    def mask_clouds(img):
+        scl = img.select('SCL')
+        clear = (scl.neq(3).And(scl.neq(8)).And(scl.neq(9))
+                    .And(scl.neq(10)).And(scl.neq(11)))
+        mndwi = img.normalizedDifference(['B3', 'B11']).rename('mndwi')
+        return img.addBands(mndwi).updateMask(clear)
+
+    masked = collection.map(mask_clouds)
+    mndwi_median = masked.select('mndwi').median()
+    obs_count = masked.select('mndwi').count()
+
+    water_mask = mndwi_median.gt(OPTICAL['water_mndwi_min']).rename('optical_water')
+    valid_mask = obs_count.gte(1).rename('optical_valid')
+
+    return water_mask, valid_mask, count
+
+
+def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_m,
+                             optical_water=None, optical_valid=None):
     """
     Generate 3-band image: ['flood', 'depth_ft', 'urban']
     - flood:    binary 1=newly flooded
@@ -233,15 +276,32 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
                .rename('urban').unmask(0))
 
     # Combine with 0-filled nodata
-    return (flood_mask.float().unmask(0)
-            .addBands(depth_ft.unmask(0))
-            .addBands(urban.float().unmask(0)))
+    combined = (flood_mask.float().unmask(0)
+                .addBands(depth_ft.unmask(0))
+                .addBands(urban.float().unmask(0)))
+
+    # Round 2: Sentinel-2 optical cross-check bands, if a cloud-free
+    # observation was available in the post-event window. Both default to
+    # 0 (no confirmation, no valid observation) wherever optical is missing
+    # — this never blocks detection, it only adds confidence signal later.
+    if optical_water is not None:
+        combined = combined.addBands(optical_water.float().unmask(0))
+    else:
+        combined = combined.addBands(ee.Image(0).rename('optical_water').float())
+    if optical_valid is not None:
+        combined = combined.addBands(optical_valid.float().unmask(0))
+    else:
+        combined = combined.addBands(ee.Image(0).rename('optical_valid').float())
+
+    return combined
 
 
 def sample_properties(combined_image, properties_df, batch_size=100):
     """
-    Sample flood fraction, max depth, urban flag at each property (50m buffer).
-    Returns DataFrame: property_id, address, pct_flooded, max_depth_ft, urban_flag
+    Sample flood fraction, max depth, urban flag, optical cross-check at each
+    property (50m buffer).
+    Returns DataFrame: property_id, address, pct_flooded, max_depth_ft,
+    urban_flag, optical_available, optical_water_pct
     """
     print(f"  Sampling {len(properties_df)} properties in batches of {batch_size}...")
 
@@ -275,6 +335,9 @@ def sample_properties(combined_image, properties_df, batch_size=100):
                     'pct_flooded':  round(max(0.0, float(p.get('flood_mean') or 0)), 4),
                     'max_depth_ft': round(max(0.0, float(p.get('depth_ft_max') or 0)), 2),
                     'urban_flag':   int(round(float(p.get('urban_mean') or 0))),
+                    'optical_available': int(
+                        float(p.get('optical_valid_mean') or 0) >= OPTICAL['min_valid_fraction']),
+                    'optical_water_pct': round(max(0.0, float(p.get('optical_water_mean') or 0)), 4),
                 })
 
         except Exception as e:
@@ -294,6 +357,9 @@ def sample_properties(combined_image, properties_df, batch_size=100):
                         'pct_flooded':  round(max(0.0, float(result.get('flood_mean') or 0)), 4),
                         'max_depth_ft': round(max(0.0, float(result.get('depth_ft_max') or 0)), 2),
                         'urban_flag':   int(round(float(result.get('urban_mean') or 0))),
+                        'optical_available': int(
+                            float(result.get('optical_valid_mean') or 0) >= OPTICAL['min_valid_fraction']),
+                        'optical_water_pct': round(max(0.0, float(result.get('optical_water_mean') or 0)), 4),
                     })
                     time.sleep(0.3)
                 except Exception:
@@ -301,6 +367,7 @@ def sample_properties(combined_image, properties_df, batch_size=100):
                         'property_id': str(row['property_id']),
                         'address':     str(row['address']),
                         'pct_flooded': 0.0, 'max_depth_ft': 0.0, 'urban_flag': 0,
+                        'optical_available': 0, 'optical_water_pct': 0.0,
                     })
 
         processed = min(batch_start + batch_size, len(properties_df))
@@ -334,27 +401,49 @@ def run_flood_pipeline(event_config):
         orbit_pass=orbit)
     print(f"  {post_count} scenes")
 
+    print("Loading Sentinel-2 optical cross-check (post-event window)...")
+    optical_water, optical_valid, optical_count = load_optical_water_mask(
+        event_config['bbox'], event_config['post_start'], event_config['post_end'])
+    if optical_count > 0:
+        print(f"  {optical_count} cloud-filtered S2 scenes available for cross-check")
+    else:
+        print("  No cloud-free S2 scenes in window — optical cross-check unavailable "
+              "(expected immediately after a storm; SAR-only result is unaffected)")
+
     print("\nBuilding flood map (Otsu threshold + slope mask)...")
     combined = build_flood_depth_image(
-        event_config['bbox'], pre_image, post_image, dem, event_config['wse_radius_m'])
+        event_config['bbox'], pre_image, post_image, dem, event_config['wse_radius_m'],
+        optical_water=optical_water, optical_valid=optical_valid)
 
     print("\nSampling properties...")
     flood_df = sample_properties(combined, properties_df, batch_size=100)
 
     result_df = properties_df.merge(
-        flood_df[['property_id', 'pct_flooded', 'max_depth_ft', 'urban_flag']],
+        flood_df[['property_id', 'pct_flooded', 'max_depth_ft', 'urban_flag',
+                  'optical_available', 'optical_water_pct']],
         on='property_id', how='left'
     )
-    result_df['pct_flooded']      = result_df['pct_flooded'].fillna(0.0)
-    result_df['max_depth_ft']     = result_df['max_depth_ft'].fillna(0.0)
-    result_df['urban_flag']       = result_df['urban_flag'].fillna(0).astype(int)
-    result_df['dem_resolution_m'] = dem_res
+    result_df['pct_flooded']         = result_df['pct_flooded'].fillna(0.0)
+    result_df['max_depth_ft']        = result_df['max_depth_ft'].fillna(0.0)
+    result_df['urban_flag']          = result_df['urban_flag'].fillna(0).astype(int)
+    result_df['optical_available']   = result_df['optical_available'].fillna(0).astype(int)
+    result_df['optical_water_pct']   = result_df['optical_water_pct'].fillna(0.0)
+    result_df['dem_resolution_m']    = dem_res
 
     flooded = (result_df['max_depth_ft'] > 0.1).sum()
     urban   = (result_df['urban_flag'] == 1).sum()
+    optical_avail = (result_df['optical_available'] == 1).sum()
+    contradicted = ((result_df['optical_available'] == 1) &
+                     (result_df['pct_flooded'] >= OPTICAL['sar_flood_pct']) &
+                     (result_df['optical_water_pct'] < OPTICAL['water_contradict_pct'])).sum()
     print(f"\nSummary:")
     print(f"  Flooded:      {flooded:,} ({flooded/len(result_df)*100:.1f}%)")
     print(f"  Urban zones:  {urban:,} (confidence penalty applied in Step 4)")
+    print(f"  Optical cross-check available: {optical_avail:,} properties "
+          f"({optical_avail/len(result_df)*100:.1f}%)")
+    if optical_avail > 0:
+        print(f"  SAR/optical contradictions:    {contradicted:,} "
+              f"(likely SAR false positives — penalized in Step 4)")
     if flooded > 0:
         avg = result_df[result_df['max_depth_ft'] > 0.1]['max_depth_ft'].mean()
         print(f"  Avg depth:    {avg:.2f} ft (building-masked {dem_res}m DEM)")
@@ -383,6 +472,11 @@ def run_flood_pipeline(event_config):
         'urban_density_dataset': 'JRC/GHSL/P2023A/GHS_BUILT_S/2020',
         'flooded_property_count': int(flooded),
         'urban_property_count':  int(urban),
+        'optical_dataset':       'COPERNICUS/S2_SR_HARMONIZED (MNDWI, SCL cloud mask)',
+        'optical_max_cloud_pct': OPTICAL['max_cloud_pct'],
+        'optical_scene_count':   optical_count,
+        'optical_available_property_count': int(optical_avail),
+        'sar_optical_contradiction_count':  int(contradicted),
     })
 
     return result_df

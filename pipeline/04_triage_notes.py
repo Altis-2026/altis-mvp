@@ -9,7 +9,7 @@ import pandas as pd
 from openai import OpenAI
 import json
 import time
-from config import OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR, PIPELINE_VERSION
+from config import OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR, PIPELINE_VERSION, OPTICAL
 from provenance import write_manifest
 
 client = OpenAI(
@@ -28,10 +28,19 @@ def calculate_confidence(row, event_config):
     - Coverage coherence (high or very low coverage = more certain signal)
     - Internal consistency (depth vs coverage contradiction = penalty)
     - Urban SAR shadow zone (-15pts for dense urban areas from Step 3)
+    - Sentinel-2 optical cross-check (Round 2): confirms or contradicts the
+      SAR call when a cloud-free observation exists for this property.
 
     The urban penalty is the key new factor. In dense building environments,
     SAR shadow artifacts create dark pixels that look like water. A property
     at 0.4ft depth in a dense urban core should be reviewed, not remotely denied.
+
+    The optical cross-check is a second, independent sensor used to catch the
+    same kind of SAR false positive: if Sentinel-2 shows clear, dry ground at
+    a property SAR flagged as flooded, that is strong evidence the SAR signal
+    is a radar artifact, not real water. Conversely, when both sensors agree,
+    confidence goes up. Optical is usually unavailable right after a storm
+    (clouds) — when so, this factor contributes nothing, never a penalty.
     """
     score = 65  # Base score
     depth = row['max_depth_ft']
@@ -73,6 +82,24 @@ def calculate_confidence(row, event_config):
     urban_flag = int(row.get('urban_flag', 0))
     if urban_flag == 1:
         score -= 15
+
+    # ── Sentinel-2 optical cross-check (Round 2)
+    # Only applies when a cloud-free observation actually exists at this
+    # property; otherwise it's a no-op, since clouds are the norm right
+    # after a hurricane and absence of optical data is not evidence either way.
+    optical_available = int(row.get('optical_available', 0))
+    if optical_available == 1:
+        optical_water_pct = float(row.get('optical_water_pct', 0.0))
+        sar_says_flooded  = pct >= OPTICAL['sar_flood_pct']
+        optical_says_water = optical_water_pct >= OPTICAL['water_confirm_pct']
+        optical_says_dry    = optical_water_pct < OPTICAL['water_contradict_pct']
+
+        if sar_says_flooded and optical_says_water:
+            score += OPTICAL['confirm_bonus']       # Both sensors agree: flooded
+        elif sar_says_flooded and optical_says_dry:
+            score += OPTICAL['contradict_penalty']  # SAR flood call, optical clear — likely SAR artifact
+        elif not sar_says_flooded and optical_says_dry:
+            score += OPTICAL['confirm_dry_bonus']   # Both sensors agree: dry
 
     return max(30, min(97, int(score)))
 
@@ -217,6 +244,14 @@ def run_triage_pipeline(event_config):
         df['urban_flag'] = 0
         print("  Note: urban_flag not found — run 03_flood_pipeline.py to add it")
 
+    # Backward compat: if optical columns not in raw CSV (pre-Round-2 pipeline),
+    # default to "unavailable" — contributes nothing to confidence, same as
+    # any property where Sentinel-2 was cloud-blocked.
+    if 'optical_available' not in df.columns:
+        df['optical_available'] = 0
+        df['optical_water_pct'] = 0.0
+        print("  Note: optical cross-check columns not found — run 03_flood_pipeline.py to add them")
+
     print("\nStep 1: Confidence scores (with urban SAR penalty)...")
     df['confidence_score'] = df.apply(
         lambda r: calculate_confidence(r, event_config), axis=1)
@@ -248,7 +283,7 @@ def run_triage_pipeline(event_config):
     final_cols = [
         'property_id', 'address', 'pct_flooded', 'max_depth_ft',
         'impact_class', 'confidence_score', 'recommended_action',
-        'adjuster_note', 'urban_flag'
+        'adjuster_note', 'urban_flag', 'optical_available', 'optical_water_pct'
     ]
     final_df = df[[c for c in final_cols if c in df.columns]].copy()
 
@@ -264,6 +299,8 @@ def run_triage_pipeline(event_config):
         'estimated_savings_usd': savings,
         'remote_resolution_count': remote_count,
         'cost_per_inspection_usd': event_config['cost_per_inspection'],
+        'optical_cross_check':    OPTICAL,
+        'optical_available_count': int((df['optical_available'] == 1).sum()),
     })
 
     return final_df

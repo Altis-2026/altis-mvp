@@ -1,6 +1,6 @@
 import pytest
 
-from config import HARVEY, TRIAGE
+from config import HARVEY, TRIAGE, OPTICAL
 from tests.conftest import load_pipeline_module
 
 triage_notes = load_pipeline_module("04_triage_notes.py")
@@ -52,6 +52,45 @@ def test_confidence_internal_inconsistency_penalty_fires_on_fraction_scale():
     suspicious = {"max_depth_ft": 3.0, "pct_flooded": 0.04, "urban_flag": 0}  # deep, tiny area
     coherent = {"max_depth_ft": 3.0, "pct_flooded": 0.70, "urban_flag": 0}    # deep, extensive
     assert calculate_confidence(suspicious, HARVEY) < calculate_confidence(coherent, HARVEY)
+
+
+def test_confidence_unaffected_when_optical_unavailable():
+    """
+    No cloud-free Sentinel-2 observation (the norm right after a storm) must
+    be a no-op — same score as a row that omits the optical columns entirely
+    (pre-Round-2 backward compatibility).
+    """
+    row_no_optical = {"max_depth_ft": 0.4, "pct_flooded": 0.30, "urban_flag": 0}
+    row_unavailable = {"max_depth_ft": 0.4, "pct_flooded": 0.30, "urban_flag": 0,
+                        "optical_available": 0, "optical_water_pct": 0.9}
+    assert calculate_confidence(row_no_optical, HARVEY) == calculate_confidence(row_unavailable, HARVEY)
+
+
+def test_confidence_boosted_when_sar_and_optical_agree_flooded():
+    base = {"max_depth_ft": 1.0, "pct_flooded": 0.30, "urban_flag": 0}
+    confirmed = {**base, "optical_available": 1, "optical_water_pct": 0.50}
+    assert calculate_confidence(confirmed, HARVEY) == (
+        calculate_confidence(base, HARVEY) + OPTICAL['confirm_bonus'])
+
+
+def test_confidence_penalized_when_optical_contradicts_sar_flood_call():
+    """
+    SAR flags flooding but a cloud-free Sentinel-2 observation shows dry
+    ground — the classic SAR false positive (radar shadow / smooth surface).
+    This must be penalized harder than the case with no optical data at all.
+    """
+    base = {"max_depth_ft": 1.0, "pct_flooded": 0.30, "urban_flag": 0}
+    contradicted = {**base, "optical_available": 1, "optical_water_pct": 0.0}
+    assert calculate_confidence(contradicted, HARVEY) == (
+        calculate_confidence(base, HARVEY) + OPTICAL['contradict_penalty'])
+    assert calculate_confidence(contradicted, HARVEY) < calculate_confidence(base, HARVEY)
+
+
+def test_confidence_boosted_when_sar_and_optical_agree_dry():
+    base = {"max_depth_ft": 0.0, "pct_flooded": 0.0, "urban_flag": 0}
+    confirmed_dry = {**base, "optical_available": 1, "optical_water_pct": 0.0}
+    assert calculate_confidence(confirmed_dry, HARVEY) == (
+        calculate_confidence(base, HARVEY) + OPTICAL['confirm_dry_bonus'])
 
 
 # Note: pct_flooded is a 0-1 fraction here too — classify_triage runs before
