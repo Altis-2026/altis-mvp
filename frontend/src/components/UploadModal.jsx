@@ -1,17 +1,38 @@
 import { useState, useRef, useCallback } from 'react';
 import { api } from '../services/api.js';
 
+const ACCEPTED_EXT = ['.csv', '.xlsx', '.xls', '.pdf'];
+
+const FIELDS = [
+  { key: 'address',         label: 'Address',         required: true },
+  { key: 'policy_number',   label: 'Policy Number',   required: false },
+  { key: 'coverage_amount', label: 'Coverage Amount', required: false },
+  { key: 'city',            label: 'City',            required: false },
+  { key: 'state',           label: 'State',           required: false },
+  { key: 'zip',             label: 'ZIP',              required: false },
+];
+
+function confidenceColor(confidence) {
+  if (confidence >= 0.8) return { color: '#4CAF82', bg: 'rgba(76,175,130,0.1)',  border: 'rgba(76,175,130,0.25)' };
+  if (confidence >= 0.5) return { color: '#FFB347', bg: 'rgba(255,179,71,0.1)',  border: 'rgba(255,179,71,0.25)' };
+  return                          { color: '#3A5060', bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)' };
+}
+
 export default function UploadModal({ events, onClose, onSuccess }) {
   const [dragging,   setDragging]   = useState(false);
   const [file,       setFile]       = useState(null);
-  const [status,     setStatus]     = useState('idle'); // idle | uploading | success | error
+  const [status,     setStatus]     = useState('idle'); // idle | uploading | preview | confirming | success | error
+  const [uploadData, setUploadData] = useState(null);
+  const [mapping,    setMapping]    = useState({});
   const [result,     setResult]     = useState(null);
   const [errorMsg,   setErrorMsg]   = useState('');
   const inputRef = useRef(null);
 
   const handleFile = useCallback((f) => {
-    if (!f || !f.name.endsWith('.csv')) {
-      setErrorMsg('Please upload a CSV file.');
+    if (!f) return;
+    const ok = ACCEPTED_EXT.some(ext => f.name.toLowerCase().endsWith(ext));
+    if (!ok) {
+      setErrorMsg('Please upload a .csv, .xlsx, .xls, or .pdf file.');
       return;
     }
     setFile(f);
@@ -32,11 +53,31 @@ export default function UploadModal({ events, onClose, onSuccess }) {
 
     try {
       const data = await api.uploadPortfolio(file);
-      setResult(data);
-      setStatus('success');
+      const initialMapping = {};
+      for (const field of Object.keys(data.suggested_mapping || {})) {
+        initialMapping[field] = data.suggested_mapping[field].matched_column;
+      }
+      setUploadData(data);
+      setMapping(initialMapping);
+      setStatus('preview');
     } catch (err) {
       setErrorMsg(err.detail || 'Upload failed. Check file format and try again.');
       setStatus('error');
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!uploadData) return;
+    setStatus('confirming');
+    setErrorMsg('');
+
+    try {
+      const data = await api.confirmPortfolioUpload(uploadData.upload_id, mapping);
+      setResult(data);
+      setStatus('success');
+    } catch (err) {
+      setErrorMsg(err.detail || 'Confirm failed. Check your column mapping and try again.');
+      setStatus('preview');
     }
   };
 
@@ -53,6 +94,10 @@ export default function UploadModal({ events, onClose, onSuccess }) {
     a.download = 'altis_portfolio_template.csv';
     a.click();
   };
+
+  const usedColumns = new Set(Object.values(mapping).filter(Boolean));
+  const canConfirm = !!mapping.address;
+  const modalWidth = status === 'preview' || status === 'confirming' ? 640 : 500;
 
   return (
     /* Backdrop */
@@ -71,13 +116,16 @@ export default function UploadModal({ events, onClose, onSuccess }) {
         className="anim-slide-in-up"
         onClick={e => e.stopPropagation()}
         style={{
-          width:     500,
+          width:     modalWidth,
+          maxHeight: '85vh',
+          overflowY: 'auto',
           background: 'rgba(6,8,16,0.97)',
           border:    '1px solid rgba(255,255,255,0.08)',
           borderRadius: 'var(--r-xl)',
           backdropFilter: 'blur(24px)',
           padding:   32,
           pointerEvents: 'all',
+          transition: 'width 0.2s ease',
         }}
       >
 
@@ -88,10 +136,12 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               Portfolio Analysis
             </div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
-              Upload Carrier Portfolio
+              {status === 'preview' || status === 'confirming' ? 'Review Column Mapping' : 'Upload Carrier Portfolio'}
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
-              Upload your policy CSV and we'll geocode every property, fly the globe to your coverage area, and analyze against our satellite flood data.
+              {status === 'preview' || status === 'confirming'
+                ? "Confirm how Altis mapped your columns before we geocode. Override any field that looks wrong."
+                : "Upload a CSV, Excel, or PDF policy file and we'll geocode every property, fly the globe to your coverage area, and analyze against our satellite flood data."}
             </p>
           </div>
           <button onClick={onClose} style={{
@@ -126,7 +176,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               <input
                 ref={inputRef}
                 type="file"
-                accept=".csv"
+                accept={ACCEPTED_EXT.join(',')}
                 style={{ display: 'none' }}
                 onChange={e => handleFile(e.target.files?.[0])}
               />
@@ -145,10 +195,10 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 <>
                   <div style={{ fontSize: '2rem', marginBottom: 10 }}>⬆</div>
                   <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                    Drop your CSV here or click to browse
+                    Drop your file here or click to browse
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Columns: policy_number, address, coverage_amount
+                    .csv, .xlsx, .xls, or .pdf — any column layout
                   </div>
                 </>
               )}
@@ -196,7 +246,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               onMouseEnter={e => { if (file) e.currentTarget.style.background = '#BEE0EF'; }}
               onMouseLeave={e => { if (file) e.currentTarget.style.background = '#A8D4E6'; }}
             >
-              Geocode + Analyze Portfolio
+              Parse File
             </button>
           </>
         ) : status === 'uploading' ? (
@@ -209,10 +259,148 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               margin: '0 auto 16px',
             }} />
             <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff', marginBottom: 6 }}>
-              Geocoding addresses…
+              Parsing file…
             </div>
             <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-              Using US Census TIGER geocoder
+              Detecting columns and standardizing addresses
+            </div>
+          </div>
+        ) : (status === 'preview' || status === 'confirming') && uploadData ? (
+          /* Mapping review state */
+          <div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 14 }}>
+              {uploadData.row_count} row{uploadData.row_count === 1 ? '' : 's'} parsed from <strong style={{ color: '#fff' }}>{uploadData.filename}</strong>
+            </div>
+
+            {/* Mapping table */}
+            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', marginBottom: 16 }}>
+              {FIELDS.map((f, i) => {
+                const suggestion = uploadData.suggested_mapping?.[f.key];
+                const confidence = suggestion?.confidence ?? 0;
+                const colors = confidenceColor(mapping[f.key] ? confidence : 0);
+                return (
+                  <div key={f.key} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                    background: 'rgba(255,255,255,0.015)',
+                  }}>
+                    <div style={{ fontSize: '0.78rem', color: '#fff', fontWeight: 600 }}>
+                      {f.label}{f.required && <span style={{ color: '#FF4444' }}> *</span>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <select
+                        value={mapping[f.key] || ''}
+                        onChange={e => setMapping(m => ({ ...m, [f.key]: e.target.value || null }))}
+                        style={{
+                          background: 'rgba(0,0,0,0.3)', color: '#fff',
+                          border: `1px solid ${colors.border}`, borderRadius: 'var(--r-sm)',
+                          padding: '5px 8px', fontSize: '0.74rem', fontFamily: 'var(--font)',
+                          minWidth: 160, cursor: 'pointer',
+                        }}
+                      >
+                        <option value="">— Not mapped —</option>
+                        {uploadData.columns.map(col => (
+                          <option key={col} value={col}>{col}</option>
+                        ))}
+                      </select>
+                      {mapping[f.key] && (
+                        <span style={{
+                          fontSize: '0.64rem', fontWeight: 700, padding: '3px 7px',
+                          borderRadius: 'var(--r-sm)', color: colors.color,
+                          background: colors.bg, border: `1px solid ${colors.border}`,
+                        }}>
+                          {Math.round(confidence * 100)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Flagged addresses callout */}
+            {uploadData.flagged_count > 0 && (
+              <div style={{
+                padding: '10px 14px', marginBottom: 16,
+                background: 'rgba(255,179,71,0.08)', border: '1px solid rgba(255,179,71,0.2)',
+                borderRadius: 'var(--r-md)', fontSize: '0.76rem', color: '#FFB347',
+              }}>
+                {uploadData.flagged_count} address{uploadData.flagged_count === 1 ? '' : 'es'} didn't standardize cleanly — they'll still be geocoded, but double-check them after confirming.
+              </div>
+            )}
+
+            {/* Preview table */}
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+              Preview
+            </div>
+            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflowX: 'auto', marginBottom: 20, maxHeight: 220, overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    <th style={previewTh}>Policy #</th>
+                    <th style={previewTh}>Address</th>
+                    <th style={previewTh}>Standardized</th>
+                    <th style={previewTh}>Coverage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {uploadData.preview_rows.slice(0, 8).map((row, i) => (
+                    <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                      <td style={previewTd}>{row.policy_number || '—'}</td>
+                      <td style={previewTd}>{row.address || '—'}</td>
+                      <td style={{ ...previewTd, color: row.address_confidence < 0.5 ? '#FFB347' : 'var(--text-secondary)' }}>
+                        {row.standardized_address || '—'}
+                      </td>
+                      <td style={previewTd}>{row.coverage_amount || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {errorMsg && (
+              <div style={{ padding: '10px 14px', background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.2)', borderRadius: 'var(--r-md)', fontSize: '0.78rem', color: '#FF4444', marginBottom: 16 }}>
+                {errorMsg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { setStatus('idle'); setUploadData(null); setFile(null); }}
+                disabled={status === 'confirming'}
+                style={{
+                  flex: '0 0 auto', padding: '14px 18px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)', color: 'var(--text-secondary)',
+                  fontSize: '0.84rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
+                }}
+              >
+                ← Back
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={!canConfirm || status === 'confirming'}
+                style={{
+                  flex: 1, padding: '14px',
+                  background: canConfirm ? '#A8D4E6' : 'rgba(255,255,255,0.05)',
+                  border: 'none', borderRadius: 'var(--r-md)',
+                  color: canConfirm ? '#000' : 'var(--text-disabled)',
+                  fontSize: '0.9rem', fontWeight: 800,
+                  cursor: canConfirm ? 'pointer' : 'not-allowed',
+                  fontFamily: 'var(--font)', letterSpacing: '0.03em',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                }}
+              >
+                {status === 'confirming' && (
+                  <span style={{
+                    width: 14, height: 14, border: '2px solid rgba(0,0,0,0.2)',
+                    borderTopColor: '#000', borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                  }} />
+                )}
+                {status === 'confirming' ? 'Geocoding…' : 'Confirm & Geocode'}
+              </button>
             </div>
           </div>
         ) : status === 'success' && result ? (
@@ -264,3 +452,14 @@ export default function UploadModal({ events, onClose, onSuccess }) {
     </div>
   );
 }
+
+const previewTh = {
+  textAlign: 'left', padding: '8px 10px', fontSize: '0.64rem',
+  fontWeight: 700, letterSpacing: '0.04em', color: 'var(--text-muted)',
+  textTransform: 'uppercase', whiteSpace: 'nowrap',
+};
+
+const previewTd = {
+  padding: '7px 10px', color: 'var(--text-secondary)',
+  whiteSpace: 'nowrap', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis',
+};

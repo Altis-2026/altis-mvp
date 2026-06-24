@@ -11,6 +11,7 @@ Endpoints:
     GET  /api/sar-thumbnails/{property_id}
     GET  /api/portfolio/template
     POST /api/portfolio/upload
+    POST /api/portfolio/{upload_id}/confirm
     GET  /api/portfolio/{id}
     POST /api/portfolio/{id}/analyze/{event_id}
     GET  /api/portfolio/{id}/results/{event_id}
@@ -19,13 +20,12 @@ Endpoints:
 import os
 import io
 import uuid
-import csv
 import asyncio
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 
@@ -33,9 +33,14 @@ from backend.database import (
     init_db, load_event_data, get_event_stats,
     save_portfolio, get_portfolio, list_portfolios,
     save_analysis_results, get_analysis_results,
+    save_pending_upload, get_pending_upload, delete_pending_upload,
 )
 from backend.geocoder import geocode_batch
 from backend.gee_service import get_flood_tile_url, get_sar_thumbnails
+from backend.ingestion import (
+    parse_upload, suggest_column_mapping, apply_mapping,
+    build_preview, IngestionError,
+)
 from pipeline.config import EVENTS
 
 # ── App setup ─────────────────────────────────────────────────────────────────
@@ -150,55 +155,84 @@ def download_template():
 @app.post("/api/portfolio/upload")
 async def upload_portfolio(file: UploadFile = File(...)):
     """
-    Process carrier portfolio CSV.
-    Geocodes addresses using Census TIGER (free, no API key).
-    Returns portfolio_id, geocoded count, and center for fly-to.
+    Parse a carrier portfolio file (.csv/.xlsx/.xls/.pdf) and suggest a
+    column mapping. Does NOT geocode or commit anything yet — the caller
+    must review/edit the mapping and call /confirm to finish the upload.
     """
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(400, "File must be a CSV.")
-
     content = await file.read()
     try:
-        text = content.decode('utf-8')
-        reader = list(csv.DictReader(io.StringIO(text)))
-    except Exception as e:
-        raise HTTPException(400, f"Could not parse CSV: {e}")
+        df = parse_upload(file.filename, content)
+    except IngestionError as e:
+        raise HTTPException(400, str(e))
 
-    if not reader:
-        raise HTTPException(400, "CSV is empty.")
+    suggested_mapping = suggest_column_mapping(list(df.columns))
+    upload_id = save_pending_upload(file.filename, df.to_dict('records'), suggested_mapping)
 
-    # Detect columns (flexible naming)
-    sample     = reader[0]
-    addr_col   = next((c for c in sample if 'address' in c.lower()), None)
-    policy_col = next((c for c in sample if 'policy' in c.lower()), None)
-    cov_col    = next((c for c in sample if 'coverage' in c.lower() or 'amount' in c.lower()), None)
+    mapping_for_preview = {f: v['matched_column'] for f, v in suggested_mapping.items()}
+    preview = build_preview(df, mapping_for_preview)
 
-    if not addr_col:
-        raise HTTPException(400, "CSV must have an 'address' column.")
+    return {
+        "upload_id":          upload_id,
+        "filename":           file.filename,
+        "columns":            list(df.columns),
+        "suggested_mapping":  suggested_mapping,
+        "row_count":          preview['row_count'],
+        "preview_rows":       preview['preview_rows'],
+        "flagged_count":      preview['flagged_count'],
+        "flagged_rows":       preview['flagged_rows'],
+    }
 
-    addresses = [row[addr_col].strip() for row in reader if row.get(addr_col, '').strip()]
+
+@app.post("/api/portfolio/{upload_id}/confirm")
+async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
+    """
+    Commit a pending upload: apply the (possibly user-edited) column
+    mapping, standardize + geocode addresses, save the portfolio, and
+    delete the pending upload row. Returns the same shape the old
+    single-shot upload endpoint used to return.
+    """
+    pending = get_pending_upload(upload_id)
+    if pending is None:
+        raise HTTPException(404, f"No pending upload '{upload_id}'. Upload the file again.")
+
+    mapping = body.get('mapping') or {}
+    if not mapping.get('address'):
+        raise HTTPException(400, "An address column (or city/state/zip columns) must be mapped.")
+
+    df = pd.DataFrame(pending['raw_rows'])
+    mapped = apply_mapping(df, mapping)
+
+    addresses = [a.strip() for a in mapped['address'].tolist() if a and a.strip()]
     if not addresses:
-        raise HTTPException(400, "No addresses found in CSV.")
+        raise HTTPException(422, "No addresses found after applying the mapping.")
 
-    # Geocode (Census TIGER — free)
     print(f"Geocoding {len(addresses)} addresses...")
     geo_results = await geocode_batch(addresses, concurrency=8)
 
-    # Build property list
     portfolio_id = str(uuid.uuid4())[:8].upper()
     properties   = []
     lats, lons   = [], []
+    geo_idx = 0
 
-    for i, (row, geo) in enumerate(zip(reader, geo_results)):
-        addr = row.get(addr_col, '').strip()
+    for i, row in mapped.iterrows():
+        addr = str(row.get('address', '')).strip()
         if not addr:
             continue
 
+        geo = geo_results[geo_idx]
+        geo_idx += 1
+
+        cov_raw = str(row.get('coverage_amount', '') or '').replace(',', '').replace('$', '').strip()
+        try:
+            coverage_amount = float(cov_raw) if cov_raw else 0
+        except ValueError:
+            coverage_amount = 0
+
         prop = {
-            'property_id':    f"PORT-{portfolio_id}-{str(i+1).zfill(4)}",
-            'policy_number':  row.get(policy_col, '') if policy_col else '',
-            'address':        addr,
-            'coverage_amount': float(row.get(cov_col, 0) or 0) if cov_col else 0,
+            'property_id':     f"PORT-{portfolio_id}-{str(i+1).zfill(4)}",
+            'policy_number':   str(row.get('policy_number', '') or ''),
+            'address':         addr,
+            'coverage_amount': coverage_amount,
             'matched_address': '',
         }
 
@@ -219,13 +253,13 @@ async def upload_portfolio(file: UploadFile = File(...)):
     if geocoded_count == 0:
         raise HTTPException(422, "Could not geocode any addresses. Check address format.")
 
-    # Compute center for fly-to
     center = {
         'lat': sum(lats) / len(lats),
         'lon': sum(lons) / len(lons),
     }
 
     save_portfolio(portfolio_id, properties, center, geocoded_count)
+    delete_pending_upload(upload_id)
     print(f"Portfolio {portfolio_id}: {geocoded_count}/{len(addresses)} geocoded")
 
     return {

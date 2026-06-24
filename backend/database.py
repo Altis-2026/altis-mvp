@@ -4,8 +4,10 @@ database.py — In-memory event data + SQLite for carrier portfolios.
 Event data (Harvey / Ian) loads from outputs/*.csv at startup.
 Portfolio data lives in SQLite so it persists across server restarts.
 """
+import json
 import os
 import sqlite3
+import uuid
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -118,6 +120,15 @@ def init_db():
             PRIMARY KEY (portfolio_id, event_id, property_id)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pending_uploads (
+            id TEXT PRIMARY KEY,
+            created_at TEXT DEFAULT (datetime('now')),
+            filename TEXT,
+            raw_json TEXT,
+            suggested_mapping_json TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -217,3 +228,40 @@ def save_thumbnail_cache(property_id: str, is_post: bool, data_url: str):
     label = 'post' if is_post else 'pre'
     path  = CACHE_DIR / f"{property_id}_{label}.b64"
     path.write_text(data_url)
+
+
+# ── SQLite: pending uploads (bridge between upload preview + confirm) ────────
+
+def save_pending_upload(filename: str, raw_rows: list, suggested_mapping: dict) -> str:
+    """Persist a parsed-but-unconfirmed upload. Returns the new upload_id."""
+    upload_id = uuid.uuid4().hex[:12]
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("""
+        INSERT INTO pending_uploads (id, filename, raw_json, suggested_mapping_json)
+        VALUES (?, ?, ?, ?)
+    """, (upload_id, filename, json.dumps(raw_rows), json.dumps(suggested_mapping)))
+    conn.commit()
+    conn.close()
+    return upload_id
+
+
+def get_pending_upload(upload_id: str) -> dict | None:
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT * FROM pending_uploads WHERE id = ?", (upload_id,)
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    d = dict(row)
+    d['raw_rows'] = json.loads(d.pop('raw_json'))
+    d['suggested_mapping'] = json.loads(d.pop('suggested_mapping_json'))
+    return d
+
+
+def delete_pending_upload(upload_id: str):
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("DELETE FROM pending_uploads WHERE id = ?", (upload_id,))
+    conn.commit()
+    conn.close()

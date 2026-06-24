@@ -27,6 +27,13 @@ export const api = {
       .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); });
   },
 
+  confirmPortfolioUpload: (uploadId, mapping) =>
+    fetch(`${BASE}/portfolio/${uploadId}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mapping }),
+    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+
   getPortfolio:     (id)         => get(`/portfolio/${id}`),
   listPortfolios:   ()           => get('/portfolios'),
   analyzePortfolio: (id, evtId)  => fetch(`${BASE}/portfolio/${id}/analyze/${evtId}`,
