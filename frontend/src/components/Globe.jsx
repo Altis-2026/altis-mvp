@@ -113,7 +113,23 @@ export default function Globe({
         paint: { 'text-color': '#000010' }
       });
 
-      /* Individual property pins */
+      /* Dispatch emphasis glow — sits beneath the pins so high-severity
+         dispatch properties read as urgent at a glance, scaling with zoom. */
+      map.addLayer({
+        id:     'dispatch-glow',
+        type:   'circle',
+        source: 'properties',
+        filter: ['all', ['!', ['has', 'point_count']], ['==', ['get', 'impact_class'], 'Dispatch']],
+        paint: {
+          'circle-color':  '#FF4444',
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 8, 10, 15, 14, 24],
+          'circle-blur':   1,
+          'circle-opacity': ['interpolate', ['linear'], ['zoom'], 4, 0.35, 10, 0.5],
+        }
+      });
+
+      /* Individual property pins — radius & stroke emphasise Dispatch and grow
+         with zoom (zoom-dependent density/label behaviour). */
       map.addLayer({
         id:     'pins',
         type:   'circle',
@@ -121,10 +137,36 @@ export default function Globe({
         filter: ['!', ['has', 'point_count']],
         paint: {
           'circle-color':        ['get', 'color'],
-          'circle-radius':       6,
-          'circle-opacity':      0.9,
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': 'rgba(255,255,255,0.4)',
+          'circle-radius':       pinRadius('__none__'),
+          'circle-opacity':      0.92,
+          'circle-stroke-width': pinStroke('__none__'),
+          'circle-stroke-color': ['case',
+            ['==', ['get', 'impact_class'], 'Dispatch'], 'rgba(255,255,255,0.85)',
+            'rgba(255,255,255,0.4)'],
+        }
+      });
+
+      /* Address labels appear only when zoomed into a neighbourhood, so the
+         globe stays clean at altitude but is legible up close. */
+      map.addLayer({
+        id:     'pin-labels',
+        type:   'symbol',
+        source: 'properties',
+        filter: ['!', ['has', 'point_count']],
+        minzoom: 12.5,
+        layout: {
+          'text-field':         ['coalesce', ['get', 'address'], ['get', 'property_id']],
+          'text-size':          10,
+          'text-offset':        [0, 1.2],
+          'text-anchor':        'top',
+          'text-font':          ['DIN Offc Pro Medium', 'Arial Unicode MS Regular'],
+          'text-optional':      true,
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color':      '#CFE8F2',
+          'text-halo-color': 'rgba(0,0,8,0.92)',
+          'text-halo-width': 1.2,
         }
       });
 
@@ -311,13 +353,8 @@ export default function Globe({
     const map = mapRef.current;
     if (!map || !map.getLayer('pins')) return;
     const selId = selectedProperty?.property_id || '__none__';
-
-    map.setPaintProperty('pins', 'circle-radius', [
-      'case', ['==', ['get', 'property_id'], selId], 10, 6
-    ]);
-    map.setPaintProperty('pins', 'circle-stroke-width', [
-      'case', ['==', ['get', 'property_id'], selId], 3, 1.5
-    ]);
+    map.setPaintProperty('pins', 'circle-radius', pinRadius(selId));
+    map.setPaintProperty('pins', 'circle-stroke-width', pinStroke(selId));
   }, [selectedProperty]);
 
   /* ── Globe brightness ────────────────────────────────────────── */
@@ -335,6 +372,27 @@ export default function Globe({
 /* ── Helpers ─────────────────────────────────────────────────────── */
 function emptyFC() {
   return { type: 'FeatureCollection', features: [] };
+}
+
+/* Pin radius: selected pin is largest; Dispatch pins are emphasised and all
+   pins grow with zoom so a dense neighbourhood stays readable up close. */
+function pinRadius(selId) {
+  return [
+    'case',
+    ['==', ['get', 'property_id'], selId], 12,
+    ['==', ['get', 'impact_class'], 'Dispatch'],
+      ['interpolate', ['linear'], ['zoom'], 4, 6, 10, 8.5, 14, 12],
+    ['interpolate', ['linear'], ['zoom'], 4, 4, 10, 6, 14, 8.5],
+  ];
+}
+
+function pinStroke(selId) {
+  return [
+    'case',
+    ['==', ['get', 'property_id'], selId], 3,
+    ['==', ['get', 'impact_class'], 'Dispatch'], 2.4,
+    1.5,
+  ];
 }
 
 function addFloodLayer(map, tileUrl) {

@@ -8,6 +8,7 @@ raises IngestionError so the caller can ask the user to re-export as CSV/XLSX
 rather than producing a wrong portfolio.
 """
 import io
+import re
 from typing import Optional
 
 import pandas as pd
@@ -231,12 +232,28 @@ def standardize_address(raw: str) -> dict:
 
 # ── Preview assembly ──────────────────────────────────────────────────────────
 
+# A trailing 5-digit (optionally zip+4) group means the string already ends in a
+# zip code. We anchor to the end so a 5-digit *house number* at the start
+# (e.g. "18520 Van Nuys Cir") is not mistaken for a zip.
+_TRAILING_ZIP = re.compile(r'\b\d{5}(-\d{4})?\s*$')
+
+
+def _looks_complete(addr: str) -> bool:
+    """A single address string is 'complete' enough to geocode on its own when
+    it carries a comma (street, city …) or ends in a zip code — i.e. it's more
+    than just a bare street line."""
+    s = str(addr).strip()
+    return (',' in s) or bool(_TRAILING_ZIP.search(s))
+
+
 def apply_mapping(df: pd.DataFrame, mapping: dict[str, Optional[str]]) -> pd.DataFrame:
     """
-    Build a canonical-column DataFrame from the raw upload using the
-    confirmed {field: source_column} mapping. Missing optional fields become
-    empty columns; address is assembled from street+city+state+zip when no
-    single address column was mapped.
+    Build a canonical-column DataFrame from the raw upload using the confirmed
+    {field: source_column} mapping. Missing optional fields become empty
+    columns. The address is assembled to be as geocodable as possible: a mapped
+    address column is combined with any *separately* mapped city/state/zip
+    columns (unless the address column is already complete), and when no address
+    column is mapped at all it's built from the city/state/zip parts.
     """
     out = pd.DataFrame(index=df.index)
 
@@ -245,11 +262,28 @@ def apply_mapping(df: pd.DataFrame, mapping: dict[str, Optional[str]]) -> pd.Dat
         out[field] = df[col] if col and col in df.columns else ''
 
     addr_col = mapping.get('address')
-    if addr_col and addr_col in df.columns:
-        out['address'] = df[addr_col]
+    part_cols = [mapping.get(f) for f in ('city', 'state', 'zip')]
+    part_cols = [c for c in part_cols if c and c in df.columns and c != addr_col]
+
+    if addr_col and addr_col in df.columns and not part_cols:
+        out['address'] = df[addr_col].astype(str)
+
+    elif addr_col and addr_col in df.columns:
+        # Address column plus separate locality columns — combine per row.
+        def combine(row):
+            base = str(row[addr_col]).strip()
+            extras = [str(row[c]).strip() for c in part_cols if str(row[c]).strip()]
+            if not base:
+                return ', '.join(extras)
+            if _looks_complete(base):
+                return base
+            return ', '.join([base] + extras)
+        out['address'] = df.apply(combine, axis=1)
+
     else:
+        # No address column — assemble from whatever locality parts exist.
         parts = []
-        for field in ('address', 'city', 'state', 'zip'):
+        for field in ('city', 'state', 'zip'):
             col = mapping.get(field)
             if col and col in df.columns:
                 parts.append(df[col].astype(str))

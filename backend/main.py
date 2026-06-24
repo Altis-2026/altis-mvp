@@ -15,6 +15,11 @@ Endpoints:
     GET  /api/portfolio/{id}
     POST /api/portfolio/{id}/analyze/{event_id}
     GET  /api/portfolio/{id}/results/{event_id}
+    GET  /api/events/{id}/dispatch-queue
+    POST /api/property/{id}/feedback
+    GET  /api/events/{id}/feedback
+    GET  /api/events/{id}/report          (audit PDF)
+    GET  /api/runs   POST /api/runs        (monitor → pipeline queue)
     GET  /api/health
 """
 import os
@@ -34,7 +39,10 @@ from backend.database import (
     save_portfolio, get_portfolio, list_portfolios,
     save_analysis_results, get_analysis_results,
     save_pending_upload, get_pending_upload, delete_pending_upload,
+    save_feedback, get_feedback_for_event, get_feedback_summary,
+    save_run, list_runs, update_run_status,
 )
+from backend.priority import rank_dispatch
 from backend.geocoder import geocode_batch
 from backend.gee_service import get_flood_tile_url, get_sar_thumbnails
 from backend.ingestion import (
@@ -430,6 +438,136 @@ def get_accuracy_calibration(event_id: str):
         )
 
     return json.loads(calib_path.read_text())
+
+
+# ── Dispatch queue (severity × coverage ranking) ──────────────────────────────
+
+@app.get("/api/events/{event_id}/dispatch-queue")
+def get_dispatch_queue(event_id: str, classes: str = "Dispatch,Review"):
+    """
+    Return the event's Dispatch (and by default Review) properties ranked by
+    severity × financial exposure — the order an adjuster should actually work,
+    not a flat list. `classes` is a comma-separated override.
+    """
+    df = load_event_data(event_id)
+    if df is None:
+        raise HTTPException(404, f"No data for event '{event_id}'.")
+
+    wanted = tuple(c.strip() for c in classes.split(',') if c.strip())
+    records = df.to_dict('records')
+    for p in records:
+        for k, v in list(p.items()):
+            if isinstance(v, float) and v != v:  # NaN
+                p[k] = None
+
+    queue = rank_dispatch(records, classes=wanted)
+    return {
+        "event_id":  event_id,
+        "count":     len(queue),
+        "queue":     queue,
+    }
+
+
+# ── Adjuster feedback loop (human-in-the-loop ground truth) ───────────────────
+
+@app.post("/api/property/{property_id}/feedback")
+def submit_feedback(property_id: str, body: dict = Body(...)):
+    """
+    Record an adjuster's verdict on a triage decision: agree (thumbs up/down),
+    an optional corrected class, and a free-text note. This is the ground-truth
+    signal that feeds back into calibration (validation/accuracy_check.py can
+    merge it as human labels).
+    """
+    agree = bool(body.get('agree', True))
+    fid = save_feedback(
+        property_id=property_id,
+        event_id=str(body.get('event_id', '')),
+        agree=agree,
+        original_class=str(body.get('original_class', '')),
+        corrected_class=str(body.get('corrected_class', '')),
+        note=str(body.get('note', '')),
+        address=str(body.get('address', '')),
+        portfolio_id=str(body.get('portfolio_id', '')),
+    )
+    return {"ok": True, "feedback_id": fid,
+            "summary": get_feedback_summary(str(body.get('event_id', '')))}
+
+
+@app.get("/api/events/{event_id}/feedback")
+def list_feedback(event_id: str):
+    """All adjuster verdicts for an event plus rollup counts."""
+    return {
+        "event_id": event_id,
+        "summary":  get_feedback_summary(event_id),
+        "feedback": get_feedback_for_event(event_id),
+    }
+
+
+# ── Audit-ready PDF report ────────────────────────────────────────────────────
+
+@app.get("/api/events/{event_id}/report")
+def event_report(event_id: str):
+    """
+    Generate and stream an audit-ready PDF: methodology, satellite scene
+    sources + dates, triage table, top dispatch priorities, and FEMA-validated
+    precision/recall. Reproducible from committed outputs (no live network).
+    """
+    df = load_event_data(event_id)
+    if df is None:
+        raise HTTPException(404, f"No data for event '{event_id}'.")
+
+    from backend.reporting import build_event_report, ReportError
+    try:
+        pdf = build_event_report(event_id, df, get_event_stats(df))
+    except ReportError as e:
+        raise HTTPException(400, str(e))
+
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={"Content-Disposition":
+                 f"attachment; filename=altis_{event_id}_audit_report.pdf"},
+    )
+
+
+# ── Pipeline runs queue (monitor → pipeline loop) ─────────────────────────────
+
+@app.get("/api/runs")
+def get_runs():
+    """List queued / running / completed pipeline runs, newest first."""
+    return {"runs": list_runs()}
+
+
+@app.post("/api/runs")
+def create_run(body: dict = Body(...)):
+    """
+    Enqueue a pipeline run. Called manually from the Operations panel and by
+    monitor.py when it auto-detects a new flood event — closing the
+    detection → analysis loop. Returns the stored run.
+    """
+    title = str(body.get('title', '')).strip()
+    if not title:
+        raise HTTPException(400, "A run title is required.")
+    run = save_run(
+        title=title,
+        source=str(body.get('source', 'manual')),
+        event_id=str(body.get('event_id', '')),
+        status=str(body.get('status', 'queued')),
+        bbox=body.get('bbox'),
+        note=str(body.get('note', '')),
+        detected_at=str(body.get('detected_at', '')),
+    )
+    return {"ok": True, "run": run}
+
+
+@app.post("/api/runs/{run_id}/status")
+def set_run_status(run_id: str, body: dict = Body(...)):
+    """Advance a run's status (queued → running → complete/failed)."""
+    status = str(body.get('status', '')).strip()
+    if status not in ('queued', 'running', 'complete', 'failed'):
+        raise HTTPException(400, "status must be queued|running|complete|failed.")
+    update_run_status(run_id, status)
+    return {"ok": True, "run_id": run_id, "status": status}
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

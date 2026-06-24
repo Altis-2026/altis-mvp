@@ -201,6 +201,38 @@ def test_apply_mapping_assembles_address_from_parts_when_no_single_column():
     assert out["address"].tolist() == ["Springfield, IL", "Chicago, IL"]
 
 
+def test_apply_mapping_combines_street_with_separate_locality_columns():
+    df = pd.DataFrame({
+        'Street Address': ['5018 Glenmeadow Dr'],
+        'City': ['Houston'], 'State': ['TX'], 'Zip': ['77096'],
+    })
+    mapping = {'address': 'Street Address', 'city': 'City', 'state': 'State', 'zip': 'Zip'}
+    out = apply_mapping(df, mapping)
+    assert out['address'].iloc[0] == '5018 Glenmeadow Dr, Houston, TX, 77096'
+
+
+def test_apply_mapping_does_not_mistake_house_number_for_zip():
+    # 5-digit house number must NOT short-circuit locality combination
+    df = pd.DataFrame({
+        'Street Address': ['18520 Van Nuys Cir'],
+        'City': ['Port Charlotte'], 'State': ['FL'], 'Zip': ['33948'],
+    })
+    mapping = {'address': 'Street Address', 'city': 'City', 'state': 'State', 'zip': 'Zip'}
+    out = apply_mapping(df, mapping)
+    assert out['address'].iloc[0] == '18520 Van Nuys Cir, Port Charlotte, FL, 33948'
+
+
+def test_apply_mapping_keeps_already_complete_address():
+    # Address already has a comma → don't append duplicate locality columns
+    df = pd.DataFrame({
+        'Address': ['123 Main St, Houston, TX 77002'],
+        'City': ['Houston'], 'State': ['TX'],
+    })
+    mapping = {'address': 'Address', 'city': 'City', 'state': 'State'}
+    out = apply_mapping(df, mapping)
+    assert out['address'].iloc[0] == '123 Main St, Houston, TX 77002'
+
+
 def test_apply_mapping_missing_optional_fields_become_empty():
     df = pd.DataFrame({"Addr": ["123 Main St"]})
     mapping = {"address": "Addr"}

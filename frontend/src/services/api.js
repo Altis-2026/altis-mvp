@@ -40,11 +40,36 @@ export const api = {
                                           { method: 'POST' }).then(r => r.json()),
   getResults:       (id, evtId)  => get(`/portfolio/${id}/results/${evtId}`),
 
+  /* Dispatch queue (severity × coverage) */
+  getDispatchQueue: (evtId, classes) =>
+    get(`/events/${evtId}/dispatch-queue${classes ? `?classes=${encodeURIComponent(classes)}` : ''}`),
+
+  /* Adjuster feedback loop */
+  submitFeedback: (propertyId, payload) =>
+    fetch(`${BASE}/property/${propertyId}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+  getFeedback: (evtId) => get(`/events/${evtId}/feedback`),
+
+  /* Pipeline runs (monitor → pipeline loop) */
+  getRuns:   ()        => get('/runs'),
+  createRun: (payload) => fetch(`${BASE}/runs`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+  setRunStatus: (runId, status) => fetch(`${BASE}/runs/${runId}/status`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  }).then(r => r.json()),
+
   /* Reports */
   getValidationReport: (evtId) => fetch(`${BASE}/validation/${evtId}`)
     .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
   getAccuracyCalibration: (evtId) => fetch(`${BASE}/accuracy/${evtId}`)
     .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+  eventReportUrl: (evtId) => `${BASE}/events/${evtId}/report`,
 
   /* Health */
   health: () => get('/health'),

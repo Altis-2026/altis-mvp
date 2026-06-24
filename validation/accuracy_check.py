@@ -345,6 +345,87 @@ def derive_property_labels(altis_df: pd.DataFrame, fema_agg: pd.DataFrame,
     return df
 
 
+def adjuster_label(agree, corrected_class: str, impact_class: str) -> Optional[int]:
+    """
+    Convert one adjuster verdict into a property-resolution flood label (1/0/None).
+
+    Priority of signal:
+      1. An explicit corrected class is the strongest signal — the adjuster is
+         telling us what the property actually is.
+      2. Otherwise, agreement means "the original call was right" → that call's
+         positivity is the truth.
+      3. Disagreement without a correction flips the original call's positivity
+         (they're saying it's wrong, just not what to instead).
+    Returns None when the verdict carries no usable signal.
+    """
+    positive = set(POSITIVE_TRIAGE_CLASSES)
+    cc = (corrected_class or '').strip()
+    if cc:
+        return 1 if cc in positive else 0
+
+    own_positive = 1 if impact_class in positive else 0
+    if agree in (1, True, '1', 'true', 'True'):
+        return own_positive
+    if agree in (0, False, '0', 'false', 'False'):
+        return 1 - own_positive
+    return None
+
+
+def merge_adjuster_labels(labeled_df: pd.DataFrame,
+                          feedback_df: pd.DataFrame) -> tuple:
+    """
+    Override zip-derived ground truth with property-resolution human labels
+    wherever adjusters have weighed in. Adjuster verdicts are per-house and
+    human-verified, so they are strictly better truth than the zip-level FEMA
+    label and take precedence. The most recent verdict per property wins.
+
+    Returns (merged_df, n_human_labeled). Pure: inputs are not mutated, no DB
+    or network access — the caller supplies the feedback frame.
+    """
+    df = labeled_df.copy()
+    df['human_labeled'] = 0
+    if feedback_df is None or len(feedback_df) == 0 or df.empty:
+        return df, 0
+
+    fb = feedback_df.copy()
+    if 'created_at' in fb.columns:
+        fb = fb.sort_values('created_at')
+    latest = fb.groupby('property_id').tail(1)
+
+    impact_by_id = df.set_index('property_id')['impact_class'].to_dict()
+    label_map = {}
+    for _, r in latest.iterrows():
+        pid = r['property_id']
+        impact = impact_by_id.get(pid, r.get('original_class', ''))
+        lab = adjuster_label(r.get('agree'), r.get('corrected_class', ''), impact)
+        if lab is not None and pid in impact_by_id:
+            label_map[pid] = lab
+
+    if not label_map:
+        return df, 0
+
+    mask = df['property_id'].isin(label_map)
+    df.loc[mask, 'flooded_truth'] = df.loc[mask, 'property_id'].map(label_map).astype(int)
+    df.loc[mask, 'human_labeled'] = 1
+    return df, int(mask.sum())
+
+
+def load_adjuster_feedback(event_id: str) -> pd.DataFrame:
+    """
+    Best-effort load of stored adjuster feedback for an event from the backend
+    DB. Returns an empty frame if the backend isn't importable or there's no
+    feedback yet — validation must never hard-depend on the API being present.
+    """
+    try:
+        sys.path.insert(0, str(BASE_DIR))
+        from backend import database as db
+        rows = db.get_feedback_for_event(event_id)
+        return pd.DataFrame(rows)
+    except Exception as e:
+        print(f"  (No adjuster feedback merged: {e})")
+        return pd.DataFrame()
+
+
 def precision_recall_by_category(labeled_df: pd.DataFrame) -> dict:
     """
     For each triage category, report how its members line up with ground truth:
@@ -571,6 +652,13 @@ def run_validation(event_id: str):
     # Round 3: per-property labels + calibrated flood probability + precision/
     # recall by triage category, on a zip-grouped hold-out (the honest number).
     labeled = derive_property_labels(altis_df, merged)
+    # Human-in-the-loop: where adjusters have given verdicts, their per-house
+    # labels override the coarse zip-level FEMA truth.
+    feedback = load_adjuster_feedback(event_id)
+    labeled, n_human = merge_adjuster_labels(labeled, feedback)
+    if n_human:
+        print(f"  Merged {n_human} property-resolution adjuster labels "
+              f"(override zip-level truth).")
     print(f"  Labelled properties: {len(labeled)} "
           f"({int(labeled['flooded_truth'].sum()) if not labeled.empty else 0} flooded-truth)")
     calibration = run_calibration(event_id, labeled)

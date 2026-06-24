@@ -8,6 +8,7 @@ import json
 import os
 import sqlite3
 import uuid
+from datetime import datetime
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -127,6 +128,33 @@ def init_db():
             filename TEXT,
             raw_json TEXT,
             suggested_mapping_json TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS adjuster_feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT DEFAULT (datetime('now')),
+            property_id TEXT,
+            event_id TEXT,
+            portfolio_id TEXT,
+            agree INTEGER,
+            original_class TEXT,
+            corrected_class TEXT,
+            note TEXT,
+            address TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_runs (
+            id TEXT PRIMARY KEY,
+            created_at TEXT DEFAULT (datetime('now')),
+            detected_at TEXT,
+            event_id TEXT,
+            title TEXT,
+            source TEXT,
+            status TEXT,
+            bbox_json TEXT,
+            note TEXT
         )
     """)
     conn.commit()
@@ -263,5 +291,106 @@ def get_pending_upload(upload_id: str) -> dict | None:
 def delete_pending_upload(upload_id: str):
     conn = sqlite3.connect(str(DB_PATH))
     conn.execute("DELETE FROM pending_uploads WHERE id = ?", (upload_id,))
+    conn.commit()
+    conn.close()
+
+
+# ── SQLite: adjuster feedback (human-in-the-loop ground truth) ──────────────
+
+def save_feedback(property_id: str, event_id: str, agree: bool,
+                  original_class: str = '', corrected_class: str = '',
+                  note: str = '', address: str = '', portfolio_id: str = '') -> int:
+    """Persist one adjuster verdict on a property. Returns the new row id."""
+    conn = sqlite3.connect(str(DB_PATH))
+    cur = conn.execute("""
+        INSERT INTO adjuster_feedback
+        (property_id, event_id, portfolio_id, agree, original_class,
+         corrected_class, note, address)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (property_id, event_id, portfolio_id, 1 if agree else 0,
+          original_class, corrected_class, note, address))
+    conn.commit()
+    fid = cur.lastrowid
+    conn.close()
+    return fid
+
+
+def get_feedback_for_event(event_id: str) -> list:
+    """Most recent verdict per property for an event, newest first."""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT * FROM adjuster_feedback
+        WHERE event_id = ?
+        ORDER BY created_at DESC
+    """, (event_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_feedback_summary(event_id: str) -> dict:
+    """Counts used by the UI badge: total verdicts, agree, disagree, corrected."""
+    conn = sqlite3.connect(str(DB_PATH))
+    row = conn.execute("""
+        SELECT COUNT(*) AS total,
+               COALESCE(SUM(agree), 0) AS agreed,
+               COALESCE(SUM(CASE WHEN corrected_class != '' AND corrected_class IS NOT NULL
+                                 THEN 1 ELSE 0 END), 0) AS corrected
+        FROM adjuster_feedback WHERE event_id = ?
+    """, (event_id,)).fetchone()
+    conn.close()
+    total, agreed, corrected = (row[0] or 0), (row[1] or 0), (row[2] or 0)
+    return {'total': total, 'agreed': agreed,
+            'disagreed': total - agreed, 'corrected': corrected}
+
+
+# ── SQLite: pipeline runs (monitor → pipeline queue) ────────────────────────
+
+def save_run(title: str, source: str, event_id: str = '', status: str = 'queued',
+             bbox: list = None, note: str = '', detected_at: str = '') -> dict:
+    """Enqueue (or record) a pipeline run. Returns the stored row as a dict."""
+    run_id = uuid.uuid4().hex[:12]
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("""
+        INSERT INTO pipeline_runs
+        (id, detected_at, event_id, title, source, status, bbox_json, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (run_id, detected_at or datetime.utcnow().isoformat(), event_id, title,
+          source, status, json.dumps(bbox) if bbox else None, note))
+    conn.commit()
+    conn.close()
+    return get_run(run_id)
+
+
+def get_run(run_id: str) -> dict | None:
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM pipeline_runs WHERE id = ?", (run_id,)).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    d = dict(row)
+    d['bbox'] = json.loads(d.pop('bbox_json')) if d.get('bbox_json') else None
+    return d
+
+
+def list_runs(limit: int = 50) -> list:
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM pipeline_runs ORDER BY created_at DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d['bbox'] = json.loads(d.pop('bbox_json')) if d.get('bbox_json') else None
+        out.append(d)
+    return out
+
+
+def update_run_status(run_id: str, status: str):
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("UPDATE pipeline_runs SET status = ? WHERE id = ?", (status, run_id))
     conn.commit()
     conn.close()

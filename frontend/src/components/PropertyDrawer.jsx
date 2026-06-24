@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SarPair from './SarPair.jsx';
+import { api } from '../services/api.js';
+
+const TRIAGE_OPTIONS = ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review'];
 
 const COLORS = {
   'Dispatch':       '#FF4444',
@@ -50,8 +53,21 @@ function Mrow({ label, value }) {
   );
 }
 
-export default function PropertyDrawer({ property, eventId, onClose, onAddToCompare, isInCompare, compareFull }) {
+export default function PropertyDrawer({ property, eventId, onClose, onAddToCompare, isInCompare, compareFull, onFeedbackSaved }) {
   const [sarView, setSarView] = useState('sar'); // 'sar' | 'optical'
+
+  /* Adjuster feedback (human-in-the-loop ground truth) */
+  const [verdict, setVerdict]       = useState(null);   // 'up' | 'down' | null
+  const [corrected, setCorrected]   = useState('');
+  const [note, setNote]             = useState('');
+  const [fbStatus, setFbStatus]     = useState('idle'); // idle | saving | saved | error
+  const [fbError, setFbError]       = useState('');
+
+  // Reset feedback widget whenever a different property is opened.
+  useEffect(() => {
+    setVerdict(null); setCorrected(''); setNote('');
+    setFbStatus('idle'); setFbError('');
+  }, [property?.property_id]);
 
   if (!property) return null;
 
@@ -71,6 +87,29 @@ export default function PropertyDrawer({ property, eventId, onClose, onAddToComp
   const disagrees = property.ensemble_disagreement === true
     || property.ensemble_disagreement === 1 || property.ensemble_disagreement === '1'
     || property.ensemble_disagreement === 'True';
+
+  const submitFeedback = async (agree) => {
+    setVerdict(agree ? 'up' : 'down');
+    if (!eventId && !property.isPortfolio) { /* still allow, event_id may be '' */ }
+    setFbStatus('saving');
+    setFbError('');
+    try {
+      const res = await api.submitFeedback(property.property_id, {
+        event_id:        eventId || '',
+        agree,
+        original_class:  ic || '',
+        corrected_class: agree ? '' : corrected,
+        note,
+        address:         property.address || '',
+        portfolio_id:    property.isPortfolio ? (property.portfolio_id || '') : '',
+      });
+      setFbStatus('saved');
+      onFeedbackSaved?.(res.summary);
+    } catch (err) {
+      setFbStatus('error');
+      setFbError(err?.detail || 'Could not save feedback.');
+    }
+  };
 
   return (
     <>
@@ -309,6 +348,92 @@ export default function PropertyDrawer({ property, eventId, onClose, onAddToComp
             </div>
           )}
 
+          {/* Adjuster feedback — human-in-the-loop ground truth */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{
+              fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em',
+              color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 10,
+            }}>
+              Adjuster Verdict
+            </div>
+
+            {fbStatus === 'saved' ? (
+              <div style={{
+                background: 'rgba(76,175,130,0.08)', border: '1px solid rgba(76,175,130,0.25)',
+                borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: '0.76rem', color: '#9FE3C0',
+              }}>
+                ✓ Verdict recorded{verdict === 'down' && corrected ? ` — corrected to ${corrected}` : ''}.
+                This feeds Altis's calibration as property-level ground truth.
+              </div>
+            ) : (
+              <div style={{
+                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                borderRadius: 'var(--r-md)', padding: '14px',
+              }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+                  Was this triage decision correct?
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginBottom: verdict === 'down' ? 12 : 0 }}>
+                  <button
+                    onClick={() => submitFeedback(true)}
+                    disabled={fbStatus === 'saving'}
+                    style={verdictBtn(verdict === 'up', '#4CAF82')}
+                  >
+                    👍 Agree
+                  </button>
+                  <button
+                    onClick={() => setVerdict('down')}
+                    disabled={fbStatus === 'saving'}
+                    style={verdictBtn(verdict === 'down', '#FF6B6B')}
+                  >
+                    👎 Disagree
+                  </button>
+                </div>
+
+                {verdict === 'down' && (
+                  <div className="anim-fade-in">
+                    <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', margin: '4px 0 6px' }}>
+                      Correct classification (optional)
+                    </div>
+                    <select value={corrected} onChange={e => setCorrected(e.target.value)} style={{
+                      width: '100%', padding: '7px 9px', fontSize: '0.74rem', marginBottom: 8,
+                      background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 'var(--r-sm)', fontFamily: 'var(--font)', cursor: 'pointer',
+                    }}>
+                      <option value="">— Select correct triage —</option>
+                      {TRIAGE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                    <textarea
+                      value={note} onChange={e => setNote(e.target.value)}
+                      placeholder="What did the satellite miss? (optional note for the model)"
+                      rows={2}
+                      style={{
+                        width: '100%', padding: '8px 10px', fontSize: '0.74rem', resize: 'vertical',
+                        background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 'var(--r-sm)', fontFamily: 'var(--font)', marginBottom: 10,
+                      }}
+                    />
+                    <button
+                      onClick={() => submitFeedback(false)}
+                      disabled={fbStatus === 'saving'}
+                      style={{
+                        width: '100%', padding: '10px 0', borderRadius: 'var(--r-md)', border: 'none',
+                        background: '#FF6B6B', color: '#000', fontSize: '0.78rem', fontWeight: 800,
+                        cursor: fbStatus === 'saving' ? 'wait' : 'pointer', fontFamily: 'var(--font)',
+                      }}
+                    >
+                      {fbStatus === 'saving' ? 'Saving…' : 'Submit correction'}
+                    </button>
+                  </div>
+                )}
+
+                {fbStatus === 'error' && (
+                  <div style={{ fontSize: '0.7rem', color: '#FF6B6B', marginTop: 8 }}>{fbError}</div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
             <ActionButton
@@ -377,6 +502,17 @@ function ActionButton({ label, color, outline, onClick }) {
       {label}
     </button>
   );
+}
+
+function verdictBtn(active, color) {
+  return {
+    flex: 1, padding: '10px 0', borderRadius: 'var(--r-md)', cursor: 'pointer',
+    fontFamily: 'var(--font)', fontSize: '0.78rem', fontWeight: 700,
+    background: active ? `${color}22` : 'rgba(255,255,255,0.03)',
+    border: `1px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
+    color: active ? color : 'var(--text-secondary)',
+    transition: 'all 0.15s ease',
+  };
 }
 
 function parseJsonField(value) {

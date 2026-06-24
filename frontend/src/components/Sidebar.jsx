@@ -4,11 +4,13 @@ const RAIL_WIDTH  = 56;
 export const PANEL_WIDTH = 340;
 
 const NAV_ITEMS = [
-  { id: 'events',     label: 'Events',      icon: 'M8 2v2M16 2v2M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z' },
+  { id: 'events',     label: 'Events',       icon: 'M8 2v2M16 2v2M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z' },
   { id: 'portfolios', label: 'Portfolios',   icon: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z' },
+  { id: 'dispatch',   label: 'Dispatch Queue', icon: 'M3 12h4l2-7 4 14 2-7h6' },
   { id: 'analysis',   label: 'Analysis',     icon: 'M4 19V10M10 19V5M16 19v-7M22 19H2' },
   { id: 'compare',    label: 'SAR Compare',  icon: 'M3 4h8v16H3zM13 4h8v16h-8zM3 12h8M13 12h8' },
   { id: 'reports',    label: 'Reports',      icon: 'M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM13 3v6h6M9 13h6M9 17h6' },
+  { id: 'operations', label: 'Operations',   icon: 'M12 2a3 3 0 0 1 3 3 7 7 0 0 1 4 6v3l2 3H3l2-3v-3a7 7 0 0 1 4-6 3 3 0 0 1 3-3zM9 19a3 3 0 0 0 6 0' },
 ];
 
 function NavIcon({ item, active, onClick, badge }) {

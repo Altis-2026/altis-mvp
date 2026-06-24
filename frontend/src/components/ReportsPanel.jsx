@@ -159,6 +159,26 @@ export default function ReportsPanel({
           ↓ Export portfolio results {portfolioLabel ? `(${portfolioLabel})` : ''}
         </button>
 
+        <a
+          href={reportEventId ? api.eventReportUrl(reportEventId) : undefined}
+          target="_blank" rel="noopener noreferrer"
+          style={{
+            ...exportBtnStyle(!reportEventId),
+            textDecoration: 'none',
+            display: 'flex', alignItems: 'center', gap: 8,
+            color: !reportEventId ? 'var(--text-disabled)' : '#A8D4E6',
+            background: !reportEventId ? 'rgba(255,255,255,0.02)' : 'rgba(168,212,230,0.08)',
+            border: '1px solid rgba(168,212,230,0.2)',
+          }}
+        >
+          <span style={{ fontSize: '0.9rem' }}>📄</span>
+          Download audit PDF {events.find(e => e.id === reportEventId)?.label ? `(${events.find(e => e.id === reportEventId).label})` : ''}
+        </a>
+        <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', margin: '-2px 2px 0', lineHeight: 1.4 }}>
+          Methodology, scene sources + dates, triage table, top dispatch priorities,
+          and FEMA-validated precision/recall — one carrier-ready document.
+        </div>
+
         {/* Validation section */}
         <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--teal)', textTransform: 'uppercase', margin: '22px 0 10px' }}>
           FEMA validation

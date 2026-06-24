@@ -19,7 +19,7 @@ const AltisLogo = () => (
   </svg>
 );
 
-export default function Header({ selectedEvent, onUploadClick, loading }) {
+export default function Header({ selectedEvent, onUploadClick, onGridClick, loading }) {
   return (
     <header style={{
       position:   'fixed',
@@ -60,42 +60,54 @@ export default function Header({ selectedEvent, onUploadClick, loading }) {
         )}
       </div>
 
-      {/* Right: Upload button */}
-      <button
-        onClick={onUploadClick}
-        style={{
-          pointerEvents: 'all',
-          display:       'flex',
-          alignItems:    'center',
-          gap:           7,
-          padding:       '8px 18px',
-          background:    'rgba(168,212,230,0.08)',
-          border:        '1px solid rgba(168,212,230,0.22)',
-          borderRadius:  'var(--r-md)',
-          color:         '#A8D4E6',
-          fontSize:      '0.8rem',
-          fontWeight:    600,
-          letterSpacing: '0.03em',
-          cursor:        'pointer',
-          fontFamily:    'var(--font)',
-          transition:    'background 0.15s, border-color 0.15s',
-          backdropFilter: 'blur(8px)',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = 'rgba(168,212,230,0.14)';
-          e.currentTarget.style.borderColor = 'rgba(168,212,230,0.4)';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = 'rgba(168,212,230,0.08)';
-          e.currentTarget.style.borderColor = 'rgba(168,212,230,0.22)';
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1v8M4 4l3-3 3 3M2 11h10" stroke="#A8D4E6" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-        Upload Portfolio
-      </button>
+      {/* Right: actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'all' }}>
+        {onGridClick && (
+          <button onClick={onGridClick} style={ghostBtn}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 1h12v12H1zM1 5h12M1 9h12M5 1v12" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+            Claims Grid
+          </button>
+        )}
+        <button
+          onClick={onUploadClick}
+          style={tealBtn}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(168,212,230,0.14)';
+            e.currentTarget.style.borderColor = 'rgba(168,212,230,0.4)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(168,212,230,0.08)';
+            e.currentTarget.style.borderColor = 'rgba(168,212,230,0.22)';
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 1v8M4 4l3-3 3 3M2 11h10" stroke="#A8D4E6" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          Upload Portfolio
+        </button>
+      </div>
 
     </header>
   );
 }
+
+const tealBtn = {
+  pointerEvents: 'all', display: 'flex', alignItems: 'center', gap: 7,
+  padding: '8px 18px', background: 'rgba(168,212,230,0.08)',
+  border: '1px solid rgba(168,212,230,0.22)', borderRadius: 'var(--r-md)',
+  color: '#A8D4E6', fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.03em',
+  cursor: 'pointer', fontFamily: 'var(--font)',
+  transition: 'background 0.15s, border-color 0.15s', backdropFilter: 'blur(8px)',
+};
+const ghostBtn = {
+  pointerEvents: 'all', display: 'flex', alignItems: 'center', gap: 7,
+  padding: '8px 14px', background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'var(--r-md)',
+  color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600,
+  letterSpacing: '0.03em', cursor: 'pointer', fontFamily: 'var(--font)',
+  transition: 'background 0.15s, color 0.15s', backdropFilter: 'blur(8px)',
+};

@@ -11,6 +11,9 @@ import PortfoliosPanel    from './components/PortfoliosPanel.jsx';
 import AnalysisPanel      from './components/AnalysisPanel.jsx';
 import SarComparePanel    from './components/SarComparePanel.jsx';
 import ReportsPanel       from './components/ReportsPanel.jsx';
+import DispatchQueuePanel from './components/DispatchQueuePanel.jsx';
+import OperationsPanel    from './components/OperationsPanel.jsx';
+import DataGrid           from './components/DataGrid.jsx';
 import { api }            from './services/api.js';
 
 function computeBounds(properties) {
@@ -49,6 +52,9 @@ export default function App() {
   /* ── Sidebar ──────────────────────────────────────────────────── */
   const [activePanel, setActivePanel] = useState(null);
   const leftInset = RAIL_WIDTH + (activePanel ? PANEL_WIDTH : 0);
+
+  /* ── Claims data grid (full-screen) ──────────────────────────── */
+  const [grid, setGrid] = useState(null); // { kind, rows, title } | null
 
   /* ── Portfolios ───────────────────────────────────────────────── */
   const [portfolios,       setPortfolios]       = useState([]);
@@ -163,6 +169,20 @@ export default function App() {
   const activePortfolio = portfolios.find(p => p.id === portfolioId);
   const selectedEventMeta = events.find(e => e.id === selectedEvent);
 
+  /* ── Open the claims data grid for a given dataset ───────────── */
+  const openGrid = useCallback((kind) => {
+    const which = kind || (properties.length ? 'event' : 'portfolio');
+    if (which === 'portfolio' && portfolioProps.length) {
+      setGrid({ kind: 'portfolio', rows: portfolioProps,
+                title: `${activePortfolio?.id || 'Portfolio'} — ${portfolioProps.length} properties` });
+    } else if (properties.length) {
+      setGrid({ kind: 'event', rows: properties,
+                title: `${selectedEventMeta?.label || 'Event'} — ${properties.length} properties` });
+    }
+  }, [properties, portfolioProps, activePortfolio, selectedEventMeta]);
+
+  const canOpenGrid = properties.length > 0 || portfolioProps.length > 0;
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
 
@@ -181,6 +201,7 @@ export default function App() {
       <Header
         selectedEvent={selectedEventMeta}
         onUploadClick={() => setShowUpload(true)}
+        onGridClick={canOpenGrid ? () => openGrid() : null}
         loading={loading}
       />
 
@@ -206,6 +227,18 @@ export default function App() {
             onSelect={handlePortfolioSelect}
             onUploadClick={() => setShowUpload(true)}
             loading={loading}
+          />
+        )}
+        {activePanel === 'dispatch' && (
+          <DispatchQueuePanel
+            eventId={selectedEvent}
+            eventLabel={selectedEventMeta?.label}
+            eventProperties={properties}
+            portfolioProps={portfolioProps}
+            portfolioAnalyzed={portfolioAnalyzed}
+            portfolioLabel={activePortfolio?.id}
+            onSelectProperty={setSelectedProperty}
+            onOpenGrid={openGrid}
           />
         )}
         {activePanel === 'analysis' && (
@@ -240,6 +273,9 @@ export default function App() {
             portfolioProperties={portfolioProps}
           />
         )}
+        {activePanel === 'operations' && (
+          <OperationsPanel selectedEventMeta={selectedEventMeta} />
+        )}
       </Sidebar>
 
       <PropertyDrawer
@@ -256,6 +292,16 @@ export default function App() {
           events={events}
           onClose={() => setShowUpload(false)}
           onSuccess={handlePortfolioSuccess}
+        />
+      )}
+
+      {grid && (
+        <DataGrid
+          title={grid.title}
+          rows={grid.rows}
+          kind={grid.kind}
+          onClose={() => setGrid(null)}
+          onRowClick={(p) => { setSelectedProperty(p); setGrid(null); }}
         />
       )}
 

@@ -37,6 +37,9 @@ STATE_FILE = BASE_DIR / 'monitor' / 'state.json'
 
 LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
+# Make the backend DB layer importable so detection can enqueue a pipeline run.
+sys.path.insert(0, str(BASE_DIR))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s  %(levelname)-8s  %(message)s',
@@ -234,10 +237,39 @@ def suggest_bbox(event: dict) -> Optional[list[float]]:
     return [lon - buf, lat - buf, lon + buf, lat + buf]
 
 
+# ── Pipeline enqueue (close the detection → analysis loop) ────────────────────
+
+def enqueue_run(event: dict, bbox: Optional[list[float]]) -> Optional[str]:
+    """
+    Persist a queued pipeline run for a freshly detected event so it shows up in
+    the Operations panel and can be promoted to an actual GEE run. Writes
+    straight to the shared SQLite DB (no HTTP), so the monitor closes the loop
+    even when the API server isn't running. Returns the run id, or None if the
+    backend isn't importable in this environment.
+    """
+    try:
+        from backend import database as db
+        db.init_db()
+        run = db.save_run(
+            title=event.get('title', 'Detected flood event'),
+            source=f"monitor:{event.get('source', '?').lower()}",
+            status='queued',
+            bbox=bbox,
+            note=f"{event.get('type', 'event')} — auto-detected; "
+                 f"lat={event.get('lat')}, lon={event.get('lon')}",
+            detected_at=event.get('detected', ''),
+        )
+        return run['id']
+    except Exception as e:
+        log.warning(f"Could not enqueue pipeline run: {e}")
+        return None
+
+
 # ── Main monitoring loop ──────────────────────────────────────────────────────
 
-def run_once():
-    """Run one monitoring check cycle."""
+def run_once(enqueue: bool = True):
+    """Run one monitoring check cycle. When enqueue is True, newly detected
+    events are written to the pipeline-runs queue (the monitor → pipeline loop)."""
     log.info("=" * 50)
     log.info("Altis Monitor — check cycle starting")
     log.info("=" * 50)
@@ -267,9 +299,16 @@ def run_once():
             bbox = suggest_bbox(event)
             if bbox:
                 log.info(f"  Suggested bbox: {bbox}")
-                log.info(f"  ► Add to pipeline/config.py and run pipeline manually")
             else:
                 log.info(f"  ► No coordinates available — check NHC/USGS source")
+
+            if enqueue:
+                run_id = enqueue_run(event, bbox)
+                if run_id:
+                    log.info(f"  ► Queued pipeline run {run_id} (status=queued) "
+                             f"— visible in the Altis Operations panel")
+            else:
+                log.info(f"  ► Add to pipeline/config.py and run pipeline manually")
 
             log.info("")
 
@@ -285,12 +324,12 @@ def run_once():
     return new_events
 
 
-def run_loop(interval_minutes: int = 60):
+def run_loop(interval_minutes: int = 60, enqueue: bool = True):
     """Run monitor in continuous loop."""
     log.info(f"Altis Monitor starting — checking every {interval_minutes} minutes")
     while True:
         try:
-            run_once()
+            run_once(enqueue=enqueue)
         except Exception as e:
             log.error(f"Monitor cycle failed: {e}")
         log.info(f"Sleeping {interval_minutes} minutes until next check...")
@@ -301,10 +340,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Altis event monitor')
     parser.add_argument('--loop', action='store_true', help='Run continuously (default: run once)')
     parser.add_argument('--interval', type=int, default=60, help='Check interval in minutes')
+    parser.add_argument('--no-enqueue', action='store_true',
+                        help="Don't queue a pipeline run for detected events")
     args = parser.parse_args()
 
+    enqueue = not args.no_enqueue
     if args.loop:
-        run_loop(args.interval)
+        run_loop(args.interval, enqueue=enqueue)
     else:
-        events = run_once()
+        events = run_once(enqueue=enqueue)
         sys.exit(0 if not events else 1)
