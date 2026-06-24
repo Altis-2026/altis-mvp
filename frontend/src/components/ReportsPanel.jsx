@@ -104,17 +104,27 @@ export default function ReportsPanel({
   const [report,         setReport]        = useState(null);
   const [reportError,    setReportError]   = useState('');
   const [loadingReport,  setLoadingReport] = useState(false);
+  const [calibration,    setCalibration]   = useState(null);
+  const [calibError,     setCalibError]    = useState('');
 
   const loadReport = async () => {
     if (!reportEventId) return;
     setLoadingReport(true);
     setReport(null);
     setReportError('');
+    setCalibration(null);
+    setCalibError('');
     try {
       const data = await api.getValidationReport(reportEventId);
       setReport(data.content);
     } catch (err) {
       setReportError(err?.detail || 'Could not load report.');
+    }
+    try {
+      const calib = await api.getAccuracyCalibration(reportEventId);
+      setCalibration(calib);
+    } catch (err) {
+      setCalibError(err?.detail || 'No calibration data for this event.');
     } finally {
       setLoadingReport(false);
     }
@@ -176,6 +186,10 @@ export default function ReportsPanel({
           </div>
         )}
 
+        {calibration && calibration.holdout_metrics && (
+          <ReliabilityWidget calibration={calibration} />
+        )}
+
         {report && (
           <div style={{
             border: '1px solid rgba(255,255,255,0.06)', borderRadius: 'var(--r-md)',
@@ -193,6 +207,92 @@ export default function ReportsPanel({
         )}
 
       </div>
+    </div>
+  );
+}
+
+function ReliabilityWidget({ calibration }) {
+  const m = calibration.holdout_metrics;
+  const curve = (m.reliability_curve || []).filter(b => b.count > 0);
+  const cls = m.classification || {};
+  const byCat = calibration.triage_precision_recall?.by_category || {};
+
+  const W = 220, H = 130, pad = 18;
+  const toX = v => pad + v * (W - 2 * pad);
+  const toY = v => H - pad - v * (H - 2 * pad);
+
+  return (
+    <div style={{
+      border: '1px solid rgba(168,212,230,0.15)', borderRadius: 'var(--r-md)',
+      padding: '14px 16px', background: 'rgba(168,212,230,0.03)', marginBottom: 14,
+    }}>
+      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#A8D4E6', marginBottom: 10 }}>
+        Calibrated probability — held-out reliability
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <svg width={W} height={H} style={{ flexShrink: 0 }}>
+          {/* perfect-calibration diagonal */}
+          <line x1={toX(0)} y1={toY(0)} x2={toX(1)} y2={toY(1)}
+                stroke="rgba(255,255,255,0.15)" strokeDasharray="3,3" />
+          {/* axes */}
+          <line x1={pad} y1={H - pad} x2={W - pad} y2={H - pad} stroke="rgba(255,255,255,0.2)" />
+          <line x1={pad} y1={pad} x2={pad} y2={H - pad} stroke="rgba(255,255,255,0.2)" />
+          {curve.map((b, i) => (
+            <circle key={i}
+              cx={toX(b.mean_predicted)} cy={toY(b.observed_frequency)}
+              r={Math.max(2, Math.min(6, Math.sqrt(b.count)))}
+              fill="#A8D4E6" opacity={0.85}
+            />
+          ))}
+        </svg>
+
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <Stat label="Brier score" value={m.brier_score} />
+          <Stat label="Calibration error (ECE)" value={m.expected_calibration_error} />
+          <Stat label="Held-out precision" value={cls.precision} />
+          <Stat label="Held-out recall" value={cls.recall} />
+          <Stat label="Held-out F1" value={cls.f1} />
+          <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4 }}>
+            n={m.classification?.support ?? '—'} · method: {m.method} · zip-grouped split
+          </div>
+        </div>
+      </div>
+
+      {Object.keys(byCat).length > 0 && (
+        <table style={{ width: '100%', marginTop: 12, fontSize: '0.68rem', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Category</th>
+              <th style={thStyle}>n</th>
+              <th style={thStyle}>% truly flooded</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(byCat).map(([cat, v]) => (
+              <tr key={cat}>
+                <td style={tdStyle}>{cat}</td>
+                <td style={tdStyle}>{v.n}</td>
+                <td style={tdStyle}>{v.pct_truly_flooded != null ? `${v.pct_truly_flooded}%` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+const thStyle = { textAlign: 'left', padding: '3px 6px', color: '#A8D4E6', borderBottom: '1px solid rgba(255,255,255,0.1)' };
+const tdStyle = { padding: '3px 6px', color: '#ccc', borderBottom: '1px solid rgba(255,255,255,0.04)' };
+
+function Stat({ label, value }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', padding: '2px 0' }}>
+      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span style={{ color: '#ddd', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+        {typeof value === 'number' ? value.toFixed(value < 1 ? 3 : 2) : (value ?? '—')}
+      </span>
     </div>
   );
 }

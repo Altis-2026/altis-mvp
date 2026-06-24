@@ -36,6 +36,8 @@ export const api = {
   /* Reports */
   getValidationReport: (evtId) => fetch(`${BASE}/validation/${evtId}`)
     .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+  getAccuracyCalibration: (evtId) => fetch(`${BASE}/accuracy/${evtId}`)
+    .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
 
   /* Health */
   health: () => get('/health'),

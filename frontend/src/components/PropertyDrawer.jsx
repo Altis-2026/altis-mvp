@@ -61,6 +61,16 @@ export default function PropertyDrawer({ property, eventId, onClose, onAddToComp
   const pct    = parseFloat(property.pct_flooded || 0).toFixed(1);
   const conf   = parseInt(property.confidence_score || 0);
   const urban  = property.urban_flag == 1;
+  const hasDepthCI = property.depth_ci_ft != null && property.depth_ci_ft !== '';
+  const depthLabel = hasDepthCI
+    ? `${depth} ft ± ${parseFloat(property.depth_ci_ft).toFixed(1)} ft`
+    : `${depth} ft`;
+
+  const breakdown = parseJsonField(property.confidence_factors);
+  const ensembleVotes = parseJsonField(property.ensemble_votes);
+  const disagrees = property.ensemble_disagreement === true
+    || property.ensemble_disagreement === 1 || property.ensemble_disagreement === '1'
+    || property.ensemble_disagreement === 'True';
 
   return (
     <>
@@ -203,7 +213,7 @@ export default function PropertyDrawer({ property, eventId, onClose, onAddToComp
             }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
-                  <Mrow label="Max Flood Depth"   value={`${depth} ft`} />
+                  <Mrow label="Max Flood Depth"   value={depthLabel} />
                   <Mrow label="Area Flooded"       value={`${pct}%`} />
                   <Mrow label="Confidence Score"   value={`${conf}%`} />
                   <Mrow label="Data Source"        value="Sentinel-1 SAR" />
@@ -213,6 +223,69 @@ export default function PropertyDrawer({ property, eventId, onClose, onAddToComp
               </table>
             </div>
           </div>
+
+          {/* Ensemble disagreement warning */}
+          {disagrees && (
+            <div style={{
+              marginBottom: 24, background: 'rgba(255,179,71,0.06)',
+              border: '1px solid rgba(255,179,71,0.25)', borderRadius: 'var(--r-md)',
+              padding: '12px 14px',
+            }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#FFB347', textTransform: 'uppercase', marginBottom: 6 }}>
+                Sensor disagreement — flagged for Review
+              </div>
+              <p style={{ fontSize: '0.74rem', color: '#ccc', lineHeight: 1.5, margin: 0 }}>
+                {property.ensemble_note || 'Independent flood signals (SAR / optical / DEM-hydrology) disagree on this property.'}
+              </p>
+              {ensembleVotes && (
+                <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+                  {Object.entries(ensembleVotes).map(([k, v]) => (
+                    <div key={k} style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                      {k.replace('_', ' ')}: <span style={{ color: '#ddd', fontWeight: 600 }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Why this decision — confidence factor breakdown */}
+          {breakdown && Array.isArray(breakdown.factors) && breakdown.factors.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{
+                fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em',
+                color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 12,
+              }}>
+                Why This Decision
+              </div>
+              <div style={{
+                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                borderRadius: 'var(--r-md)', padding: '4px 14px',
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <Mrow label="Base score" value={breakdown.base} />
+                    {breakdown.factors.map((f, i) => (
+                      <tr key={i}>
+                        <td style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                          {f.factor}
+                          <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 2 }}>{f.reason}</div>
+                        </td>
+                        <td style={{
+                          fontSize: '0.76rem', textAlign: 'right', verticalAlign: 'top', paddingTop: 5,
+                          borderTop: '1px solid rgba(255,255,255,0.04)', fontVariantNumeric: 'tabular-nums',
+                          color: f.delta > 0 ? '#4CAF82' : '#FF6B6B', fontWeight: 700,
+                        }}>
+                          {f.delta > 0 ? '+' : ''}{f.delta}
+                        </td>
+                      </tr>
+                    ))}
+                    <Mrow label="Final score (clamped 30–97)" value={`${breakdown.final_score}%`} />
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Adjuster note */}
           {property.adjuster_note && (
@@ -304,6 +377,12 @@ function ActionButton({ label, color, outline, onClick }) {
       {label}
     </button>
   );
+}
+
+function parseJsonField(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch { return null; }
 }
 
 function colorToRgb(hex) {

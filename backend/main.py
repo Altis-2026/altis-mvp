@@ -377,6 +377,27 @@ def get_validation_report(event_id: str):
     return {"event_id": event_id, "content": report_path.read_text()}
 
 
+@app.get("/api/accuracy/{event_id}")
+def get_accuracy_calibration(event_id: str):
+    """
+    Return the calibrated-probability + precision/recall blob for an event,
+    if it's been generated. Run validation/accuracy_check.py first.
+    """
+    import json
+    from pathlib import Path
+    BASE_DIR = Path(__file__).parent.parent
+    calib_path = BASE_DIR / 'outputs' / f"calibration_{event_id}.json"
+
+    if not calib_path.exists():
+        raise HTTPException(
+            404,
+            f"No calibration data found for '{event_id}'. Run "
+            f"'python validation/accuracy_check.py --event {event_id}' first."
+        )
+
+    return json.loads(calib_path.read_text())
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/health")
