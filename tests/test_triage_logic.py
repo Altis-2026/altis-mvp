@@ -22,29 +22,36 @@ def test_confidence_penalized_for_urban_shadow_zone():
     assert calculate_confidence(row_urban, HARVEY) == calculate_confidence(row_rural, HARVEY) - 15
 
 
-def test_confidence_internal_inconsistency_penalty_uses_percent_scale_thresholds():
+def test_confidence_coverage_coherence_uses_fraction_scale():
     """
-    KNOWN BUG: the "internal consistency" and "coverage coherence" branches in
-    calculate_confidence compare `pct` against thresholds written for a 0-100
-    percent scale (pct >= 60, pct >= 35, pct < 5, pct > 45), but the function is
-    always called with pct_flooded as a 0-1 fraction in the real pipeline
-    (see run_triage_pipeline in 04_triage_notes.py — the *100 conversion to
-    percent happens AFTER classify_triage/calculate_confidence run). Because a
-    fraction is always < 5, `pct < 5` is always true and every property — fully
-    flooded or completely dry — gets treated as "confidently dry" (+7). This
-    test documents the current (buggy) behavior; it is not the intended design.
+    Coverage coherence operates on the 0-1 fraction scale. A property that is
+    extensively flooded (60%+ coverage) earns the high-coverage bonus (+8),
+    while one with mid-range partial coverage (5-35%) takes the ambiguity
+    penalty (-3). These must differ — the pre-fix code treated every fraction
+    as "< 5" and gave them all the same "confidently dry" bonus.
     """
-    fully_flooded = {"max_depth_ft": 5.0, "pct_flooded": 1.0, "urban_flag": 0}  # 100% flooded
-    completely_dry = {"max_depth_ft": 0.0, "pct_flooded": 0.0, "urban_flag": 0}  # 0% flooded
+    extensive = {"max_depth_ft": 2.0, "pct_flooded": 0.70, "urban_flag": 0}
+    ambiguous = {"max_depth_ft": 2.0, "pct_flooded": 0.15, "urban_flag": 0}
+    # +8 (coverage >= 0.60) vs -3 (ambiguous partial) → 11-point spread.
+    assert calculate_confidence(extensive, HARVEY) == calculate_confidence(ambiguous, HARVEY) + 11
 
-    score_flooded = calculate_confidence(fully_flooded, HARVEY)
-    score_dry = calculate_confidence(completely_dry, HARVEY)
 
-    # Both hit the same "pct < 5" branch today because pct is a fraction, not a percent.
-    # A correct implementation would NOT score full flooding the same way as fully dry.
-    assert score_flooded != score_dry  # depth/recency factors still differ
-    # This assertion exists to flag the gap: if someone "fixes" the % thresholds
-    # to operate on the 0-1 scale, this test should be revisited.
+def test_confidence_confidently_dry_gets_boost():
+    """Near-zero coverage (< 0.05 fraction) is a confident 'dry' signal (+7)."""
+    dry = {"max_depth_ft": 0.0, "pct_flooded": 0.0, "urban_flag": 0}
+    ambiguous = {"max_depth_ft": 0.0, "pct_flooded": 0.15, "urban_flag": 0}
+    assert calculate_confidence(dry, HARVEY) > calculate_confidence(ambiguous, HARVEY)
+
+
+def test_confidence_internal_inconsistency_penalty_fires_on_fraction_scale():
+    """
+    Deep water over a tiny footprint (depth > 1.5ft, coverage < 0.08) is
+    physically suspicious and must be penalized relative to a coherent
+    deep+extensive reading.
+    """
+    suspicious = {"max_depth_ft": 3.0, "pct_flooded": 0.04, "urban_flag": 0}  # deep, tiny area
+    coherent = {"max_depth_ft": 3.0, "pct_flooded": 0.70, "urban_flag": 0}    # deep, extensive
+    assert calculate_confidence(suspicious, HARVEY) < calculate_confidence(coherent, HARVEY)
 
 
 # Note: pct_flooded is a 0-1 fraction here too — classify_triage runs before

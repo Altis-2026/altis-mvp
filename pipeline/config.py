@@ -90,3 +90,31 @@ TRIAGE = {
     'remote_approve_min_pct':     0.20,  # Min coverage for remote approve (20%)
     'remote_approve_conf':        78,    # Min confidence for remote approve
 }
+
+# ─── SAR DETECTION PARAMETERS ─────────────────────────────────────────────────
+# Tunable knobs for the Sentinel-1 flood-detection step (03_flood_pipeline.py).
+SAR = {
+    # Speckle filter: Sentinel-1 GRD is noisy; a focal-mean smooth before
+    # thresholding is UN-SPIDER recommended practice and sharply cuts false
+    # positives. Radius in meters; set to 0 to disable.
+    'speckle_radius_m':       50,
+
+    # Otsu range guard. Open-water VV backscatter sits roughly in this band.
+    # If the per-scene Otsu threshold lands outside it (e.g. a unimodal scene
+    # with little/no water), we fall back to a safe default instead of using a
+    # garbage threshold that floods the whole map.
+    'water_db_min':          -22.0,
+    'water_db_max':          -12.0,
+    'otsu_fallback_db':      -16.0,
+
+    # Water-surface-elevation (WSE) estimator. The waterline sits at the HIGHER
+    # elevations among flooded pixels, but a plain focal_max is dominated by a
+    # single spurious high pixel and produces absurd depths. A high percentile
+    # is robust to those outliers while still tracking the waterline.
+    'wse_percentile':         90,
+
+    # Physical depth cap. Residential flood depths above this are almost
+    # certainly DEM/WSE artifacts, not real water. Depth is clamped here so a
+    # single-family home never reports a 40-foot flood.
+    'max_plausible_depth_ft': 20.0,
+}

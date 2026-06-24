@@ -35,6 +35,9 @@ def calculate_confidence(row, event_config):
     """
     score = 65  # Base score
     depth = row['max_depth_ft']
+    # pct_flooded is a 0-1 fraction at this stage of the pipeline. The
+    # *100 conversion to a percentage happens later, only for the final CSV /
+    # display. All coverage thresholds below are therefore on the 0-1 scale.
     pct   = row['pct_flooded']
     days  = event_config['days_since_event']
 
@@ -52,15 +55,15 @@ def calculate_confidence(row, event_config):
     elif depth < 0.1:   score += 10  # Near-zero — confidently not flooded
     else:               score -= 7   # Very shallow — most uncertain
 
-    # Coverage coherence
-    if pct >= 60:    score += 8
-    elif pct >= 35:  score += 4
-    elif pct < 5:    score += 7   # Confidently dry
-    else:            score -= 3
+    # Coverage coherence (pct is a 0-1 fraction)
+    if pct >= 0.60:    score += 8    # Extensive, coherent flood signal
+    elif pct >= 0.35:  score += 4
+    elif pct < 0.05:   score += 7    # Confidently dry
+    else:              score -= 3    # Ambiguous partial coverage
 
-    # Internal consistency
-    if depth > 1.5 and pct < 8:   score -= 10  # Deep but tiny area — suspicious
-    if depth < 0.3 and pct > 45:  score -= 8   # Near-zero depth but half flooded — suspicious
+    # Internal consistency (pct is a 0-1 fraction)
+    if depth > 1.5 and pct < 0.08:   score -= 10  # Deep but tiny area — suspicious
+    if depth < 0.3 and pct > 0.45:   score -= 8   # Near-zero depth but half flooded — suspicious
 
     # ── Urban SAR shadow penalty (new in v2)
     # Properties in high-density urban areas get -15pts.
@@ -122,7 +125,7 @@ def generate_notes_batch(batch_rows):
         property_block += (
             f"Property {i}: {street} | "
             f"Depth: {row['max_depth_ft']:.1f}ft | "
-            f"Coverage: {int(row['pct_flooded'])}% | "
+            f"Coverage: {int(round(row['pct_flooded'] * 100))}% | "
             f"Class: {row['impact_class']} | "
             f"Confidence: {row['confidence_score']}%"
             + (" | Urban SAR zone" if int(row.get('urban_flag', 0)) == 1 else "")
@@ -163,7 +166,7 @@ def generate_notes_batch(batch_rows):
             urban  = " (urban SAR zone, elevated uncertainty)" if int(row.get('urban_flag', 0)) == 1 else ""
             fallback.append(
                 f"Satellite analysis at {street} shows {row['max_depth_ft']:.1f}ft max flood depth "
-                f"with {int(row['pct_flooded'])}% coverage at {row['confidence_score']}% confidence{urban}; "
+                f"with {int(round(row['pct_flooded'] * 100))}% coverage at {row['confidence_score']}% confidence{urban}; "
                 f"{action.lower()}."[:200]
             )
         return fallback

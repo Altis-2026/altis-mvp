@@ -13,7 +13,7 @@ import ee
 import pandas as pd
 import time
 from collections import Counter
-from config import GEE_PROJECT, HARVEY, IAN, OUTPUT_DIR
+from config import GEE_PROJECT, HARVEY, IAN, OUTPUT_DIR, SAR
 from provenance import write_manifest
 
 ee.Initialize(project=GEE_PROJECT)
@@ -106,11 +106,17 @@ def otsu_threshold_gee(image, bbox_coords):
     return compute_otsu(ee.Dictionary(histogram).get('VV'))
 
 
-def load_sar_composite(bbox_coords, start_date, end_date, orbit_pass=None):
+def load_sar_composite(bbox_coords, start_date, end_date, orbit_pass=None,
+                       speckle_radius_m=None):
     """
     Load Sentinel-1 VV median composite. Auto-selects dominant orbit direction.
+    Applies a focal-mean speckle filter (UN-SPIDER recommended practice) so the
+    downstream Otsu threshold sees a smoother, less noisy histogram.
     Returns: (composite_image, scene_count, orbit_direction_used)
     """
+    if speckle_radius_m is None:
+        speckle_radius_m = SAR['speckle_radius_m']
+
     bbox = ee.Geometry.Rectangle(bbox_coords)
     base_filter = (ee.ImageCollection("COPERNICUS/S1_GRD")
         .filterBounds(bbox)
@@ -137,7 +143,17 @@ def load_sar_composite(bbox_coords, start_date, end_date, orbit_pass=None):
     if count == 0:
         raise ValueError(f"No Sentinel-1 images found for {start_date} to {end_date}.")
 
-    return collection.median(), count, orbit_pass
+    composite = collection.median()
+
+    # Speckle filter: focal-mean smoothing in dB space. Suppresses the
+    # salt-and-pepper noise inherent to SAR that otherwise produces isolated
+    # false-positive "flood" pixels.
+    if speckle_radius_m and speckle_radius_m > 0:
+        composite = composite.focal_mean(
+            radius=speckle_radius_m, kernelType='circle', units='meters'
+        ).rename('VV')
+
+    return composite, count, orbit_pass
 
 
 def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_m):
@@ -152,7 +168,15 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
     a confident Remote-Deny. Scientifically correct, legally defensible.
     """
     # Otsu adaptive threshold
-    threshold = otsu_threshold_gee(post_image, bbox_coords)
+    raw_threshold = ee.Number(otsu_threshold_gee(post_image, bbox_coords))
+
+    # Range guard: if Otsu lands outside the plausible open-water VV band
+    # (common when a scene is unimodal — little or no standing water), fall back
+    # to a safe default instead of letting a garbage threshold flood the map.
+    in_range = raw_threshold.gte(SAR['water_db_min']).And(
+        raw_threshold.lte(SAR['water_db_max']))
+    threshold = ee.Number(ee.Algorithms.If(
+        in_range, raw_threshold, SAR['otsu_fallback_db']))
 
     # Slope mask: water physically cannot pool on slopes > 5 degrees
     slope_mask = ee.Terrain.slope(dem).lt(5)
@@ -171,15 +195,27 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
                     .And(permanent_water.Not())
                     .rename('flood'))
 
-    # Depth via Water Surface Elevation minus ground elevation
+    # Depth via Water Surface Elevation minus ground elevation.
+    # The waterline sits at the HIGHER elevations among flooded pixels, but a
+    # plain focal_max is dominated by a single spurious high pixel (a false-
+    # positive flood pixel on higher ground, or an imperfectly masked building)
+    # and that one outlier sets the WSE — and therefore the depth — absurdly
+    # high for the whole neighborhood. Using a high percentile instead is robust
+    # to those outliers while still tracking the true waterline.
     flooded_elevation = dem.updateMask(flood_mask)
-    wse = flooded_elevation.focal_max(
-        radius=wse_radius_m, units='meters', iterations=2
-    ).reproject(crs='EPSG:4326', scale=30)
+    wse = (flooded_elevation
+           .reduceNeighborhood(
+               reducer=ee.Reducer.percentile([SAR['wse_percentile']]),
+               kernel=ee.Kernel.circle(radius=wse_radius_m, units='meters'),
+           )
+           .reproject(crs='EPSG:4326', scale=30))
 
+    # Physical depth cap: clamp implausibly deep readings (residential flooding
+    # above ~20ft is almost always a DEM/WSE artifact, not real water).
+    max_depth_m = SAR['max_plausible_depth_ft'] / 3.28084
     depth_ft = (wse.subtract(dem)
                    .updateMask(flood_mask)
-                   .max(ee.Image(0.0))
+                   .clamp(0.0, max_depth_m)
                    .multiply(3.28084)
                    .rename('depth_ft'))
 
@@ -327,7 +363,12 @@ def run_flood_pipeline(event_config):
         'pre_event_window':      [event_config['pre_start'], event_config['pre_end']],
         'post_event_window':     [event_config['post_start'], event_config['post_end']],
         'wse_radius_m':          event_config['wse_radius_m'],
-        'threshold_method':      'Otsu adaptive',
+        'threshold_method':      'Otsu adaptive + range guard',
+        'otsu_water_db_range':   [SAR['water_db_min'], SAR['water_db_max']],
+        'otsu_fallback_db':      SAR['otsu_fallback_db'],
+        'speckle_filter_radius_m': SAR['speckle_radius_m'],
+        'wse_estimator':         f"p{SAR['wse_percentile']} neighborhood percentile",
+        'max_plausible_depth_ft': SAR['max_plausible_depth_ft'],
         'slope_mask_max_degrees': 5,
         'permanent_water_dataset': 'JRC/GSW1_4/GlobalSurfaceWater (seasonality >= 8mo)',
         'building_mask_dataset': 'GOOGLE/Research/open-buildings/v3',
