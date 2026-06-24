@@ -38,6 +38,31 @@ import numpy as np
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# RAW FLOOD-LIKELIHOOD SCORE (the quantity we calibrate)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def raw_flood_score(pct_flooded_frac, max_depth_ft, depth_ref_ft: float = 3.0) -> float:
+    """
+    A monotonic, model-side flood-evidence score in [0, 1], blending coverage
+    and depth. This — not the hand-tuned triage confidence — is what we map to a
+    calibrated probability of flooding, since it is a direct measure of flood
+    evidence rather than decision certainty.
+
+    pct_flooded_frac is a 0-1 fraction (caller divides by 100 if working from
+    the final CSV's percentage column).
+    """
+    try:
+        pct = min(max(float(pct_flooded_frac), 0.0), 1.0)
+    except (TypeError, ValueError):
+        pct = 0.0
+    try:
+        depth_term = min(max(float(max_depth_ft), 0.0) / depth_ref_ft, 1.0)
+    except (TypeError, ValueError):
+        depth_term = 0.0
+    return round(0.5 * pct + 0.5 * depth_term, 4)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ISOTONIC REGRESSION (Pool Adjacent Violators)
 # ─────────────────────────────────────────────────────────────────────────────
 
