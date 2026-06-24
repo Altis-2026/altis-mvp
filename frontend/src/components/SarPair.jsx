@@ -30,8 +30,8 @@ function ImgBox({ label, src, loading, compact }) {
   );
 }
 
-/* Pre/post SAR pair — fetches once per property_id, reused in drawer + compare tray */
-export default function SarPair({ propertyId, compact = false }) {
+/* Pre/post pair — refetches per property_id and sensor view (sar | optical) */
+export default function SarPair({ propertyId, view = 'sar', compact = false }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -39,11 +39,11 @@ export default function SarPair({ propertyId, compact = false }) {
     if (!propertyId) return;
     setData(null);
     setLoading(true);
-    api.getSarThumbnails(propertyId)
+    api.getSarThumbnails(propertyId, view)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [propertyId]);
+  }, [propertyId, view]);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 6 : 10 }}>

@@ -15,7 +15,7 @@ export const api = {
   getTiles:       (id)     => get(`/events/${id}/tiles`),
 
   /* SAR thumbnails */
-  getSarThumbnails: (pid)  => get(`/sar-thumbnails/${pid}`),
+  getSarThumbnails: (pid, view = 'sar') => get(`/sar-thumbnails/${pid}?view=${view}`),
 
   /* Portfolio */
   downloadTemplate: ()     => fetch(`${BASE}/portfolio/template`),

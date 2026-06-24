@@ -73,31 +73,38 @@ def get_flood_tile_url(event_id: str) -> Optional[str]:
 # ── SAR thumbnail generation ──────────────────────────────────────────────────
 
 def generate_synthetic_thumbnail(property_id: str, depth_ft: float,
-                                  is_post: bool) -> str:
+                                  is_post: bool, view: str = 'sar') -> str:
     """
-    Generate a synthetic SAR-like thumbnail using PIL.
-    Returns a base64-encoded PNG data URL.
+    Generate a synthetic thumbnail using PIL. Returns a base64 PNG data URL.
+    Fallback when real GEE imagery isn't cached.
 
-    This is the fallback when GEE thumbnails aren't cached.
-    Renders in the Altis blue-gray color scheme:
-    - Water: near-black
-    - Flooded areas: mid-teal
-    - Buildings/land: bright gray-white
+    Two distinct, physically-motivated renderings:
+    - view='sar'     : Sentinel-1 radar. Speckled grayscale; standing water is
+                       specular and reads NEAR-BLACK. Flooding => dark pools.
+    - view='optical' : Sentinel-2 MNDWI-style. Vegetated land reads green;
+                       water has high MNDWI and reads BRIGHT CYAN. Flooding =>
+                       bright pools. (Deliberately the inverse of SAR so the
+                       two sensors are visibly different, as they are in reality.)
     """
     try:
         from PIL import Image
     except ImportError:
         return ""
 
-    seed = int(hashlib.md5(f"{property_id}{'post' if is_post else 'pre'}".encode())
-               .hexdigest()[:8], 16) % 100_000
+    optical = (view == 'optical')
+    seed = int(hashlib.md5(
+        f"{property_id}{'post' if is_post else 'pre'}{view}".encode()
+    ).hexdigest()[:8], 16) % 100_000
     rng  = np.random.RandomState(seed)
     H, W = 200, 300
 
-    # SAR speckle texture
-    base = rng.exponential(scale=0.32, size=(H, W)).astype(np.float32)
+    # Base texture: SAR is heavy speckle; optical is smoother.
+    if optical:
+        base = rng.normal(0.55, 0.10, size=(H, W)).astype(np.float32)
+    else:
+        base = rng.exponential(scale=0.32, size=(H, W)).astype(np.float32)
 
-    # Building-like bright returns
+    # Building-like bright returns (both sensors see structures as brighter)
     for _ in range(rng.randint(5, 12)):
         bx = rng.randint(5, W - 20)
         by = rng.randint(5, H - 18)
@@ -109,32 +116,47 @@ def generate_synthetic_thumbnail(property_id: str, depth_ft: float,
     ry = rng.randint(H // 3, 2 * H // 3)
     base[ry:ry+2, :] *= rng.uniform(0.25, 0.40)
 
-    # Add flood signature on post-event image
+    # Flood mask on post-event image — same geometry for both sensors, so a
+    # demo viewer can see the *same* flood read oppositely by the two sensors.
+    flood_mask = np.zeros((H, W), dtype=bool)
     if is_post and depth_ft > 0.2:
         inten = min(depth_ft / 7.0, 1.0)
+        Y, X  = np.ogrid[:H, :W]
         cx    = rng.randint(W // 4, 3 * W // 4)
         cy    = rng.randint(H // 2, H - 15)
         rx    = int(38 + W * 0.17 * inten)
         ry2   = int(28 + H * 0.17 * inten)
-        Y, X  = np.ogrid[:H, :W]
-        m1    = ((X - cx)**2 / rx**2 + (Y - cy)**2 / ry2**2) <= 1.0
-        base[m1] = rng.uniform(0.01, 0.06, m1.sum())
-
+        flood_mask |= ((X - cx)**2 / rx**2 + (Y - cy)**2 / ry2**2) <= 1.0
         if depth_ft > 1.5:
             cx2, cy2 = rng.randint(15, W - 25), rng.randint(H // 3, H - 15)
-            r2  = int(18 + 22 * inten)
-            m2  = (X - cx2)**2 + (Y - cy2)**2 <= r2**2
-            base[m2] = rng.uniform(0.01, 0.05, m2.sum())
+            r2 = int(18 + 22 * inten)
+            flood_mask |= (X - cx2)**2 + (Y - cy2)**2 <= r2**2
+
+    if not optical:
+        # SAR: water is dark
+        base[flood_mask] = rng.uniform(0.01, 0.06, flood_mask.sum())
 
     # Normalize
-    p97 = np.percentile(base, 97) + 1e-8
-    arr = np.clip(base / p97, 0, 1)
+    if optical:
+        arr = np.clip(base / (np.percentile(base, 99) + 1e-8), 0, 1)
+    else:
+        arr = np.clip(base / (np.percentile(base, 97) + 1e-8), 0, 1)
 
-    # Altis blue-gray palette
-    rgb          = np.zeros((H, W, 3), dtype=np.uint8)
-    rgb[:, :, 0] = (arr * 155).astype(np.uint8)
-    rgb[:, :, 1] = (arr * 178).astype(np.uint8)
-    rgb[:, :, 2] = (arr * 205).astype(np.uint8)
+    rgb = np.zeros((H, W, 3), dtype=np.uint8)
+    if optical:
+        # Natural-ish: land leans green, then paint water bright cyan on top.
+        rgb[:, :, 0] = (arr * 120).astype(np.uint8)
+        rgb[:, :, 1] = (arr * 150).astype(np.uint8)
+        rgb[:, :, 2] = (arr * 110).astype(np.uint8)
+        if flood_mask.any():
+            rgb[flood_mask, 0] = 40
+            rgb[flood_mask, 1] = (140 + arr[flood_mask] * 60).astype(np.uint8)
+            rgb[flood_mask, 2] = (200 + arr[flood_mask] * 55).astype(np.uint8)
+    else:
+        # Altis blue-gray SAR palette
+        rgb[:, :, 0] = (arr * 155).astype(np.uint8)
+        rgb[:, :, 1] = (arr * 178).astype(np.uint8)
+        rgb[:, :, 2] = (arr * 205).astype(np.uint8)
 
     img    = Image.fromarray(rgb)
     buffer = io.BytesIO()
@@ -143,23 +165,27 @@ def generate_synthetic_thumbnail(property_id: str, depth_ft: float,
     return f"data:image/png;base64,{b64}"
 
 
-def get_sar_thumbnails(property_id: str, depth_ft: float) -> dict:
+def get_sar_thumbnails(property_id: str, depth_ft: float, view: str = 'sar') -> dict:
     """
-    Return pre/post SAR thumbnail data URLs for a property.
-    Checks GEE cache first, falls back to synthetic generation.
+    Return pre/post thumbnail data URLs for a property and sensor view
+    ('sar' or 'optical'). Checks GEE cache first, falls back to synthetic.
     """
     from backend.database import get_cached_thumbnail
 
-    pre_url  = get_cached_thumbnail(property_id, is_post=False)
-    post_url = get_cached_thumbnail(property_id, is_post=True)
+    # Only real SAR tiles are cached; optical always uses the synthetic path.
+    pre_url = post_url = None
+    if view == 'sar':
+        pre_url  = get_cached_thumbnail(property_id, is_post=False)
+        post_url = get_cached_thumbnail(property_id, is_post=True)
 
     if not pre_url:
-        pre_url  = generate_synthetic_thumbnail(property_id, depth_ft, is_post=False)
+        pre_url  = generate_synthetic_thumbnail(property_id, depth_ft, is_post=False, view=view)
     if not post_url:
-        post_url = generate_synthetic_thumbnail(property_id, depth_ft, is_post=True)
+        post_url = generate_synthetic_thumbnail(property_id, depth_ft, is_post=True, view=view)
 
     return {
         'property_id': property_id,
+        'view':        view,
         'pre_url':     pre_url,
         'post_url':    post_url,
         'is_real_sar': False,   # Will be True when GEE thumbnails are cached

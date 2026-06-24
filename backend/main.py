@@ -37,7 +37,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from backend.database import (
     init_db, load_event_data, get_event_stats,
     save_portfolio, get_portfolio, list_portfolios,
-    save_analysis_results, get_analysis_results,
+    save_analysis_results, get_analysis_results, get_analyzed_depth,
     save_pending_upload, get_pending_upload, delete_pending_upload,
     save_feedback, get_feedback_for_event, get_feedback_summary,
     save_run, list_runs, update_run_status,
@@ -127,12 +127,17 @@ def get_tiles(event_id: str):
 # ── SAR thumbnails ────────────────────────────────────────────────────────────
 
 @app.get("/api/sar-thumbnails/{property_id}")
-def get_thumbnails(property_id: str):
+def get_thumbnails(property_id: str, view: str = 'sar'):
     """
-    Return before/after SAR thumbnails for a property.
-    Uses cached GEE imagery if available, otherwise synthetic.
+    Return before/after thumbnails for a property and sensor view
+    ('sar' or 'optical'). Uses cached GEE imagery if available, else synthetic.
+
+    Depth (which drives the flood signature) is resolved from pre-computed
+    event data first, then from saved portfolio analysis results — so an
+    *uploaded* property shows its flood once it has been analyzed.
     """
-    # Look up depth from event data
+    view = 'optical' if view == 'optical' else 'sar'
+
     depth_ft = 0.0
     for eid in EVENTS:
         df = load_event_data(eid)
@@ -142,7 +147,12 @@ def get_thumbnails(property_id: str):
                 depth_ft = float(matches.iloc[0].get('max_depth_ft', 0))
                 break
 
-    return get_sar_thumbnails(property_id, depth_ft)
+    if depth_ft == 0.0:
+        analyzed = get_analyzed_depth(property_id)
+        if analyzed:
+            depth_ft = analyzed
+
+    return get_sar_thumbnails(property_id, depth_ft, view=view)
 
 
 # ── Portfolio upload ──────────────────────────────────────────────────────────

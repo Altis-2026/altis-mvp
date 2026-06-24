@@ -98,3 +98,34 @@ def test_event_report_pdf(client):
 
 def test_event_report_unknown_event_404(client):
     assert client.get("/api/events/nope/report").status_code == 404
+
+
+# ── SAR / optical thumbnails ──────────────────────────────────────────────────
+
+def test_sar_and_optical_thumbnails_differ(client):
+    """The SAR/OPTICAL toggle must return genuinely different imagery."""
+    sar = client.get("/api/sar-thumbnails/demo_prop?view=sar").json()
+    opt = client.get("/api/sar-thumbnails/demo_prop?view=optical").json()
+    assert sar["view"] == "sar" and opt["view"] == "optical"
+    assert sar["pre_url"].startswith("data:image/png;base64,")
+    assert sar["post_url"] != opt["post_url"]   # different sensors, different image
+    assert sar["pre_url"] != opt["pre_url"]
+
+
+def test_sar_thumbnail_uses_analyzed_depth_for_uploaded_property(client):
+    """An uploaded property's flood signature comes from saved analysis."""
+    import backend.database as db
+    db.init_db()
+    db.save_analysis_results("pf1", "harvey", [{
+        "property_id": "PF-UP-1", "impact_class": "Dispatch", "max_depth_ft": 4.2,
+        "pct_flooded": 0.6, "confidence_score": 88, "adjuster_note": "",
+    }])
+    assert db.get_analyzed_depth("PF-UP-1") == 4.2
+    # flooded post image must differ from the dry pre image
+    body = client.get("/api/sar-thumbnails/PF-UP-1?view=sar").json()
+    assert body["pre_url"] != body["post_url"]
+
+
+def test_sar_thumbnail_defaults_to_sar_view(client):
+    body = client.get("/api/sar-thumbnails/whatever").json()
+    assert body["view"] == "sar"

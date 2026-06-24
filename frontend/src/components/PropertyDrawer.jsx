@@ -210,7 +210,7 @@ export default function PropertyDrawer({ property, eventId, onClose, onAddToComp
                 fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em',
                 color: 'var(--teal)', textTransform: 'uppercase',
               }}>
-                Sentinel-1 SAR Imagery
+                {sarView === 'optical' ? 'Sentinel-2 Optical (MNDWI)' : 'Sentinel-1 SAR Imagery'}
               </span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['sar', 'optical'].map(v => (
@@ -229,7 +229,7 @@ export default function PropertyDrawer({ property, eventId, onClose, onAddToComp
               </div>
             </div>
 
-            <SarPair propertyId={property.property_id} />
+            <SarPair propertyId={property.property_id} view={sarView} />
 
             <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
               Synthetic preview shown when GEE imagery isn't cached — see README

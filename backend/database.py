@@ -241,6 +241,22 @@ def get_analysis_results(portfolio_id: str, event_id: str) -> list | None:
     return [dict(r) for r in rows] if rows else None
 
 
+def get_analyzed_depth(property_id: str) -> float | None:
+    """
+    Largest flood depth recorded for a property across any saved portfolio
+    analysis. Lets the SAR thumbnail endpoint render the flood signature for
+    an *uploaded* property once it has been analyzed against an event — event
+    data alone doesn't know about portfolio property ids.
+    """
+    conn = sqlite3.connect(str(DB_PATH))
+    row = conn.execute(
+        "SELECT MAX(max_depth_ft) FROM analysis_results WHERE property_id = ?",
+        (property_id,),
+    ).fetchone()
+    conn.close()
+    return float(row[0]) if row and row[0] is not None else None
+
+
 # ── SAR thumbnail helpers ─────────────────────────────────────────────────────
 
 def get_cached_thumbnail(property_id: str, is_post: bool) -> str | None:
