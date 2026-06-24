@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#000004"/>
+  <g transform="translate(32,30) rotate(-35)">
+    <!-- solar panels -->
+    <rect x="-26" y="-7" width="14" height="14" rx="1.2" fill="#A8D4E6" opacity="0.55"/>
+    <rect x="12"  y="-7" width="14" height="14" rx="1.2" fill="#A8D4E6" opacity="0.55"/>
+    <line x1="-12" y1="0" x2="-7" y2="0" stroke="#A8D4E6" stroke-width="2"/>
+    <line x1="7"   y1="0" x2="12" y2="0" stroke="#A8D4E6" stroke-width="2"/>
+    <g opacity="0.85">
+      <line x1="-22" y1="-4" x2="-18" y2="-4" stroke="#000004" stroke-width="1.4"/>
+      <line x1="-22" y1="0"  x2="-18" y2="0"  stroke="#000004" stroke-width="1.4"/>
+      <line x1="-22" y1="4"  x2="-18" y2="4"  stroke="#000004" stroke-width="1.4"/>
+      <line x1="18" y1="-4" x2="22" y2="-4" stroke="#000004" stroke-width="1.4"/>
+      <line x1="18" y1="0"  x2="22" y2="0"  stroke="#000004" stroke-width="1.4"/>
+      <line x1="18" y1="4"  x2="22" y2="4"  stroke="#000004" stroke-width="1.4"/>
+    </g>
+    <!-- body -->
+    <rect x="-7" y="-8" width="14" height="16" rx="2" fill="#A8D4E6"/>
+    <!-- dish -->
+    <circle cx="0" cy="-15" r="6" fill="none" stroke="#A8D4E6" stroke-width="2"/>
+    <line x1="0" y1="-9" x2="0" y2="-15" stroke="#A8D4E6" stroke-width="1.6"/>
+  </g>
+</svg>

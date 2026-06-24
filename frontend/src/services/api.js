@@ -71,6 +71,13 @@ export const api = {
     .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
   eventReportUrl: (evtId) => `${BASE}/events/${evtId}/report`,
 
+  /* Chat ("Ask about this area") */
+  sendChatMessage: (payload) => fetch(`${BASE}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+
   /* Health */
   health: () => get('/health'),
 };

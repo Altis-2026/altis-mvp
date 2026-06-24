@@ -14,6 +14,7 @@ import ReportsPanel       from './components/ReportsPanel.jsx';
 import DispatchQueuePanel from './components/DispatchQueuePanel.jsx';
 import OperationsPanel    from './components/OperationsPanel.jsx';
 import DataGrid           from './components/DataGrid.jsx';
+import ChatBar            from './components/ChatBar.jsx';
 import { api }            from './services/api.js';
 
 function computeBounds(properties) {
@@ -302,6 +303,14 @@ export default function App() {
           kind={grid.kind}
           onClose={() => setGrid(null)}
           onRowClick={(p) => { setSelectedProperty(p); setGrid(null); }}
+        />
+      )}
+
+      {!grid && (
+        <ChatBar
+          eventMeta={selectedEventMeta}
+          eventStats={stats}
+          selectedProperty={selectedProperty}
         />
       )}
 

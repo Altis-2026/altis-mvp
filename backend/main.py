@@ -20,6 +20,7 @@ Endpoints:
     GET  /api/events/{id}/feedback
     GET  /api/events/{id}/report          (audit PDF)
     GET  /api/runs   POST /api/runs        (monitor → pipeline queue)
+    POST /api/chat                         (ask-about-this-area assistant)
     GET  /api/health
 """
 import os
@@ -578,6 +579,36 @@ def set_run_status(run_id: str, body: dict = Body(...)):
         raise HTTPException(400, "status must be queued|running|complete|failed.")
     update_run_status(run_id, status)
     return {"ok": True, "run_id": run_id, "status": status}
+
+
+# ── Chat ("Ask about this area") ──────────────────────────────────────────────
+
+@app.post("/api/chat")
+def chat(body: dict = Body(...)):
+    """
+    Grounded Q&A about the event/property currently on screen. Forwards to
+    OpenRouter (Claude Haiku 4.5) with the on-screen data as context — the
+    frontend sends whatever event/property it currently has loaded so the
+    assistant never has to re-derive (or guess) what the user is looking at.
+    """
+    from backend.chat import ask, ChatError
+
+    message = str(body.get("message", "")).strip()
+    if not message:
+        raise HTTPException(400, "message is required.")
+
+    try:
+        reply = ask(
+            message=message,
+            history=body.get("history") or [],
+            event_meta=body.get("event_meta"),
+            event_stats=body.get("event_stats"),
+            property_row=body.get("property"),
+        )
+    except ChatError as e:
+        raise HTTPException(502, str(e))
+
+    return {"reply": reply}
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

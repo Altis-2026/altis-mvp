@@ -1,21 +1,26 @@
 /* Header.jsx — Fixed top bar with logo, event label, upload button */
 import { useState } from 'react';
 
+/* Altis brand mark — satellite with solar panels + dish, teal-on-black. */
 const AltisLogo = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-    <rect x="7" y="6" width="8" height="10" rx="1.5" fill="#A8D4E6"/>
-    <rect x="0" y="8" width="6" height="6" rx="0.5" fill="#A8D4E6" opacity="0.65"/>
-    <rect x="16" y="8" width="6" height="6" rx="0.5" fill="#A8D4E6" opacity="0.65"/>
-    <rect x="1.5" y="9.5" width="1.5" height="1.5" fill="#000010" opacity="0.7"/>
-    <rect x="3.5" y="9.5" width="1.5" height="1.5" fill="#000010" opacity="0.7"/>
-    <rect x="1.5" y="11.5" width="1.5" height="1.5" fill="#000010" opacity="0.7"/>
-    <rect x="3.5" y="11.5" width="1.5" height="1.5" fill="#000010" opacity="0.7"/>
-    <rect x="16.5" y="9.5" width="1.5" height="1.5" fill="#000010" opacity="0.7"/>
-    <rect x="18.5" y="9.5" width="1.5" height="1.5" fill="#000010" opacity="0.7"/>
-    <rect x="16.5" y="11.5" width="1.5" height="1.5" fill="#000010" opacity="0.7"/>
-    <rect x="18.5" y="11.5" width="1.5" height="1.5" fill="#000010" opacity="0.7"/>
-    <circle cx="5.5" cy="18.5" r="2.5" fill="#A8D4E6" opacity="0.7"/>
-    <line x1="7.8" y1="16.2" x2="9" y2="16" stroke="#A8D4E6" strokeWidth="1"/>
+  <svg width="24" height="24" viewBox="0 0 64 64">
+    <g transform="translate(32,30) rotate(-35)">
+      <rect x="-26" y="-7" width="14" height="14" rx="1.2" fill="#A8D4E6" opacity="0.55"/>
+      <rect x="12"  y="-7" width="14" height="14" rx="1.2" fill="#A8D4E6" opacity="0.55"/>
+      <line x1="-12" y1="0" x2="-7" y2="0" stroke="#A8D4E6" strokeWidth="2"/>
+      <line x1="7"   y1="0" x2="12" y2="0" stroke="#A8D4E6" strokeWidth="2"/>
+      <g opacity="0.85">
+        <line x1="-22" y1="-4" x2="-18" y2="-4" stroke="#000004" strokeWidth="1.4"/>
+        <line x1="-22" y1="0"  x2="-18" y2="0"  stroke="#000004" strokeWidth="1.4"/>
+        <line x1="-22" y1="4"  x2="-18" y2="4"  stroke="#000004" strokeWidth="1.4"/>
+        <line x1="18" y1="-4" x2="22" y2="-4" stroke="#000004" strokeWidth="1.4"/>
+        <line x1="18" y1="0"  x2="22" y2="0"  stroke="#000004" strokeWidth="1.4"/>
+        <line x1="18" y1="4"  x2="22" y2="4"  stroke="#000004" strokeWidth="1.4"/>
+      </g>
+      <rect x="-7" y="-8" width="14" height="16" rx="2" fill="#A8D4E6"/>
+      <circle cx="0" cy="-15" r="6" fill="none" stroke="#A8D4E6" strokeWidth="2"/>
+      <line x1="0" y1="-9" x2="0" y2="-15" stroke="#A8D4E6" strokeWidth="1.6"/>
+    </g>
   </svg>
 );
 

@@ -129,3 +129,41 @@ def test_sar_thumbnail_uses_analyzed_depth_for_uploaded_property(client):
 def test_sar_thumbnail_defaults_to_sar_view(client):
     body = client.get("/api/sar-thumbnails/whatever").json()
     assert body["view"] == "sar"
+
+
+# ── Chat ("Ask about this area") ─────────────────────────────────────────────
+
+def test_chat_requires_message(client):
+    assert client.post("/api/chat", json={}).status_code == 400
+
+
+def test_chat_grounds_reply_in_context(client, monkeypatch):
+    import backend.chat as chat_mod
+
+    captured = {}
+
+    def fake_ask(message, history, event_meta, event_stats, property_row):
+        captured.update(message=message, event_meta=event_meta, event_stats=event_stats)
+        return f"{event_stats['dispatch']} properties need dispatch."
+
+    monkeypatch.setattr(chat_mod, "ask", fake_ask)
+    r = client.post("/api/chat", json={
+        "message": "How many need dispatch?",
+        "event_meta": {"label": "Hurricane Harvey"},
+        "event_stats": {"dispatch": 80},
+    })
+    assert r.status_code == 200
+    assert r.json()["reply"] == "80 properties need dispatch."
+    assert captured["event_meta"]["label"] == "Hurricane Harvey"
+
+
+def test_chat_surfaces_upstream_error_as_502(client, monkeypatch):
+    import backend.chat as chat_mod
+
+    def fake_ask(*a, **kw):
+        raise chat_mod.ChatError("OPENROUTER_API_KEY is missing")
+
+    monkeypatch.setattr(chat_mod, "ask", fake_ask)
+    r = client.post("/api/chat", json={"message": "hi"})
+    assert r.status_code == 502
+    assert "OPENROUTER_API_KEY" in r.json()["detail"]
