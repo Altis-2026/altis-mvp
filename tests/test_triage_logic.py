@@ -5,6 +5,7 @@ from tests.conftest import load_pipeline_module
 
 triage_notes = load_pipeline_module("04_triage_notes.py")
 calculate_confidence = triage_notes.calculate_confidence
+confidence_breakdown = triage_notes.confidence_breakdown
 classify_triage = triage_notes.classify_triage
 
 
@@ -91,6 +92,43 @@ def test_confidence_boosted_when_sar_and_optical_agree_dry():
     confirmed_dry = {**base, "optical_available": 1, "optical_water_pct": 0.0}
     assert calculate_confidence(confirmed_dry, HARVEY) == (
         calculate_confidence(base, HARVEY) + OPTICAL['confirm_dry_bonus'])
+
+
+# ── Explainability: confidence-factor breakdown ──────────────────────────────
+
+def test_breakdown_final_score_matches_calculate_confidence():
+    """The breakdown must never drift from the scalar score it explains."""
+    rows = [
+        {"max_depth_ft": 5.0, "pct_flooded": 0.7, "urban_flag": 0},
+        {"max_depth_ft": 0.4, "pct_flooded": 0.10, "urban_flag": 1},
+        {"max_depth_ft": 0.0, "pct_flooded": 0.0, "urban_flag": 0,
+         "optical_available": 1, "optical_water_pct": 0.0},
+        {"max_depth_ft": 1.0, "pct_flooded": 0.30, "urban_flag": 0,
+         "optical_available": 1, "optical_water_pct": 0.5},
+    ]
+    for row in rows:
+        b = confidence_breakdown(row, HARVEY)
+        assert b['final_score'] == calculate_confidence(row, HARVEY)
+
+
+def test_breakdown_deltas_plus_base_equal_raw_score():
+    row = {"max_depth_ft": 0.4, "pct_flooded": 0.10, "urban_flag": 1,
+           "optical_available": 1, "optical_water_pct": 0.0}
+    b = confidence_breakdown(row, HARVEY)
+    assert b['base'] + sum(f['delta'] for f in b['factors']) == b['raw_score']
+
+
+def test_breakdown_surfaces_named_factors_with_reasons():
+    row = {"max_depth_ft": 0.4, "pct_flooded": 0.10, "urban_flag": 1,
+           "optical_available": 1, "optical_water_pct": 0.0}
+    b = confidence_breakdown(row, HARVEY)
+    names = {f['factor'] for f in b['factors']}
+    assert 'Urban SAR shadow' in names
+    assert 'Optical cross-check' in names
+    # Every factor carries a human-readable reason and a nonzero delta.
+    for f in b['factors']:
+        assert f['reason'] and isinstance(f['reason'], str)
+        assert f['delta'] != 0
 
 
 # Note: pct_flooded is a 0-1 fraction here too — classify_triage runs before

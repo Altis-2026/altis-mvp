@@ -43,66 +43,100 @@ def calculate_confidence(row, event_config):
     confidence goes up. Optical is usually unavailable right after a storm
     (clouds) — when so, this factor contributes nothing, never a penalty.
     """
-    score = 65  # Base score
+    return confidence_breakdown(row, event_config)['final_score']
+
+
+CONFIDENCE_BASE = 65
+
+
+def confidence_breakdown(row, event_config):
+    """
+    The 'why this decision' explainability view: returns the confidence score
+    together with the exact per-factor contributions that produced it.
+
+    Returns a dict:
+      {
+        'base': 65,
+        'factors': [{'factor': str, 'delta': int, 'reason': str}, ...],
+        'raw_score': int,        # base + sum(deltas), before clamping
+        'final_score': int,      # clamped to [30, 97]
+      }
+
+    calculate_confidence() is a thin wrapper over this, so the breakdown and the
+    score can never drift apart.
+    """
+    factors = []
+
+    def add(factor, delta, reason):
+        if delta:
+            factors.append({'factor': factor, 'delta': int(delta), 'reason': reason})
+
     depth = row['max_depth_ft']
     # pct_flooded is a 0-1 fraction at this stage of the pipeline. The
     # *100 conversion to a percentage happens later, only for the final CSV /
     # display. All coverage thresholds below are therefore on the 0-1 scale.
-    pct   = row['pct_flooded']
-    days  = event_config['days_since_event']
+    pct  = row['pct_flooded']
+    days = event_config['days_since_event']
 
     # Recency factor
-    if days <= 2:   score += 15
-    elif days <= 4: score += 8
-    elif days <= 7: score += 2
-    else:           score -= 8
+    if days <= 2:   add('SAR recency', +15, f'Imagery {days}d post-event — very fresh')
+    elif days <= 4: add('SAR recency', +8,  f'Imagery {days}d post-event — fresh')
+    elif days <= 7: add('SAR recency', +2,  f'Imagery {days}d post-event — acceptable')
+    else:           add('SAR recency', -8,  f'Imagery {days}d post-event — stale')
 
     # Depth certainty
-    if depth >= 4.0:    score += 12
-    elif depth >= 2.0:  score += 7
-    elif depth >= 1.0:  score += 3
-    elif depth >= 0.5:  score -= 4   # Shallow — hardest to measure accurately
-    elif depth < 0.1:   score += 10  # Near-zero — confidently not flooded
-    else:               score -= 7   # Very shallow — most uncertain
+    if depth >= 4.0:    add('Depth certainty', +12, f'Deep water ({depth:.1f}ft) — unambiguous')
+    elif depth >= 2.0:  add('Depth certainty', +7,  f'Moderate depth ({depth:.1f}ft) — clear signal')
+    elif depth >= 1.0:  add('Depth certainty', +3,  f'Shallow-moderate depth ({depth:.1f}ft)')
+    elif depth >= 0.5:  add('Depth certainty', -4,  f'Shallow ({depth:.1f}ft) — hardest to measure')
+    elif depth < 0.1:   add('Depth certainty', +10, 'Near-zero depth — confidently not flooded')
+    else:               add('Depth certainty', -7,  f'Very shallow ({depth:.1f}ft) — most uncertain')
 
     # Coverage coherence (pct is a 0-1 fraction)
-    if pct >= 0.60:    score += 8    # Extensive, coherent flood signal
-    elif pct >= 0.35:  score += 4
-    elif pct < 0.05:   score += 7    # Confidently dry
-    else:              score -= 3    # Ambiguous partial coverage
+    if pct >= 0.60:    add('Coverage coherence', +8, f'{pct*100:.0f}% coverage — extensive, coherent')
+    elif pct >= 0.35:  add('Coverage coherence', +4, f'{pct*100:.0f}% coverage — substantial')
+    elif pct < 0.05:   add('Coverage coherence', +7, f'{pct*100:.0f}% coverage — confidently dry')
+    else:              add('Coverage coherence', -3, f'{pct*100:.0f}% coverage — ambiguous partial')
 
     # Internal consistency (pct is a 0-1 fraction)
-    if depth > 1.5 and pct < 0.08:   score -= 10  # Deep but tiny area — suspicious
-    if depth < 0.3 and pct > 0.45:   score -= 8   # Near-zero depth but half flooded — suspicious
+    if depth > 1.5 and pct < 0.08:
+        add('Internal consistency', -10, 'Deep water over a tiny footprint — physically suspicious')
+    if depth < 0.3 and pct > 0.45:
+        add('Internal consistency', -8, 'Near-zero depth but half the area flagged — suspicious')
 
-    # ── Urban SAR shadow penalty (new in v2)
-    # Properties in high-density urban areas get -15pts.
-    # Building walls create radar shadows that look like water.
-    # This pushes borderline urban cases toward Review rather than
-    # a confident Remote-Deny. Legally and scientifically defensible.
-    urban_flag = int(row.get('urban_flag', 0))
-    if urban_flag == 1:
-        score -= 15
+    # ── Urban SAR shadow penalty
+    # Building walls create radar shadows that look like water; push borderline
+    # urban cases toward Review rather than a confident Remote-Deny.
+    if int(row.get('urban_flag', 0)) == 1:
+        add('Urban SAR shadow', -15, 'Dense urban area — radar shadow can mimic water')
 
     # ── Sentinel-2 optical cross-check (Round 2)
     # Only applies when a cloud-free observation actually exists at this
-    # property; otherwise it's a no-op, since clouds are the norm right
-    # after a hurricane and absence of optical data is not evidence either way.
-    optical_available = int(row.get('optical_available', 0))
-    if optical_available == 1:
+    # property; otherwise it's a no-op (clouds are the norm right after a storm).
+    if int(row.get('optical_available', 0)) == 1:
         optical_water_pct = float(row.get('optical_water_pct', 0.0))
-        sar_says_flooded  = pct >= OPTICAL['sar_flood_pct']
+        sar_says_flooded   = pct >= OPTICAL['sar_flood_pct']
         optical_says_water = optical_water_pct >= OPTICAL['water_confirm_pct']
-        optical_says_dry    = optical_water_pct < OPTICAL['water_contradict_pct']
+        optical_says_dry   = optical_water_pct < OPTICAL['water_contradict_pct']
 
         if sar_says_flooded and optical_says_water:
-            score += OPTICAL['confirm_bonus']       # Both sensors agree: flooded
+            add('Optical cross-check', OPTICAL['confirm_bonus'],
+                'Sentinel-2 confirms standing water — sensors agree')
         elif sar_says_flooded and optical_says_dry:
-            score += OPTICAL['contradict_penalty']  # SAR flood call, optical clear — likely SAR artifact
+            add('Optical cross-check', OPTICAL['contradict_penalty'],
+                'Sentinel-2 shows dry ground — likely SAR false positive')
         elif not sar_says_flooded and optical_says_dry:
-            score += OPTICAL['confirm_dry_bonus']   # Both sensors agree: dry
+            add('Optical cross-check', OPTICAL['confirm_dry_bonus'],
+                'Sentinel-2 confirms dry ground — sensors agree')
 
-    return max(30, min(97, int(score)))
+    raw = CONFIDENCE_BASE + sum(f['delta'] for f in factors)
+    final = max(30, min(97, int(raw)))
+    return {
+        'base': CONFIDENCE_BASE,
+        'factors': factors,
+        'raw_score': int(raw),
+        'final_score': final,
+    }
 
 
 def classify_triage(row, thresholds):
@@ -272,8 +306,11 @@ def run_triage_pipeline(event_config):
         print("  Note: depth interval derived in triage (run 03_flood_pipeline.py for measured WSE spread)")
 
     print("\nStep 1: Confidence scores (with urban SAR penalty)...")
-    df['confidence_score'] = df.apply(
-        lambda r: calculate_confidence(r, event_config), axis=1)
+    breakdowns = df.apply(lambda r: confidence_breakdown(r, event_config), axis=1)
+    df['confidence_score'] = [b['final_score'] for b in breakdowns]
+    # 'Why this decision': persist the per-factor breakdown as JSON so the API
+    # and Reports panel can show exactly what drove each property's confidence.
+    df['confidence_factors'] = [json.dumps(b['factors']) for b in breakdowns]
     urban_penalized = (df['urban_flag'] == 1).sum()
     print(f"  Mean: {df['confidence_score'].mean():.0f}%  "
           f"Urban-penalized: {urban_penalized}")
@@ -303,7 +340,8 @@ def run_triage_pipeline(event_config):
         'property_id', 'address', 'pct_flooded', 'max_depth_ft',
         'depth_lower_ft', 'depth_upper_ft', 'depth_ci_ft',
         'impact_class', 'confidence_score', 'recommended_action',
-        'adjuster_note', 'urban_flag', 'optical_available', 'optical_water_pct'
+        'adjuster_note', 'urban_flag', 'optical_available', 'optical_water_pct',
+        'confidence_factors'
     ]
     final_df = df[[c for c in final_cols if c in df.columns]].copy()
 
