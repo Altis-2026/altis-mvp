@@ -11,6 +11,7 @@ import json
 import time
 from config import OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR, PIPELINE_VERSION, OPTICAL
 from provenance import write_manifest
+from uncertainty import depth_interval_ft
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -252,6 +253,24 @@ def run_triage_pipeline(event_config):
         df['optical_water_pct'] = 0.0
         print("  Note: optical cross-check columns not found — run 03_flood_pipeline.py to add them")
 
+    # Backward compat (Round 3): depth uncertainty interval. If 03 already wrote
+    # it, keep it; otherwise derive it here from depth + DEM resolution (+ the
+    # measured water-surface spread when present, else a depth-proportional
+    # fallback inside depth_interval_ft).
+    if 'depth_ci_ft' not in df.columns:
+        dem_res = df['dem_resolution_m'] if 'dem_resolution_m' in df.columns else None
+        spread_col = df['wse_spread_ft'] if 'wse_spread_ft' in df.columns else None
+        lowers, uppers, cis = [], [], []
+        for i, row in df.iterrows():
+            res = row['dem_resolution_m'] if dem_res is not None else None
+            spread = row['wse_spread_ft'] if spread_col is not None else None
+            lo, up, ci = depth_interval_ft(row['max_depth_ft'], res, spread)
+            lowers.append(lo); uppers.append(up); cis.append(ci)
+        df['depth_lower_ft'] = lowers
+        df['depth_upper_ft'] = uppers
+        df['depth_ci_ft'] = cis
+        print("  Note: depth interval derived in triage (run 03_flood_pipeline.py for measured WSE spread)")
+
     print("\nStep 1: Confidence scores (with urban SAR penalty)...")
     df['confidence_score'] = df.apply(
         lambda r: calculate_confidence(r, event_config), axis=1)
@@ -282,6 +301,7 @@ def run_triage_pipeline(event_config):
 
     final_cols = [
         'property_id', 'address', 'pct_flooded', 'max_depth_ft',
+        'depth_lower_ft', 'depth_upper_ft', 'depth_ci_ft',
         'impact_class', 'confidence_score', 'recommended_action',
         'adjuster_note', 'urban_flag', 'optical_available', 'optical_water_pct'
     ]

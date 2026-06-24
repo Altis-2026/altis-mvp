@@ -137,3 +137,31 @@ OPTICAL = {
     'confirm_dry_bonus':     6,   # Confidence bonus when SAR + optical agree on dry
     'contradict_penalty':  -12,   # Confidence penalty when optical contradicts a SAR flood call
 }
+
+# ─── DEPTH UNCERTAINTY PARAMETERS (Round 3) ──────────────────────────────────
+# Estimated depth = water-surface elevation (WSE) minus ground elevation, both
+# read from the DEM. Its uncertainty is dominated by the DEM's own vertical
+# accuracy, plus the local spread of the water surface. We report a ±1σ (~68%)
+# interval per property so a depth is never presented as more precise than the
+# elevation data underneath it actually supports.
+UNCERTAINTY = {
+    # DEM vertical RMSE in metres, keyed by DEM resolution. 3DEP 1m lidar is
+    # specified at <=0.1m RMSEz in the open; we use a conservative 0.30m to
+    # cover vegetated/built returns. SRTM 30m is ~6m RMSE — large enough that
+    # absolute depth from SRTM is barely meaningful, which is exactly why the
+    # pipeline prefers 3DEP and why surfacing this interval matters.
+    'dem_vertical_rmse_m':  {1: 0.30, 30: 6.0},
+    'dem_vertical_rmse_default_m': 6.0,   # conservative fallback for unknown DEM res
+
+    # The water surface is not perfectly flat over a neighborhood. We treat a
+    # fraction of the measured flooded-pixel elevation spread (std, in ft) as
+    # the WSE sigma. When the pipeline can't supply a measured spread, fall
+    # back to a fraction of depth (deeper readings carry more absolute error).
+    'wse_spread_to_sigma':  0.5,
+    'depth_frac_fallback':  0.15,
+
+    # Interval half-width in sigmas (1.0 ≈ 68%) and a floor so we never claim
+    # implausibly tight precision on real residential depths.
+    'k_sigma':              1.0,
+    'min_ci_ft':            0.3,
+}
