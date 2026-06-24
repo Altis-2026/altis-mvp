@@ -110,7 +110,8 @@ def otsu_threshold_gee(image, bbox_coords):
         )
         return ee.Dictionary(result).getNumber('best_threshold')
 
-    return compute_otsu(ee.Dictionary(histogram).get('VV'))
+    band_name = ee.String(image.bandNames().get(0))
+    return compute_otsu(ee.Dictionary(histogram).get(band_name))
 
 
 def load_sar_composite(bbox_coords, start_date, end_date, orbit_pass=None,
