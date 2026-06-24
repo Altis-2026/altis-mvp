@@ -32,7 +32,14 @@ def load_dem(bbox_coords):
         dem_collection = ee.ImageCollection("USGS/3DEP/1m").filterBounds(bbox)
         dem_count = dem_collection.size().getInfo()
         if dem_count > 0:
-            dem = dem_collection.mosaic().rename('elevation')
+            # .mosaic() drops each tile's native (UTM-like) projection and
+            # falls back to a degenerate 1-degree-per-pixel transform, which
+            # silently breaks ee.Terrain.slope() (gradients computed over
+            # ~111km "pixels" instead of 1m, masking out every slope value).
+            # Re-attach the source tiles' real projection before any terrain
+            # analysis.
+            native_proj = dem_collection.first().projection()
+            dem = dem_collection.mosaic().rename('elevation').setDefaultProjection(native_proj)
             dem_resolution = 1
             print(f"  DEM: 3DEP 1m lidar ({dem_count} tiles)")
         else:
@@ -219,8 +226,8 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
                    .multiply(3.28084)
                    .rename('depth_ft'))
 
-    # Urban density: GHS built surface > 1000 m2 per cell
-    urban = (ee.Image("JRC/GHSL/P2023A/GHS_BUILT_S/10")
+    # Urban density: GHS built surface > 1000 m2 per cell (2020 epoch, 100m res)
+    urban = (ee.Image("JRC/GHSL/P2023A/GHS_BUILT_S/2020")
                .select('built_surface').gt(1000)
                .rename('urban').unmask(0))
 
@@ -372,7 +379,7 @@ def run_flood_pipeline(event_config):
         'slope_mask_max_degrees': 5,
         'permanent_water_dataset': 'JRC/GSW1_4/GlobalSurfaceWater (seasonality >= 8mo)',
         'building_mask_dataset': 'GOOGLE/Research/open-buildings/v3',
-        'urban_density_dataset': 'JRC/GHSL/P2023A/GHS_BUILT_S/10',
+        'urban_density_dataset': 'JRC/GHSL/P2023A/GHS_BUILT_S/2020',
         'flooded_property_count': int(flooded),
         'urban_property_count':  int(urban),
     })
