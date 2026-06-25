@@ -383,6 +383,14 @@ def build(path):
         "and run the date <b>2022-09-05</b> (the catastrophic Sindh floods). Most properties come "
         "back Dispatch with multi-foot depths — real Sentinel-1 detection over Pakistan.", BODY)]
     E += [Paragraph(
+        "A second, independently verified dataset is included: "
+        "<font face='Courier'>samples/demo_portfolio_australia_floods.csv</font> — run the date "
+        "<b>2022-02-28</b> (the record Northern Rivers/Lismore floods, NSW). 14 of 16 properties "
+        "come back Dispatch with depths up to 5.6ft; the Lismore CBD parcel correctly routes to "
+        "Review (dense-urban ambiguity) and the rural high-ground control to Remote-Deny. Both "
+        "datasets were built by grid-sampling the real flood extent live via Earth Engine first — "
+        "never by guessing coordinates.", BODY)]
+    E += [Paragraph(
         "Where SAR shines vs. struggles: it is strongest on <b>open-water, riverine, and "
         "storm-surge flooding</b> (vast, unambiguous dark water). It is weakest on <b>dense-urban "
         "rainfall flooding</b>, where buildings hide street-level water and floods often recede "
