@@ -9,7 +9,30 @@ load_dotenv()
 PIPELINE_VERSION = '1.0.0'
 
 # ─── GOOGLE EARTH ENGINE ─────────────────────────────────────────────────────
-GEE_PROJECT = 'altis-mvp'  # <-- change this to your project ID
+GEE_PROJECT = os.getenv('GEE_PROJECT', 'altis-mvp')
+
+# Path to a GEE service-account JSON key. When set (and the file exists), the
+# backend can authenticate non-interactively and run live, on-demand flood
+# analysis for ANY location on Earth. When unset, live analysis is disabled and
+# the app falls back to the pre-computed demo events + synthetic preview imagery
+# — surfaced honestly via GET /api/gee-status rather than pretending to work.
+#
+# Default search order (first existing wins): the env var, then a few
+# conventional locations so local setup is "drop the key here and go".
+_BASE_DIR_CFG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_GEE_KEY_CANDIDATES = [
+    os.getenv('GEE_SERVICE_ACCOUNT_KEY', ''),
+    os.path.join(_BASE_DIR_CFG, 'secrets', 'ee-sa-key.json'),
+]
+GEE_SERVICE_ACCOUNT_KEY = next(
+    (p for p in _GEE_KEY_CANDIDATES if p and os.path.exists(p)), None)
+
+# ─── MAPBOX (global geocoding) ───────────────────────────────────────────────
+# Mapbox geocodes worldwide (unlike the US-only Census geocoder), so uploaded
+# portfolios resolve anywhere — Colombia, Spain, anywhere. Reuses the same token
+# the frontend map already uses. Backend reads MAPBOX_TOKEN; if unset, the
+# geocoder falls back to the US Census service.
+MAPBOX_TOKEN = os.getenv('MAPBOX_TOKEN') or os.getenv('VITE_MAPBOX_TOKEN')
 
 # ─── ANTHROPIC ───────────────────────────────────────────────────────────────
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')

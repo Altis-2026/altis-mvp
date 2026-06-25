@@ -14,8 +14,14 @@ export const api = {
   getProperties:  (id)     => get(`/events/${id}/properties`),
   getTiles:       (id)     => get(`/events/${id}/tiles`),
 
-  /* SAR thumbnails */
-  getSarThumbnails: (pid, view = 'sar') => get(`/sar-thumbnails/${pid}?view=${view}`),
+  /* SAR thumbnails — pass coords + eventDate to get REAL imagery (live path) */
+  getSarThumbnails: (pid, view = 'sar', opts = {}) => {
+    const q = new URLSearchParams({ view });
+    if (opts.lat != null && opts.lon != null && opts.eventDate) {
+      q.set('lat', opts.lat); q.set('lon', opts.lon); q.set('event_date', opts.eventDate);
+    }
+    return get(`/sar-thumbnails/${pid}?${q.toString()}`);
+  },
 
   /* Portfolio */
   downloadTemplate: ()     => fetch(`${BASE}/portfolio/template`),
@@ -39,6 +45,13 @@ export const api = {
   analyzePortfolio: (id, evtId)  => fetch(`${BASE}/portfolio/${id}/analyze/${evtId}`,
                                           { method: 'POST' }).then(r => r.json()),
   getResults:       (id, evtId)  => get(`/portfolio/${id}/results/${evtId}`),
+
+  /* Live, global satellite analysis (real Sentinel-1, any location + date) */
+  geeStatus:    ()                 => get('/gee-status'),
+  analyzeLive:  (id, payload)      => fetch(`${BASE}/portfolio/${id}/analyze-live`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
 
   /* Dispatch queue (severity × coverage) */
   getDispatchQueue: (evtId, classes) =>

@@ -145,7 +145,7 @@ def build(path):
         ("Version", "MVP build — branch claude/wizardly-volta-bj8wdd"),
         ("Audience", "Operators, demo presenters, evaluators"),
         ("Two processes", "FastAPI backend (port 8000) + React frontend (port 5173)"),
-        ("Keys needed", "One free Mapbox token (globe). No paid APIs for the demo."),
+        ("Keys needed", "Mapbox token (globe + global geocoding). Earth Engine key = live global analysis."),
     ])]
     E += [PageBreak()]
 
@@ -361,38 +361,70 @@ def build(path):
         "Detected NHC/USGS flood events are auto-queued as pipeline runs and appear in the "
         "Operations panel — the monitor → pipeline loop, closed.", BODY)]
 
+    E += [Paragraph("Live GLOBAL satellite analysis (any location on Earth)", H3)]
+    E += [Paragraph(
+        "With a Google Earth Engine service-account key in place, Altis runs real Sentinel-1 "
+        "flood detection on demand for any uploaded portfolio, anywhere — no pre-computed event "
+        "needed. Drop the key at <font face='Courier'>secrets/ee-sa-key.json</font> (or set "
+        "<font face='Courier'>GEE_SERVICE_ACCOUNT_KEY</font>) and restart the backend.", BODY)]
+    E += [numbered([
+        "Upload a portfolio (Upload Portfolio → map columns → confirm). Files with "
+        "<b>latitude/longitude columns geocode instantly</b>; address-only files use the global "
+        "Mapbox geocoder.",
+        "Open the <b>Analysis</b> panel, switch source to your portfolio. A “Live satellite "
+        "analysis” card shows a <b>Global</b> badge when Earth Engine is connected.",
+        "Enter the <b>flood/landfall date</b> and click <b>Run</b>. Altis composites Sentinel-1 "
+        "before/after that date, detects flooding, and triages every property (30–90s).",
+        "Open any property — the SAR/Optical panel now shows <b>real Sentinel imagery</b> for "
+        "that exact spot and date, with the unmistakable bright-to-black flood signature.",
+    ])]
+    E += [Paragraph(
+        "Try it: upload <font face='Courier'>samples/demo_portfolio_pakistan_floods.csv</font> "
+        "and run the date <b>2022-09-05</b> (the catastrophic Sindh floods). Most properties come "
+        "back Dispatch with multi-foot depths — real Sentinel-1 detection over Pakistan.", BODY)]
+    E += [Paragraph(
+        "Where SAR shines vs. struggles: it is strongest on <b>open-water, riverine, and "
+        "storm-surge flooding</b> (vast, unambiguous dark water). It is weakest on <b>dense-urban "
+        "rainfall flooding</b>, where buildings hide street-level water and floods often recede "
+        "before the satellite overpass. Altis is honest about this — borderline cases go to "
+        "Review with the confidence score attached, not a false Dispatch/Deny.", BODY)]
+
     # ── 8. Coverage & limits ─────────────────────────────────────────────────
     E += [PageBreak()]
     E += [Paragraph("8 — Coverage, limits &amp; honest answers", H1), rule()]
     E += [Paragraph(
         "Read this before a demo. These are the questions a sharp evaluator asks, and the "
         "true answers.", LEAD)]
-    E += [Paragraph("“Why only two events? Does it work anywhere?”", H3)]
+    E += [Paragraph("“Does it work anywhere?”", H3)]
     E += [bullets([
-        "The <b>technology is global</b>: Sentinel-1 images the entire Earth every ~6–12 days. "
-        "Nothing in the algorithm is specific to Texas or Florida — the pipeline takes a "
-        "bounding box + dates as input.",
-        "The demo ships with <b>Harvey and Ian pre-computed</b> so it runs instantly with no "
-        "Earth Engine login. That's a packaging choice, not a tech limit.",
-        "Adding a new event = add a config dict (bbox + before/after dates) and run the "
-        "pipeline. See §9.",
+        "<b>Yes, globally — and it's wired live.</b> Sentinel-1 images the entire Earth every "
+        "~6–12 days. With an Earth Engine key, uploading a portfolio and entering a flood date "
+        "runs real detection for that location on demand (see §7) — proven on the Pakistan 2022 "
+        "floods, not just US events.",
+        "<b>Geocoding is now global</b> via Mapbox (Colombia, Pakistan, anywhere); the US Census "
+        "geocoder remains a fallback. Files with lat/lon columns skip geocoding entirely.",
+        "<b>Global elevation</b>: the pipeline uses US 3DEP lidar where available, then Copernicus "
+        "GLO-30 (worldwide 30m), then SRTM — so depth works outside the US too.",
+        "The two pre-computed events (Harvey, Ian) still ship for instant, no-login demos.",
     ])]
     E += [Paragraph("Real constraints today (don't oversell)", H3)]
     E += [bullets([
         "<b>You need an actual flood with known dates.</b> SAR compares before vs after, so you "
         "can't point at a dry location on a random day and get a result.",
-        "<b>Geocoding is US-only</b> (free US Census geocoder). International addresses need a "
-        "different geocoder swapped in — small change, not present today.",
-        "<b>Live satellite tiles need Google Earth Engine credentials</b> (a free service "
-        "account). Without them the app serves synthetic SAR thumbnails so the demo never "
-        "hard-fails.",
-        "<b>“Fully accurate” is the wrong claim.</b> Accuracy varies with terrain, urban radar "
-        "artifacts, DEM quality, and cloud cover — which is exactly why Altis reports "
-        "calibrated confidence and uncertainty instead of a single number.",
+        "<b>SAR has a sweet spot.</b> Open-water / riverine / storm-surge flooding detects "
+        "beautifully; dense-urban rainfall flooding is genuinely hard (buildings hide water, "
+        "floods recede before the overpass). Altis routes those to Review rather than guessing.",
+        "<b>Depth precision tracks the DEM.</b> Outside the US (GLO-30 30m, ~6m vertical error) "
+        "depth intervals are wide — surfaced honestly as ± feet, never hidden.",
+        "<b>Calibrated confidence is sharpest where there's ground truth.</b> FEMA anchors US "
+        "calibration; new markets sharpen as partners feed claims back through the adjuster loop.",
+        "<b>Without an Earth Engine key</b>, live analysis is disabled (the app says so via "
+        "/api/gee-status) and imagery falls back to synthetic previews — the demo never hard-fails.",
     ])]
     E += [Paragraph(
-        "The defensible one-liner: <i>“Global satellite coverage, US go-to-market today, and "
-        "adding a new flood event is a config + pipeline run, not a rebuild.”</i>", BODY)]
+        "The defensible one-liner: <i>“Real global flood detection on day one — strongest on "
+        "open-water flooding, honest about urban and depth limits, and it gets sharper per market "
+        "as partners feed ground truth back.”</i>", BODY)]
 
     # ── 9. Adding a new event ────────────────────────────────────────────────
     E += [Paragraph("9 — Adding a new flood event", H1), rule()]

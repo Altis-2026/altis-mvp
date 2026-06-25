@@ -117,8 +117,11 @@ def test_suggest_column_mapping_clean_headers():
     assert mapping["city"]["matched_column"] == "City"
     assert mapping["state"]["matched_column"] == "State"
     assert mapping["zip"]["matched_column"] == "Zip"
+    # Every field that DID match resolves with high confidence. Optional fields
+    # with no corresponding header (e.g. latitude/longitude here) stay unmatched.
     for field in mapping.values():
-        assert field["confidence"] > 0.5
+        if field["matched_column"] is not None:
+            assert field["confidence"] > 0.5
 
 
 def test_suggest_column_mapping_no_double_claiming_a_column():

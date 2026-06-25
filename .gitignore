@@ -4,6 +4,9 @@ venv/
 .venv/
 .env
 .env.local
+secrets/
+*-sa-key.json
+*-service-account*.json
 altis.db
 cache/
 node_modules/

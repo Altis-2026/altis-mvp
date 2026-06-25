@@ -30,8 +30,10 @@ function ImgBox({ label, src, loading, compact }) {
   );
 }
 
-/* Pre/post pair — refetches per property_id and sensor view (sar | optical) */
-export default function SarPair({ propertyId, view = 'sar', compact = false }) {
+/* Pre/post pair — refetches per property_id and sensor view (sar | optical).
+   When lat/lon + eventDate are supplied and Earth Engine is live, the backend
+   returns REAL Sentinel-1/Sentinel-2 imagery for that exact spot + date. */
+export default function SarPair({ propertyId, view = 'sar', lat, lon, eventDate, compact = false }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -39,16 +41,29 @@ export default function SarPair({ propertyId, view = 'sar', compact = false }) {
     if (!propertyId) return;
     setData(null);
     setLoading(true);
-    api.getSarThumbnails(propertyId, view)
+    const opts = (lat != null && lon != null && eventDate) ? { lat, lon, eventDate } : {};
+    api.getSarThumbnails(propertyId, view, opts)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [propertyId, view]);
+  }, [propertyId, view, lat, lon, eventDate]);
+
+  const real = data?.is_real_sar;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 6 : 10 }}>
-      <ImgBox label="Pre"  src={data?.pre_url}  loading={loading} compact={compact} />
-      <ImgBox label="Post" src={data?.post_url} loading={loading} compact={compact} />
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 6 : 10 }}>
+        <ImgBox label="Pre"  src={data?.pre_url}  loading={loading} compact={compact} />
+        <ImgBox label="Post" src={data?.post_url} loading={loading} compact={compact} />
+      </div>
+      {!compact && (
+        <div style={{ fontSize: '0.62rem', marginTop: 6, textAlign: 'center',
+                      color: real ? 'var(--approve)' : 'var(--text-muted)' }}>
+          {loading ? 'Loading imagery…'
+            : real ? '● Live Sentinel imagery — this exact location & date'
+            : 'Synthetic preview — run live analysis (with GEE) for real imagery'}
+        </div>
+      )}
     </div>
   );
 }

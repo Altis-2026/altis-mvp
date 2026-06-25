@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import math
 
-from config import UNCERTAINTY, SAR
+try:
+    from config import UNCERTAINTY, SAR
+except ImportError:  # pragma: no cover - import path guard
+    from pipeline.config import UNCERTAINTY, SAR
 
 _M_TO_FT = 3.28084
 

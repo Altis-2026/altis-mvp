@@ -27,7 +27,9 @@ export default function AnalysisPanel({
   portfolioProperties = [], portfolioLabel, portfolioAnalyzed,
   onSelectProperty, onAddToCompare, compareIds, compareFull,
   onAnalyzePortfolio, analyzing,
+  onAnalyzeLive, liveAnalyzing, geeLive,
 }) {
+  const [liveDate, setLiveDate] = useState('2022-09-05');
   const hasEvent     = eventProperties.length > 0;
   const hasPortfolio = portfolioProperties.length > 0;
 
@@ -160,15 +162,65 @@ export default function AnalysisPanel({
               }}>
                 Not yet analyzed against flood data.
                 {eventLabel && (
-                  <button onClick={onAnalyzePortfolio} disabled={analyzing} style={{
+                  <button onClick={onAnalyzePortfolio} disabled={analyzing || liveAnalyzing} style={{
                     display: 'block', width: '100%', marginTop: 8, padding: '8px 0',
                     background: 'rgba(168,212,230,0.12)', border: '1px solid rgba(168,212,230,0.3)',
                     borderRadius: 'var(--r-sm)', color: '#A8D4E6', fontWeight: 700, fontSize: '0.72rem',
                     cursor: analyzing ? 'wait' : 'pointer', fontFamily: 'var(--font)',
                   }}>
-                    {analyzing ? 'Analyzing…' : `Analyze against ${eventLabel}`}
+                    {analyzing ? 'Analyzing…' : `Match against ${eventLabel}`}
                   </button>
                 )}
+
+                {/* ── Live, global satellite analysis ───────────────────── */}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#A8D4E6' }}>
+                      Live satellite analysis
+                    </span>
+                    <span style={{
+                      fontSize: '0.56rem', fontWeight: 700, letterSpacing: '0.05em', padding: '1px 6px',
+                      borderRadius: 999, textTransform: 'uppercase',
+                      background: geeLive ? 'rgba(76,175,130,0.15)' : 'rgba(107,143,163,0.15)',
+                      color: geeLive ? 'var(--approve)' : 'var(--text-muted)',
+                      border: `1px solid ${geeLive ? 'rgba(76,175,130,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                    }}>
+                      {geeLive ? 'Global' : 'Offline'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 7, lineHeight: 1.45 }}>
+                    Run real Sentinel-1 detection for this portfolio anywhere on Earth. Enter the
+                    flood/landfall date — we composite the satellite imagery around it.
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      type="date" value={liveDate} onChange={e => setLiveDate(e.target.value)}
+                      disabled={!geeLive || liveAnalyzing}
+                      style={{
+                        flex: 1, padding: '6px 8px', fontSize: '0.72rem', colorScheme: 'dark',
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
+                      }}
+                    />
+                    <button
+                      onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate)}
+                      disabled={!geeLive || liveAnalyzing}
+                      style={{
+                        padding: '6px 12px', whiteSpace: 'nowrap',
+                        background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(168,212,230,0.3)', borderRadius: 'var(--r-sm)',
+                        color: geeLive ? '#A8D4E6' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.72rem',
+                        cursor: (!geeLive || liveAnalyzing) ? 'default' : 'pointer', fontFamily: 'var(--font)',
+                      }}>
+                      {liveAnalyzing ? 'Analyzing…' : 'Run'}
+                    </button>
+                  </div>
+                  {liveAnalyzing && (
+                    <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>
+                      Pulling Sentinel-1 scenes & running detection — this can take 30–90s…
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

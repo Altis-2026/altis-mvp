@@ -119,6 +119,8 @@ CANONICAL_FIELD_ALIASES = {
     'city':            ['city', 'town'],
     'state':           ['state', 'st', 'province'],
     'zip':             ['zip', 'zip code', 'postal code', 'zipcode', 'postcode'],
+    'latitude':        ['latitude', 'lat', 'lat dd', 'geo lat'],
+    'longitude':       ['longitude', 'lon', 'lng', 'long', 'lon dd', 'geo lon'],
 }
 
 REQUIRED_FIELDS = ('address',)
@@ -257,7 +259,7 @@ def apply_mapping(df: pd.DataFrame, mapping: dict[str, Optional[str]]) -> pd.Dat
     """
     out = pd.DataFrame(index=df.index)
 
-    for field in ('policy_number', 'coverage_amount'):
+    for field in ('policy_number', 'coverage_amount', 'latitude', 'longitude'):
         col = mapping.get(field)
         out[field] = df[col] if col and col in df.columns else ''
 

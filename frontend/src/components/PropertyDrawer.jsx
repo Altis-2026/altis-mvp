@@ -53,7 +53,7 @@ function Mrow({ label, value }) {
   );
 }
 
-export default function PropertyDrawer({ property, eventId, onClose, onAddToCompare, isInCompare, compareFull, onFeedbackSaved }) {
+export default function PropertyDrawer({ property, eventId, liveEventDate, onClose, onAddToCompare, isInCompare, compareFull, onFeedbackSaved }) {
   const [sarView, setSarView] = useState('sar'); // 'sar' | 'optical'
 
   /* Adjuster feedback (human-in-the-loop ground truth) */
@@ -229,11 +229,13 @@ export default function PropertyDrawer({ property, eventId, onClose, onAddToComp
               </div>
             </div>
 
-            <SarPair propertyId={property.property_id} view={sarView} />
-
-            <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
-              Synthetic preview shown when GEE imagery isn't cached — see README
-            </div>
+            <SarPair
+              propertyId={property.property_id}
+              view={sarView}
+              lat={property.latitude}
+              lon={property.longitude}
+              eventDate={liveEventDate}
+            />
           </div>
 
           {/* Measurements */}

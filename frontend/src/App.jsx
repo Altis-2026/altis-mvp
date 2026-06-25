@@ -64,6 +64,15 @@ export default function App() {
   const [portfolioAnalyzed, setPortfolioAnalyzed] = useState(false);
   const [analyzing,        setAnalyzing]        = useState(false);
 
+  /* ── Live, global satellite analysis ─────────────────────────── */
+  const [geeLive,       setGeeLive]       = useState(null);
+  const [liveAnalyzing, setLiveAnalyzing] = useState(false);
+  const [liveEventDate, setLiveEventDate] = useState(null);
+
+  useEffect(() => {
+    api.geeStatus().then(d => setGeeLive(!!d.live_analysis)).catch(() => setGeeLive(false));
+  }, []);
+
   const refreshPortfolios = useCallback(() => {
     api.listPortfolios().then(d => setPortfolios(d.portfolios || [])).catch(() => {});
   }, []);
@@ -120,6 +129,7 @@ export default function App() {
     setPortfolioId(data.portfolio_id);
     setPortfolioProps(data.properties || []);
     setPortfolioAnalyzed(false);
+    setLiveEventDate(null);
     setShowUpload(false);
     refreshPortfolios();
 
@@ -141,6 +151,7 @@ export default function App() {
       setPortfolioId(id);
       setPortfolioProps(props);
       setPortfolioAnalyzed(false);
+      setLiveEventDate(null);
 
       const bounds = computeBounds(props);
       if (bounds) setFlyTarget({ bounds });
@@ -165,6 +176,28 @@ export default function App() {
       setAnalyzing(false);
     }
   }, [portfolioId, selectedEvent]);
+
+  /* ── Run live, global satellite analysis on the active portfolio ── */
+  const handleAnalyzeLive = useCallback(async (eventDate) => {
+    if (!portfolioId || !eventDate) return;
+    setLiveAnalyzing(true);
+    try {
+      const data = await api.analyzeLive(portfolioId, {
+        event_date: eventDate,
+        label: `${portfolioId} — ${eventDate}`,
+      });
+      setPortfolioProps(data.results || []);
+      setPortfolioAnalyzed(true);
+      setLiveEventDate(eventDate);
+      const bounds = computeBounds(data.results || []);
+      if (bounds) setFlyTarget({ bounds });
+    } catch (err) {
+      console.error('Live analysis failed:', err);
+      alert(err?.detail || 'Live analysis failed. See console for details.');
+    } finally {
+      setLiveAnalyzing(false);
+    }
+  }, [portfolioId]);
 
   const drawerOpen = selectedProperty !== null;
   const activePortfolio = portfolios.find(p => p.id === portfolioId);
@@ -255,6 +288,9 @@ export default function App() {
             compareFull={compareFull}
             onAnalyzePortfolio={handleAnalyzePortfolio}
             analyzing={analyzing}
+            onAnalyzeLive={handleAnalyzeLive}
+            liveAnalyzing={liveAnalyzing}
+            geeLive={geeLive}
           />
         )}
         {activePanel === 'compare' && (
@@ -282,6 +318,7 @@ export default function App() {
       <PropertyDrawer
         property={selectedProperty}
         eventId={selectedEvent}
+        liveEventDate={liveEventDate}
         onClose={() => setSelectedProperty(null)}
         onAddToCompare={addToCompare}
         isInCompare={selectedProperty ? compareIds.has(selectedProperty.property_id) : false}

@@ -128,17 +128,35 @@ def get_tiles(event_id: str):
 # ── SAR thumbnails ────────────────────────────────────────────────────────────
 
 @app.get("/api/sar-thumbnails/{property_id}")
-def get_thumbnails(property_id: str, view: str = 'sar'):
+def get_thumbnails(property_id: str, view: str = 'sar',
+                   lat: float = None, lon: float = None, event_date: str = None):
     """
     Return before/after thumbnails for a property and sensor view
-    ('sar' or 'optical'). Uses cached GEE imagery if available, else synthetic.
+    ('sar' or 'optical').
 
-    Depth (which drives the flood signature) is resolved from pre-computed
-    event data first, then from saved portfolio analysis results — so an
-    *uploaded* property shows its flood once it has been analyzed.
+    When real coordinates + an event date are supplied AND Earth Engine is
+    configured, this serves *real* Sentinel-1 / Sentinel-2 imagery for that
+    exact spot and date window (the live, global path). Otherwise it falls back
+    to a synthetic render whose flood signature is driven by the property's
+    analyzed depth — resolved from pre-computed event data, then saved analysis.
     """
     view = 'optical' if view == 'optical' else 'sar'
 
+    # ── Real imagery path (live, global) ─────────────────────────────────
+    if lat is not None and lon is not None and event_date:
+        try:
+            from backend.live_pipeline import real_thumbnail, derive_windows, gee_available
+            if gee_available():
+                windows = derive_windows(event_date)
+                pre  = real_thumbnail(lat, lon, windows, is_post=False, view=view)
+                post = real_thumbnail(lat, lon, windows, is_post=True,  view=view)
+                if pre and post:
+                    return {'property_id': property_id, 'view': view,
+                            'pre_url': pre, 'post_url': post, 'is_real_sar': True}
+        except Exception as e:
+            print(f"real thumbnail path failed, falling back to synthetic: {e}")
+
+    # ── Synthetic fallback (depth-driven) ────────────────────────────────
     depth_ft = 0.0
     for eid in EVENTS:
         df = load_event_data(eid)
@@ -221,26 +239,44 @@ async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
     df = pd.DataFrame(pending['raw_rows'])
     mapped = apply_mapping(df, mapping)
 
-    addresses = [a.strip() for a in mapped['address'].tolist() if a and a.strip()]
-    if not addresses:
-        raise HTTPException(422, "No addresses found after applying the mapping.")
+    def _parse_coord(v, lo, hi):
+        try:
+            f = float(str(v).strip())
+        except (TypeError, ValueError):
+            return None
+        return f if lo <= f <= hi else None
 
-    print(f"Geocoding {len(addresses)} addresses...")
-    geo_results = await geocode_batch(addresses, concurrency=8)
+    # First pass: keep rows with an address OR explicit coordinates, and pull
+    # any pre-geocoded lat/lon straight through (real carrier files often ship
+    # coordinates — and it makes the result deterministic, no geocoder needed).
+    rows = []
+    for i, row in mapped.iterrows():
+        addr = str(row.get('address', '')).strip()
+        lat  = _parse_coord(row.get('latitude'),  -90,  90)
+        lon  = _parse_coord(row.get('longitude'), -180, 180)
+        if not addr and lat is None:
+            continue
+        rows.append({'i': i, 'addr': addr, 'lat': lat, 'lon': lon, 'row': row})
+
+    if not rows:
+        raise HTTPException(422, "No addresses or coordinates found after applying the mapping.")
+
+    # Geocode only the rows that don't already have coordinates.
+    to_geocode = [r for r in rows if r['lat'] is None or r['lon'] is None]
+    if to_geocode:
+        print(f"Geocoding {len(to_geocode)} addresses ({len(rows) - len(to_geocode)} pre-geocoded)...")
+        geo_results = await geocode_batch([r['addr'] for r in to_geocode], concurrency=8)
+        for r, geo in zip(to_geocode, geo_results):
+            if geo:
+                r['lat'], r['lon'] = geo['lat'], geo['lon']
+                r['matched'] = geo.get('matched_address', r['addr'])
 
     portfolio_id = str(uuid.uuid4())[:8].upper()
     properties   = []
     lats, lons   = [], []
-    geo_idx = 0
 
-    for i, row in mapped.iterrows():
-        addr = str(row.get('address', '')).strip()
-        if not addr:
-            continue
-
-        geo = geo_results[geo_idx]
-        geo_idx += 1
-
+    for r in rows:
+        row = r['row']
         cov_raw = str(row.get('coverage_amount', '') or '').replace(',', '').replace('$', '').strip()
         try:
             coverage_amount = float(cov_raw) if cov_raw else 0
@@ -248,19 +284,18 @@ async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
             coverage_amount = 0
 
         prop = {
-            'property_id':     f"PORT-{portfolio_id}-{str(i+1).zfill(4)}",
+            'property_id':     f"PORT-{portfolio_id}-{str(r['i']+1).zfill(4)}",
             'policy_number':   str(row.get('policy_number', '') or ''),
-            'address':         addr,
+            'address':         r['addr'] or f"{r['lat']:.4f}, {r['lon']:.4f}",
             'coverage_amount': coverage_amount,
-            'matched_address': '',
+            'matched_address': r.get('matched', ''),
         }
 
-        if geo:
-            prop['latitude']        = geo['lat']
-            prop['longitude']       = geo['lon']
-            prop['matched_address'] = geo.get('matched_address', addr)
-            lats.append(geo['lat'])
-            lons.append(geo['lon'])
+        if r['lat'] is not None and r['lon'] is not None:
+            prop['latitude']  = r['lat']
+            prop['longitude'] = r['lon']
+            lats.append(r['lat'])
+            lons.append(r['lon'])
         else:
             prop['latitude']  = None
             prop['longitude'] = None
@@ -268,9 +303,10 @@ async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
         properties.append(prop)
 
     geocoded_count = sum(1 for p in properties if p.get('latitude') is not None)
+    addresses = rows  # for the count in the response/log below
 
     if geocoded_count == 0:
-        raise HTTPException(422, "Could not geocode any addresses. Check address format.")
+        raise HTTPException(422, "Could not resolve any locations. Check address format or add lat/lon columns.")
 
     center = {
         'lat': sum(lats) / len(lats),
@@ -378,6 +414,73 @@ async def analyze_portfolio(portfolio_id: str, event_id: str,
         "event_id":     event_id,
         "analyzed":     len(results),
         "results":      results,
+        "stats":        _portfolio_stats(results),
+    }
+
+
+@app.get("/api/gee-status")
+def gee_status():
+    """
+    Honest capability report: can the backend run live, on-demand satellite
+    analysis for an arbitrary location, or is it limited to the pre-computed
+    demo events? The frontend uses this to label the experience truthfully.
+    """
+    from backend.live_pipeline import gee_available
+    available = gee_available()
+    return {
+        "live_analysis": available,
+        "project": "altis-mvp" if available else None,
+        "message": (
+            "Live global satellite analysis is enabled — analyze any location on Earth."
+            if available else
+            "Live analysis is off (no Earth Engine credentials). Pre-computed demo "
+            "events still work; add a GEE service-account key to enable global analysis."
+        ),
+    }
+
+
+@app.post("/api/portfolio/{portfolio_id}/analyze-live")
+def analyze_portfolio_live_endpoint(portfolio_id: str, body: dict = Body(...)):
+    """
+    Run a REAL Sentinel-1 flood analysis for this portfolio's properties over a
+    user-specified event — anywhere on Earth. Body:
+      { event_date: 'YYYY-MM-DD' (auto-windowed),  OR
+        windows: {pre_start, pre_end, post_start, post_end[, days_since_event]},
+        label?: str, wse_radius_m?: int }
+
+    Persists results under the 'live' event key and returns them inline (same
+    shape as /analyze) plus run metadata (bbox, scene counts, DEM used).
+    """
+    from backend.live_pipeline import analyze_portfolio_live, LiveAnalysisError
+
+    props = get_portfolio(portfolio_id)
+    if not props:
+        raise HTTPException(404, f"Portfolio '{portfolio_id}' not found.")
+
+    try:
+        out = analyze_portfolio_live(
+            props,
+            event_date=body.get('event_date'),
+            windows=body.get('windows'),
+            wse_radius_m=int(body.get('wse_radius_m', 300)),
+            label=str(body.get('label', 'Custom event')),
+        )
+    except LiveAnalysisError as e:
+        # 503 when credentials are missing (a configuration state, not a bug);
+        # 422 for bad/empty input.
+        msg = str(e)
+        code = 503 if 'service-account' in msg or 'authentication' in msg else 422
+        raise HTTPException(code, msg)
+
+    results = out['results']
+    save_analysis_results(portfolio_id, 'live', results)
+
+    return {
+        "portfolio_id": portfolio_id,
+        "event_id":     "live",
+        "analyzed":     len(results),
+        "results":      results,
+        "meta":         out['meta'],
         "stats":        _portfolio_stats(results),
     }
 
