@@ -189,6 +189,74 @@ export default function Globe({
         }
       });
 
+      /* Address labels for portfolio pins — same zoomed-in-only behaviour
+         as the event pin-labels layer. */
+      map.addLayer({
+        id:     'portfolio-pin-labels',
+        type:   'symbol',
+        source: 'portfolio',
+        minzoom: 12.5,
+        layout: {
+          'text-field':         ['coalesce', ['get', 'address'], ['get', 'property_id']],
+          'text-size':          10,
+          'text-offset':        [0, 1.2],
+          'text-anchor':        'top',
+          'text-font':          ['DIN Offc Pro Medium', 'Arial Unicode MS Regular'],
+          'text-optional':      true,
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color':      '#E8D5A3',
+          'text-halo-color': 'rgba(0,0,8,0.92)',
+          'text-halo-width': 1.2,
+        }
+      });
+
+      /* ── Portfolio area outline (bounding box around the analyzed
+         properties) + a label naming the area and property count. */
+      map.addSource('portfolio-bounds', { type: 'geojson', data: emptyFC() });
+      map.addSource('portfolio-bounds-label', { type: 'geojson', data: emptyFC() });
+
+      map.addLayer({
+        id:     'portfolio-bounds-fill',
+        type:   'fill',
+        source: 'portfolio-bounds',
+        paint: {
+          'fill-color':   '#E8D5A3',
+          'fill-opacity': 0.06,
+        }
+      });
+
+      map.addLayer({
+        id:     'portfolio-bounds-line',
+        type:   'line',
+        source: 'portfolio-bounds',
+        paint: {
+          'line-color':     '#E8D5A3',
+          'line-width':     2,
+          'line-dasharray': [2, 1.5],
+          'line-opacity':   0.85,
+        }
+      });
+
+      map.addLayer({
+        id:     'portfolio-bounds-label',
+        type:   'symbol',
+        source: 'portfolio-bounds-label',
+        layout: {
+          'text-field':  ['get', 'label'],
+          'text-size':   13,
+          'text-anchor': 'bottom',
+          'text-offset': [0, -0.6],
+          'text-font':   ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        },
+        paint: {
+          'text-color':      '#E8D5A3',
+          'text-halo-color': 'rgba(0,0,8,0.92)',
+          'text-halo-width': 1.4,
+        }
+      });
+
       pinsReady.current = true;
 
       /* ── Flood overlay (raster, inserted below pins) */
@@ -275,18 +343,64 @@ export default function Globe({
   /* ── Update portfolio properties ─────────────────────────────── */
   useEffect(() => {
     if (!pinsReady.current || !mapRef.current) return;
-    const src = mapRef.current.getSource('portfolio');
+    const map = mapRef.current;
+    const src = map.getSource('portfolio');
     if (!src) return;
+
+    const valid = portfolioProperties.filter(p => p.latitude && p.longitude);
 
     src.setData({
       type:     'FeatureCollection',
-      features: portfolioProperties
-        .filter(p => p.latitude && p.longitude)
-        .map(p => ({
-          type:       'Feature',
-          geometry:   { type: 'Point', coordinates: [+p.longitude, +p.latitude] },
-          properties: { ...p, color: TRIAGE_COLORS[p.impact_class] || '#E8D5A3' },
-        }))
+      features: valid.map(p => ({
+        type:       'Feature',
+        geometry:   { type: 'Point', coordinates: [+p.longitude, +p.latitude] },
+        properties: { ...p, color: TRIAGE_COLORS[p.impact_class] || '#E8D5A3' },
+      }))
+    });
+
+    const boundsSrc      = map.getSource('portfolio-bounds');
+    const boundsLabelSrc = map.getSource('portfolio-bounds-label');
+    if (!boundsSrc || !boundsLabelSrc) return;
+
+    if (valid.length === 0) {
+      boundsSrc.setData(emptyFC());
+      boundsLabelSrc.setData(emptyFC());
+      return;
+    }
+
+    const lats = valid.map(p => +p.latitude);
+    const lons = valid.map(p => +p.longitude);
+    let minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    let minLon = Math.min(...lons), maxLon = Math.max(...lons);
+
+    // Pad so the box visibly frames the cluster instead of clipping the pins.
+    const padLat = Math.max((maxLat - minLat) * 0.18, 0.004);
+    const padLon = Math.max((maxLon - minLon) * 0.18, 0.004);
+    minLat -= padLat; maxLat += padLat;
+    minLon -= padLon; maxLon += padLon;
+
+    boundsSrc.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [minLon, minLat], [maxLon, minLat],
+            [maxLon, maxLat], [minLon, maxLat],
+            [minLon, minLat],
+          ]],
+        },
+      }],
+    });
+
+    boundsLabelSrc.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [(minLon + maxLon) / 2, maxLat] },
+        properties: { label: `PORTFOLIO — ${valid.length} PROPERTIES` },
+      }],
     });
   }, [portfolioProperties]);
 
