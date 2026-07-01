@@ -123,12 +123,16 @@ def analyze_portfolio_live(props: list, event_date: str = None,
     import pandas as pd
     from pipeline.flood_detect import (
         load_dem, load_sar_composite, load_optical_water_mask,
-        build_flood_depth_image, sample_properties,
+        load_sar_vh_composite, load_sar_slice, load_rainfall_sum,
+        load_ndvi_median, build_flood_depth_image, sample_properties,
     )
     from pipeline.uncertainty import depth_interval_ft
     from pipeline.triage_core import (
         confidence_breakdown, classify_triage, ensemble_disagreement,
+        dualpol_review_override,
     )
+    from pipeline.severity import estimate_claim_range
+    from pipeline.config import DURATION, VEGETATION
 
     geocoded = [p for p in props if p.get('latitude') is not None
                 and p.get('longitude') is not None]
@@ -159,12 +163,56 @@ def analyze_portfolio_live(props: list, event_date: str = None,
     optical_water, optical_valid, optical_n = load_optical_water_mask(
         bbox, windows['post_start'], windows['post_end'])
 
+    # Dual-polarization cross-check (coherence proxy) — abstains if no VH.
+    pre_vh, _ = load_sar_vh_composite(
+        bbox, windows['pre_start'], windows['pre_end'], orbit)
+    post_vh, vh_n = load_sar_vh_composite(
+        bbox, windows['post_start'], windows['post_end'], orbit)
+    if pre_vh is None or post_vh is None:
+        pre_vh = post_vh = None
+        vh_n = 0
+
+    # Event-total rainfall (CHIRPS, mm) over pre_end → post_end.
+    rain_img, _ = load_rainfall_sum(bbox, windows['pre_end'], windows['post_end'])
+
+    # Vegetation loss: NDVI pre vs post (cloud-permitting).
+    ndvi_pre, _ = load_ndvi_median(bbox, windows['pre_start'], windows['pre_end'])
+    ndvi_post, _ = load_ndvi_median(bbox, windows['post_start'], windows['post_end'])
+    if ndvi_pre is None or ndvi_post is None:
+        ndvi_pre = ndvi_post = None
+
+    # Inundation-duration slices over the post window (same orbit + threshold).
+    post_s = datetime.strptime(windows['post_start'], "%Y-%m-%d")
+    post_e = datetime.strptime(windows['post_end'], "%Y-%m-%d")
+    total_days = max(1, (post_e - post_s).days)
+    n_slices = DURATION['n_slices']
+    slice_edges = [post_s + timedelta(days=round(total_days * i / n_slices))
+                   for i in range(n_slices + 1)]
+    post_slices, slice_meta = [], []
+    for i in range(n_slices):
+        s0, s1 = slice_edges[i], slice_edges[i + 1]
+        img, cnt = load_sar_slice(bbox, s0.strftime("%Y-%m-%d"),
+                                  s1.strftime("%Y-%m-%d"), orbit)
+        post_slices.append(img)
+        slice_meta.append({'start': s0.strftime("%Y-%m-%d"),
+                           'end': s1.strftime("%Y-%m-%d"),
+                           'days': (s1 - s0).days, 'scenes': cnt})
+
     combined = build_flood_depth_image(
         bbox, pre_img, post_img, dem, wse_radius_m,
-        optical_water=optical_water, optical_valid=optical_valid)
+        optical_water=optical_water, optical_valid=optical_valid,
+        pre_vh=pre_vh, post_vh=post_vh, rain=rain_img,
+        ndvi_pre=ndvi_pre, ndvi_post=ndvi_post, post_slices=post_slices)
 
     sampled = sample_properties(combined, props_df, batch_size=100, throttle=False)
     sampled = sampled.set_index('property_id')
+
+    # FEMA NFHL flood zones (US properties only; non-US resolve to None
+    # instantly, service failures degrade to 'unavailable' without blocking).
+    from backend.fema import flood_zones_batch
+    coords = [(float(p['latitude']), float(p['longitude'])) for p in geocoded]
+    fema_zones = flood_zones_batch(coords)
+    fema_by_pid = {p['property_id']: z for p, z in zip(geocoded, fema_zones)}
 
     # ── Triage scoring (identical calibrated logic as the demo events) ────
     event_cfg = {'days_since_event': days_since}
@@ -188,6 +236,8 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'optical_water_pct': float(s.get('optical_water_pct', 0.0)),
             'rel_elev_ft':       float(s.get('rel_elev_ft', 0.0)),
             'wse_spread_ft':     float(s.get('wse_spread_ft', 0.0)),
+            'vh_available':      int(s.get('vh_available', 0) or 0),
+            'vh_water_pct':      float(s.get('vh_water_pct', 0.0) or 0.0),
         }
 
         breakdown = confidence_breakdown(row, event_cfg)
@@ -199,9 +249,51 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             impact_class = 'Review'
             action = 'Flag for manual review — independent sensors (SAR/optical/DEM) disagree'
 
+        # Dual-pol hard override: VV flood call uncorroborated by VH → Review.
+        dp_override, dp_note = dualpol_review_override(row)
+        if dp_override and impact_class != 'Review':
+            impact_class = 'Review'
+            action = 'Flag for manual review — dual-polarization channels disagree'
+            if not ens_note:
+                ens_note = dp_note
+
         lo, hi, ci = depth_interval_ft(row['max_depth_ft'], dem_res, row['wse_spread_ft'])
+        is_flooded = row['pct_flooded'] >= 0.10 or row['max_depth_ft'] > 0.1
         if row['max_depth_ft'] > 0.1:
             flooded += 1
+
+        # Inundation duration from post-window slices (None = insufficient data).
+        known = [(i, s.get(f'flood_s{i}')) for i in range(n_slices)
+                 if s.get(f'flood_s{i}') is not None
+                 and not (isinstance(s.get(f'flood_s{i}'), float)
+                          and math.isnan(s.get(f'flood_s{i}')))]
+        if len(known) >= 2 and is_flooded:
+            duration_days = sum(slice_meta[i]['days'] for i, v in known
+                                if v >= DURATION['slice_flood_pct'])
+        elif len(known) >= 2:
+            duration_days = 0
+        else:
+            duration_days = None
+
+        # Claim severity range in dollars (reserving aid). The displayed depth
+        # CI is conservatively built from the DEM's ABSOLUTE vertical RMSE, but
+        # depth is a same-DEM difference (WSE − ground) where that bias is
+        # common-mode and largely cancels — so the dollar range uses the
+        # relative-error component (≈25% of depth, floor 0.5ft) rather than
+        # letting a coarse global DEM push every low estimate to $0.
+        sev_ci = min(ci, max(0.5, 0.25 * row['max_depth_ft']))
+        sev = estimate_claim_range(row['max_depth_ft'], sev_ci,
+                                   prop.get('coverage_amount'))
+
+        # Subrogation candidate: flooded AND adjacent to permanent water /
+        # drainage — worth checking whether third-party infrastructure
+        # channeled the water. A screening flag, not a legal determination.
+        near_water = int(s.get('near_water_flag', 0) or 0)
+        subrogation = bool(is_flooded and near_water)
+
+        ndvi_valid = int(s.get('ndvi_valid', 0) or 0)
+        ndvi_delta = float(s.get('ndvi_delta', 0.0) or 0.0)
+        fema = fema_by_pid.get(pid, {'flood_zone': None, 'sfha': None})
 
         results.append({
             **prop,
@@ -217,12 +309,49 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'urban_flag':        row['urban_flag'],
             'optical_available': row['optical_available'],
             'optical_water_pct': round(row['optical_water_pct'], 4),
-            'ensemble_disagreement': int(disagree),
+            'ensemble_disagreement': int(disagree or dp_override),
             'ensemble_note':     ens_note,
             'ensemble_votes':    json.dumps(votes),
+            # Round-7 signals
+            'rain_mm':           float(s.get('rain_mm', 0.0) or 0.0),
+            'vh_available':      row['vh_available'],
+            'vh_water_pct':      round(row['vh_water_pct'], 4),
+            'duration_days':     duration_days,
+            'ndvi_delta':        round(ndvi_delta, 3) if ndvi_valid else None,
+            'vegetation_loss':   int(ndvi_valid and ndvi_delta >= VEGETATION['loss_flag_delta']),
+            'near_water_flag':   near_water,
+            'subrogation_flag':  int(subrogation),
+            'flood_zone':        fema['flood_zone'],
+            'sfha_flag':         fema['sfha'],
+            'severity_low_usd':  sev['low'] if sev else None,
+            'severity_mid_usd':  sev['mid'] if sev else None,
+            'severity_high_usd': sev['high'] if sev else None,
+            'severity_damage_pct': sev['damage_pct'] if sev else None,
             'adjuster_note':     _note(prop.get('address', ''), row, impact_class),
             'color':             COLOR_MAP.get(impact_class, '#6B8FA3'),
         })
+
+    # ── Exposure summary (PIF zone-scan view: the pre-triage numbers a
+    #    carrier wants within minutes of an event) ──────────────────────────
+    def _cov(r):
+        try:
+            return float(r.get('coverage_amount') or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    in_zone = [r for r in results if r['pct_flooded'] >= 10.0 or r['max_depth_ft'] > 0.1]
+    sev_rows = [r for r in results if r['severity_low_usd'] is not None]
+    exposure = {
+        'policies_total':    len(results),
+        'policies_in_zone':  len(in_zone),
+        'tiv_total':         int(sum(_cov(r) for r in results)),
+        'tiv_in_zone':       int(sum(_cov(r) for r in in_zone)),
+        'est_loss_low_usd':  int(sum(r['severity_low_usd'] for r in sev_rows)),
+        'est_loss_mid_usd':  int(sum(r['severity_mid_usd'] for r in sev_rows)),
+        'est_loss_high_usd': int(sum(r['severity_high_usd'] for r in sev_rows)),
+        'by_class': {c: sum(1 for r in results if r['impact_class'] == c)
+                     for c in ('Dispatch', 'Review', 'Remote-Approve', 'Remote-Deny')},
+    }
 
     meta = {
         'label':       label,
@@ -233,11 +362,116 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         'pre_scene_count':  pre_n,
         'post_scene_count': post_n,
         'optical_scene_count': optical_n,
+        'vh_scene_count':   vh_n,
+        'duration_slices':  slice_meta,
+        'exposure':         exposure,
         'flooded_count':    flooded,
         'analyzed_count':   len(results),
         'is_live':          True,
     }
     return {'results': results, 'bbox': bbox, 'meta': meta}
+
+
+def portfolio_risk_scores(props: list) -> dict:
+    """
+    Pre-event, static flood-risk score per property (1=minimal … 5=severe) —
+    the 365-days-a-year underwriting/renewals view, no SAR pass needed.
+
+    Signals (all static GEE layers, one sampling round-trip):
+      - JRC Global Surface Water historical flood occurrence at the parcel
+      - elevation relative to the local drainage minimum (DEM neighborhood)
+      - proximity to permanent water
+    Plus FEMA NFHL zone for US properties (network, budget-capped).
+    """
+    init_ee()
+    import ee
+    import pandas as pd
+    from pipeline.config import RISK
+    from pipeline.flood_detect import load_dem
+    from backend.fema import flood_zones_batch
+
+    geocoded = [p for p in props if p.get('latitude') is not None
+                and p.get('longitude') is not None]
+    if not geocoded:
+        raise LiveAnalysisError("None of the portfolio properties are geocoded.")
+    bbox = bbox_from_properties(geocoded)
+
+    dem, dem_res = load_dem(bbox)
+    neigh_min = (dem.reduceNeighborhood(
+                     reducer=ee.Reducer.min(),
+                     kernel=ee.Kernel.circle(radius=300, units='meters'))
+                 .reproject(crs='EPSG:4326', scale=30))
+    rel_elev_ft = dem.subtract(neigh_min).multiply(3.28084).rename('rel_elev_ft')
+
+    gsw = ee.Image("JRC/GSW1_4/GlobalSurfaceWater")
+    occurrence = gsw.select('occurrence').unmask(0).divide(100).rename('occurrence')
+    near_water = (gsw.select('occurrence').unmask(0).gte(50)
+                  .focal_max(radius=300, kernelType='circle', units='meters')
+                  .rename('near_water'))
+
+    combined = (occurrence.float()
+                .addBands(rel_elev_ft.float().unmask(0))
+                .addBands(near_water.float().unmask(0)))
+
+    features = [ee.Feature(
+        ee.Geometry.Point([float(p['longitude']), float(p['latitude'])]).buffer(50),
+        {'property_id': str(p['property_id'])}) for p in geocoded]
+    sampled = combined.reduceRegions(
+        collection=ee.FeatureCollection(features),
+        reducer=ee.Reducer.mean(), scale=30).getInfo()
+
+    by_pid = {}
+    for feat in sampled.get('features', []):
+        a = feat.get('properties', {})
+        by_pid[a.get('property_id', '')] = a
+
+    coords = [(float(p['latitude']), float(p['longitude'])) for p in geocoded]
+    fema_zones = flood_zones_batch(coords)
+
+    out = []
+    for p, fema in zip(geocoded, fema_zones):
+        a = by_pid.get(p['property_id'], {})
+        occ = max(0.0, float(a.get('occurrence') or 0))
+        rel = max(0.0, float(a.get('rel_elev_ft') or 0))
+        near = float(a.get('near_water') or 0) >= 0.5
+
+        pts = 0
+        for thresh, points in RISK['occurrence_weights']:
+            if occ >= thresh:
+                pts += points
+                break
+        for thresh, points in RISK['rel_elev_weights']:
+            if rel <= thresh:
+                pts += points
+                break
+        if near:
+            pts += RISK['near_water_points']
+        if fema.get('sfha'):
+            pts += 15
+
+        score = 5
+        for max_pts, s in RISK['score_bins']:
+            if pts <= max_pts:
+                score = s
+                break
+
+        out.append({
+            'property_id':   p['property_id'],
+            'address':       p.get('address', ''),
+            'latitude':      p['latitude'],
+            'longitude':     p['longitude'],
+            'risk_score':    score,
+            'risk_points':   pts,
+            'flood_occurrence_pct': round(occ * 100, 1),
+            'rel_elev_ft':   round(rel, 1),
+            'near_permanent_water': int(near),
+            'flood_zone':    fema.get('flood_zone'),
+            'sfha_flag':     fema.get('sfha'),
+        })
+
+    return {'results': out, 'dem_resolution_m': dem_res,
+            'method': 'JRC historical flood occurrence + elevation vs local '
+                      'drainage + permanent-water proximity + FEMA NFHL (US)'}
 
 
 _SAR_PALETTE = ['000000', '2A3A4A', '4A6A8A', 'A8D4E6', 'FFFFFF']

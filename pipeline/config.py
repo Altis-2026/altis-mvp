@@ -161,6 +161,80 @@ OPTICAL = {
     'contradict_penalty':  -12,   # Confidence penalty when optical contradicts a SAR flood call
 }
 
+# ─── DUAL-POLARIZATION CROSS-CHECK (Round 7) ─────────────────────────────────
+# Sentinel-1 IW scenes carry both VV and VH polarizations. Water suppresses
+# backscatter in BOTH channels, but the noise/artifact modes differ (VH is more
+# sensitive to volume scattering, less to specular double-bounce), so running
+# the same change detection independently on VH gives a second, partially
+# independent flood vote from the SAME satellite pass. True InSAR coherence
+# change detection needs SLC phase data, which Google Earth Engine does not
+# distribute (GRD only) — this amplitude-based dual-pol check is the honest,
+# implementable equivalent and is standard practice in operational flood
+# mapping. VH open-water backscatter sits lower than VV.
+SAR_VH = {
+    'water_db_min':     -30.0,
+    'water_db_max':     -18.0,
+    'otsu_fallback_db': -24.0,
+    'flood_pct':         0.10,  # vh_water_pct >= this → VH votes "flood"
+    'dry_pct':           0.03,  # vh_water_pct <  this → VH votes "dry"
+    'agree_bonus':        6,    # confidence when VV + VH agree on flood
+    'agree_dry_bonus':    4,    # confidence when VV + VH agree on dry
+    'disagree_penalty':  -9,    # confidence when VH contradicts the VV call
+    'downgrade_to_review': True,  # VV says flood, VH says dry → manual Review
+}
+
+# ─── INUNDATION DURATION (Round 7) ───────────────────────────────────────────
+# The post-event window is split into consecutive slices; a flood mask is built
+# per slice (same threshold + baseline) and each property's flooded fraction is
+# sampled per slice. Duration ≈ sum of slice lengths where the property reads
+# flooded. Slices without a Sentinel-1 scene abstain, and duration is reported
+# as unknown when fewer than 2 slices had data — never fabricated.
+DURATION = {
+    'n_slices':        3,
+    'slice_flood_pct': 0.15,  # per-slice flooded fraction to count as "still inundated"
+}
+
+# ─── RAINFALL (Round 7) ──────────────────────────────────────────────────────
+# CHIRPS daily precipitation (global, ~5.5km) summed over the event window
+# (pre_end → post_end). Context metric for adjusters: distinguishes riverine/
+# rainfall events from surge, and corroborates the SAR signal.
+RAIN = {
+    'dataset': 'UCSB-CHG/CHIRPS/DAILY',
+}
+
+# ─── VEGETATION / NON-FLOOD DAMAGE (Round 7) ─────────────────────────────────
+# NDVI delta (pre-event median minus post-event median, cloud-masked Sentinel-2)
+# catches damage SAR misses: stripped vegetation, debris fields. Positive delta
+# = vegetation loss. Advisory only — clouds are the norm post-storm.
+VEGETATION = {
+    'loss_flag_delta': 0.15,   # ndvi_delta above this flags notable vegetation loss
+}
+
+# ─── CLAIM SEVERITY (Round 7) ────────────────────────────────────────────────
+# USACE/FEMA-style generic one-story residential depth-damage curve:
+# (depth_ft, % of structure value damaged). Piecewise-linear interpolation.
+# This produces a defensible reserving RANGE, not an adjuster's estimate —
+# the range endpoints come from the depth uncertainty interval.
+SEVERITY = {
+    'depth_damage_curve': [
+        (0.0, 0.0), (0.5, 8.0), (1.0, 14.0), (2.0, 22.0), (3.0, 29.0),
+        (4.0, 35.0), (5.0, 40.0), (6.0, 45.0), (8.0, 52.0), (10.0, 58.0),
+        (15.0, 70.0), (20.0, 80.0),
+    ],
+    'min_depth_ft': 0.1,      # below this, no loss estimate is produced
+}
+
+# ─── PRE-EVENT FLOOD RISK SCORE (Round 7) ────────────────────────────────────
+# Static per-property flood risk (1=minimal … 5=severe) for underwriting/
+# renewals — no SAR needed. Combines JRC historical flood occurrence,
+# elevation relative to local drainage, and proximity to permanent water.
+RISK = {
+    'occurrence_weights': [(1.0, 40), (0.25, 30), (0.05, 15)],  # (occ fraction, points)
+    'rel_elev_weights':   [(3.0, 30), (8.0, 18), (15.0, 8)],    # (<= ft above drainage, points)
+    'near_water_points':  20,
+    'score_bins':         [(20, 1), (40, 2), (60, 3), (80, 4)], # <=pts → score, else 5
+}
+
 # ─── DEPTH UNCERTAINTY PARAMETERS (Round 3) ──────────────────────────────────
 # Estimated depth = water-surface elevation (WSE) minus ground elevation, both
 # read from the DEM. Its uncertainty is dominated by the DEM's own vertical

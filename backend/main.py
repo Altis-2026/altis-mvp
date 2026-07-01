@@ -39,6 +39,7 @@ from backend.database import (
     init_db, load_event_data, get_event_stats,
     save_portfolio, get_portfolio, list_portfolios,
     save_analysis_results, get_analysis_results, get_analyzed_depth,
+    save_analysis_meta, get_analysis_meta,
     save_pending_upload, get_pending_upload, delete_pending_upload,
     save_feedback, get_feedback_for_event, get_feedback_summary,
     save_run, list_runs, update_run_status,
@@ -474,6 +475,7 @@ def analyze_portfolio_live_endpoint(portfolio_id: str, body: dict = Body(...)):
 
     results = out['results']
     save_analysis_results(portfolio_id, 'live', results)
+    save_analysis_meta(portfolio_id, 'live', out['meta'])
 
     return {
         "portfolio_id": portfolio_id,
@@ -495,8 +497,67 @@ def get_results(portfolio_id: str, event_id: str):
         "portfolio_id": portfolio_id,
         "event_id":     event_id,
         "results":      results,
+        "meta":         get_analysis_meta(portfolio_id, event_id),
         "stats":        _portfolio_stats(results),
     }
+
+
+@app.get("/api/portfolio/{portfolio_id}/risk-score")
+def portfolio_risk_score(portfolio_id: str):
+    """
+    Pre-event flood risk score (1–5) per property — static hazard layers
+    (JRC flood history, elevation vs drainage, permanent-water proximity)
+    plus FEMA NFHL zone for US properties. The 365-day underwriting/renewals
+    view; requires GEE but no storm/event date.
+    """
+    from backend.live_pipeline import portfolio_risk_scores, LiveAnalysisError
+
+    props = get_portfolio(portfolio_id)
+    if not props:
+        raise HTTPException(404, f"Portfolio '{portfolio_id}' not found.")
+    try:
+        out = portfolio_risk_scores(props)
+    except LiveAnalysisError as e:
+        msg = str(e)
+        code = 503 if 'service-account' in msg or 'authentication' in msg else 422
+        raise HTTPException(code, msg)
+
+    scores = [r['risk_score'] for r in out['results']]
+    return {
+        "portfolio_id": portfolio_id,
+        "results":      out['results'],
+        "method":       out['method'],
+        "summary": {
+            "total":     len(scores),
+            "by_score":  {s: scores.count(s) for s in range(1, 6)},
+            "high_risk": sum(1 for s in scores if s >= 4),
+        },
+    }
+
+
+@app.get("/api/portfolio/{portfolio_id}/cat-report/{event_id}")
+def portfolio_cat_report(portfolio_id: str, event_id: str):
+    """
+    Reinsurance-format catastrophe report (PDF) for an analyzed portfolio:
+    exposure, estimated loss range, triage distribution, methodology.
+    """
+    from backend.reporting import build_cat_report, ReportError
+
+    results = get_analysis_results(portfolio_id, event_id)
+    if not results or not any(r.get('impact_class') for r in results):
+        raise HTTPException(404, "No analysis results found. Run analyze first.")
+    meta = get_analysis_meta(portfolio_id, event_id) or {}
+    label = meta.get('label', 'Live satellite analysis')
+
+    try:
+        pdf = build_cat_report(portfolio_id, results, meta, label=label)
+    except ReportError as e:
+        raise HTTPException(422, str(e))
+
+    return StreamingResponse(
+        io.BytesIO(pdf), media_type="application/pdf",
+        headers={"Content-Disposition":
+                 f'attachment; filename="altis-cat-report-{portfolio_id}.pdf"'})
 
 
 def _portfolio_stats(results: list) -> dict:

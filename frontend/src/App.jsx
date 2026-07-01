@@ -68,6 +68,7 @@ export default function App() {
   const [geeLive,       setGeeLive]       = useState(null);
   const [liveAnalyzing, setLiveAnalyzing] = useState(false);
   const [liveEventDate, setLiveEventDate] = useState(null);
+  const [liveMeta,      setLiveMeta]      = useState(null);
 
   useEffect(() => {
     api.geeStatus().then(d => setGeeLive(!!d.live_analysis)).catch(() => setGeeLive(false));
@@ -130,7 +131,9 @@ export default function App() {
     setPortfolioProps(data.properties || []);
     setPortfolioAnalyzed(false);
     setLiveEventDate(null);
+    setLiveMeta(null);
     setShowUpload(false);
+    setActivePanel('analysis');   // land the user on the Run-Analysis step
     refreshPortfolios();
 
     const bounds = computeBounds(data.properties || []);
@@ -152,6 +155,7 @@ export default function App() {
       setPortfolioProps(props);
       setPortfolioAnalyzed(false);
       setLiveEventDate(null);
+      setLiveMeta(null);
 
       const bounds = computeBounds(props);
       if (bounds) setFlyTarget({ bounds });
@@ -188,6 +192,7 @@ export default function App() {
       });
       setPortfolioProps(data.results || []);
       setPortfolioAnalyzed(true);
+      setLiveMeta(data.meta || null);
       setLiveEventDate(eventDate);
       const bounds = computeBounds(data.results || []);
       if (bounds) setFlyTarget({ bounds });
@@ -291,6 +296,7 @@ export default function App() {
             onAnalyzeLive={handleAnalyzeLive}
             liveAnalyzing={liveAnalyzing}
             geeLive={geeLive}
+            liveMeta={liveMeta}
           />
         )}
         {activePanel === 'compare' && (

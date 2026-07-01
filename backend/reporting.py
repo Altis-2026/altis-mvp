@@ -252,6 +252,160 @@ def build_event_report(event_id: str, df, stats: dict) -> bytes:
     return buf.getvalue()
 
 
+def build_cat_report(portfolio_id: str, results: list, meta: dict,
+                     label: str = 'Live satellite analysis') -> bytes:
+    """
+    Reinsurance-format catastrophe report for an analyzed portfolio (Round 7):
+    event, peril, affected zone, total insured exposure, estimated loss range,
+    breakdown by triage class, methodology and data sources — the structured
+    document a cat-modeling / reinsurance ops team compiles manually today.
+    Built entirely from stored analysis results, so it's reproducible.
+    """
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, Table, HRFlowable,
+        )
+        from reportlab.lib.enums import TA_LEFT
+    except ImportError as e:  # pragma: no cover
+        raise ReportError(f"PDF support not installed (reportlab missing): {e}")
+
+    if not results:
+        raise ReportError("No analysis results to report. Run an analysis first.")
+
+    def num(v):
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    in_zone = [r for r in results
+               if num(r.get('pct_flooded')) >= 10.0 or num(r.get('max_depth_ft')) > 0.1]
+    tiv_total = int(sum(num(r.get('coverage_amount')) for r in results))
+    tiv_zone = int(sum(num(r.get('coverage_amount')) for r in in_zone))
+    sev_rows = [r for r in results if r.get('severity_low_usd') is not None]
+    loss_low = int(sum(num(r.get('severity_low_usd')) for r in sev_rows))
+    loss_mid = int(sum(num(r.get('severity_mid_usd')) for r in sev_rows))
+    loss_high = int(sum(num(r.get('severity_high_usd')) for r in sev_rows))
+    by_class = {c: sum(1 for r in results if r.get('impact_class') == c)
+                for c in ('Dispatch', 'Review', 'Remote-Approve', 'Remote-Deny')}
+    windows = (meta or {}).get('windows', {})
+    bbox = (meta or {}).get('bbox')
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        topMargin=0.7 * inch, bottomMargin=0.7 * inch,
+        leftMargin=0.75 * inch, rightMargin=0.75 * inch,
+        title=f"Altis Catastrophe Report — {label}", author="Altis")
+
+    styles = getSampleStyleSheet()
+    ink = colors.HexColor('#0B1622')
+    teal = colors.HexColor('#1C6E8C')
+    muted = colors.HexColor('#5A6B78')
+    h1 = ParagraphStyle('h1', parent=styles['Title'], textColor=ink,
+                        fontSize=22, spaceAfter=2, alignment=TA_LEFT)
+    h2 = ParagraphStyle('h2', parent=styles['Heading2'], textColor=teal,
+                        fontSize=13, spaceBefore=16, spaceAfter=6)
+    body = ParagraphStyle('body', parent=styles['BodyText'], textColor=ink,
+                          fontSize=9.5, leading=14, spaceAfter=4)
+    small = ParagraphStyle('small', parent=styles['BodyText'], textColor=muted,
+                           fontSize=8, leading=11)
+
+    elems = []
+    elems.append(Paragraph("Altis Catastrophe Report", h1))
+    elems.append(Paragraph(f"{label} &nbsp;·&nbsp; Peril: Flood (riverine/surface water)", body))
+    generated = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+    elems.append(Paragraph(
+        f"Generated {generated} &nbsp;·&nbsp; Portfolio {portfolio_id} &nbsp;·&nbsp; "
+        f"Ground-truth source: Sentinel-1 SAR change detection", small))
+    elems.append(Spacer(1, 6))
+    elems.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#D6DEE5')))
+
+    # ── Event & exposure summary ─────────────────────────────────────────────
+    elems.append(Paragraph("Event &amp; Exposure Summary", h2))
+    rows = [
+        ['Item', 'Value'],
+        ['Event window (post)', f"{windows.get('post_start', '—')} → {windows.get('post_end', '—')}"],
+        ['Baseline window (pre)', f"{windows.get('pre_start', '—')} → {windows.get('pre_end', '—')}"],
+        ['Policies analyzed', f"{len(results):,}"],
+        ['Policies in detected flood zone', f"{len(in_zone):,}"],
+        ['Total insured value (TIV)', f"${tiv_total:,}"],
+        ['TIV in detected flood zone', f"${tiv_zone:,}"],
+        ['Estimated gross loss (depth-damage)',
+         (f"${loss_mid:,} (range ${loss_low:,} – ${loss_high:,})" if loss_mid
+          else f"${loss_low:,} – ${loss_high:,}") if sev_rows
+         else 'n/a (no coverage data)'],
+    ]
+    if bbox:
+        rows.append(['Affected zone bbox [W,S,E,N]',
+                     f"[{bbox[0]:.3f}, {bbox[1]:.3f}, {bbox[2]:.3f}, {bbox[3]:.3f}]"])
+    t = Table(rows, colWidths=[2.7 * inch, 3.5 * inch])
+    t.setStyle(_table_style(colors))
+    elems.append(t)
+
+    # ── Triage distribution ──────────────────────────────────────────────────
+    elems.append(Paragraph("Claims Triage Distribution", h2))
+    total = max(len(results), 1)
+    rows = [['Triage decision', 'Policies', 'Share']]
+    for cls in ('Dispatch', 'Review', 'Remote-Approve', 'Remote-Deny'):
+        rows.append([cls, f"{by_class[cls]:,}", f"{100 * by_class[cls] / total:.1f}%"])
+    t = Table(rows, colWidths=[3.2 * inch, 1.5 * inch, 1.5 * inch])
+    t.setStyle(_table_style(colors, numeric_from=1))
+    elems.append(t)
+
+    # ── Largest estimated losses ─────────────────────────────────────────────
+    top = sorted(sev_rows, key=lambda r: num(r.get('severity_high_usd')), reverse=True)[:10]
+    if top:
+        elems.append(Paragraph("Largest Estimated Losses", h2))
+        rows = [['Property', 'Depth (ft)', 'Est. loss range', 'FEMA zone']]
+        for r in top:
+            addr = str(r.get('address', r.get('property_id', '')))
+            addr = addr if len(addr) <= 38 else addr[:37].rstrip(', ') + '…'
+            zone = r.get('flood_zone') or '—'
+            rows.append([
+                addr, f"{num(r.get('max_depth_ft')):.1f}",
+                f"${int(num(r.get('severity_low_usd'))):,} – ${int(num(r.get('severity_high_usd'))):,}",
+                str(zone)])
+        t = Table(rows, colWidths=[2.6 * inch, 0.8 * inch, 1.9 * inch, 0.9 * inch])
+        t.setStyle(_table_style(colors, numeric_from=1))
+        elems.append(t)
+
+    # ── Methodology & data sources ───────────────────────────────────────────
+    elems.append(Paragraph("Ground-Truth Methodology &amp; Data Sources", h2))
+    for line in [
+        "Flood extent: Sentinel-1 C-band SAR change detection (pre/post median "
+        "composites, speckle-filtered, range-guarded Otsu threshold, permanent "
+        "water masked via JRC Global Surface Water).",
+        "Depth: water-surface elevation (robust high percentile of flooded-pixel "
+        "elevation) minus DEM ground elevation, reported with a ±1σ interval.",
+        "Cross-checks: Sentinel-2 optical MNDWI, dual-polarization (VH) SAR, and "
+        "DEM-hydrology plausibility — disagreements route to manual review, never "
+        "auto-resolved.",
+        "Loss estimates: USACE/FEMA-style generic residential depth-damage curve "
+        "applied to reported dwelling coverage; the range reflects the depth "
+        "uncertainty interval. Reserving aid, not an adjuster estimate.",
+        f"Scene counts this run: {meta.get('pre_scene_count', '—')} pre / "
+        f"{meta.get('post_scene_count', '—')} post Sentinel-1, "
+        f"{meta.get('optical_scene_count', '—')} Sentinel-2, "
+        f"{meta.get('vh_scene_count', '—')} VH-capable.",
+    ]:
+        elems.append(Paragraph(f"• {line}", body))
+
+    elems.append(Spacer(1, 10))
+    elems.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#D6DEE5')))
+    elems.append(Paragraph(
+        "Generated by Altis · Pre-decisional catastrophe intelligence. Loss figures "
+        "are satellite-derived estimates for reserving support, not adjusted claims.",
+        small))
+
+    doc.build(elems)
+    return buf.getvalue()
+
+
 def _table_style(colors, numeric_from: Optional[int] = None, numeric_cols=None):
     """Shared header/zebra table style. If numeric_from is set, columns at that
     index and beyond are right-aligned (for depth/score columns)."""

@@ -121,6 +121,21 @@ def init_db():
             PRIMARY KEY (portfolio_id, event_id, property_id)
         )
     """)
+    # Round-7 fields (severity $, rainfall, FEMA zone, duration, cross-checks…)
+    # ride in one JSON column so reloading a saved analysis keeps everything.
+    try:
+        conn.execute("ALTER TABLE analysis_results ADD COLUMN extra_json TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_meta (
+            portfolio_id TEXT,
+            event_id TEXT,
+            meta_json TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (portfolio_id, event_id)
+        )
+    """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pending_uploads (
             id TEXT PRIMARY KEY,
@@ -209,27 +224,42 @@ def get_portfolio(portfolio_id: str) -> list | None:
     return [dict(r) for r in rows] if rows else None
 
 
+# Columns stored natively in analysis_results; everything else in a result row
+# is preserved via extra_json so richer live-analysis fields survive reloads.
+_NATIVE_RESULT_KEYS = {
+    'portfolio_id', 'event_id', 'property_id', 'impact_class', 'max_depth_ft',
+    'pct_flooded', 'confidence_score', 'adjuster_note',
+    # portfolio_properties columns (re-joined on read, don't duplicate):
+    'policy_number', 'address', 'coverage_amount', 'latitude', 'longitude',
+    'matched_address',
+}
+
+
 def save_analysis_results(portfolio_id: str, event_id: str, results: list):
+    import json as _json
     conn = sqlite3.connect(str(DB_PATH))
     conn.executemany("""
         INSERT OR REPLACE INTO analysis_results
         (portfolio_id, event_id, property_id, impact_class,
-         max_depth_ft, pct_flooded, confidence_score, adjuster_note)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         max_depth_ft, pct_flooded, confidence_score, adjuster_note, extra_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, [(portfolio_id, event_id,
            r['property_id'], r['impact_class'], r['max_depth_ft'],
-           r['pct_flooded'], r['confidence_score'], r['adjuster_note'])
+           r['pct_flooded'], r['confidence_score'], r['adjuster_note'],
+           _json.dumps({k: v for k, v in r.items()
+                        if k not in _NATIVE_RESULT_KEYS}))
           for r in results])
     conn.commit()
     conn.close()
 
 
 def get_analysis_results(portfolio_id: str, event_id: str) -> list | None:
+    import json as _json
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
         SELECT pp.*, ar.impact_class, ar.max_depth_ft, ar.pct_flooded,
-               ar.confidence_score, ar.adjuster_note
+               ar.confidence_score, ar.adjuster_note, ar.extra_json
         FROM portfolio_properties pp
         LEFT JOIN analysis_results ar
           ON ar.portfolio_id = pp.portfolio_id
@@ -238,7 +268,45 @@ def get_analysis_results(portfolio_id: str, event_id: str) -> list | None:
         WHERE pp.portfolio_id = ?
     """, (event_id, portfolio_id)).fetchall()
     conn.close()
-    return [dict(r) for r in rows] if rows else None
+    if not rows:
+        return None
+    out = []
+    for r in rows:
+        d = dict(r)
+        extra = d.pop('extra_json', None)
+        if extra:
+            try:
+                d.update(_json.loads(extra))
+            except (ValueError, TypeError):
+                pass
+        out.append(d)
+    return out
+
+
+def save_analysis_meta(portfolio_id: str, event_id: str, meta: dict):
+    import json as _json
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("""
+        INSERT OR REPLACE INTO analysis_meta (portfolio_id, event_id, meta_json)
+        VALUES (?, ?, ?)
+    """, (portfolio_id, event_id, _json.dumps(meta)))
+    conn.commit()
+    conn.close()
+
+
+def get_analysis_meta(portfolio_id: str, event_id: str) -> dict | None:
+    import json as _json
+    conn = sqlite3.connect(str(DB_PATH))
+    row = conn.execute(
+        "SELECT meta_json FROM analysis_meta WHERE portfolio_id = ? AND event_id = ?",
+        (portfolio_id, event_id)).fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return None
+    try:
+        return _json.loads(row[0])
+    except (ValueError, TypeError):
+        return None
 
 
 def get_analyzed_depth(property_id: str) -> float | None:

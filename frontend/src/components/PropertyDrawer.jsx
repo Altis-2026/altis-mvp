@@ -71,6 +71,10 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
 
   if (!property) return null;
 
+  // Portfolio property that hasn't been analyzed yet: show an honest "no
+  // analysis yet" state instead of misleading 0%-confidence measurements.
+  const notAnalyzed = !property.impact_class;
+
   const ic     = property.impact_class;
   const color  = COLORS[ic] || '#6B8FA3';
   const depth  = parseFloat(property.max_depth_ft || 0).toFixed(2);
@@ -81,6 +85,20 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   const depthLabel = hasDepthCI
     ? `${depth} ft ± ${parseFloat(property.depth_ci_ft).toFixed(1)} ft`
     : `${depth} ft`;
+
+  // Round-7 enrichment fields (present only on live analyses)
+  const rainMm    = property.rain_mm != null && property.rain_mm !== '' ? +property.rain_mm : null;
+  const durDays   = property.duration_days != null && property.duration_days !== '' ? +property.duration_days : null;
+  const sevLow    = property.severity_low_usd != null && property.severity_low_usd !== '' ? +property.severity_low_usd : null;
+  const sevMid    = property.severity_mid_usd != null && property.severity_mid_usd !== '' ? +property.severity_mid_usd : null;
+  const sevHigh   = property.severity_high_usd != null ? +property.severity_high_usd : null;
+  const floodZone = property.flood_zone || null;
+  const sfha      = property.sfha_flag === true || property.sfha_flag === 1 || property.sfha_flag === '1';
+  const vhAvail   = property.vh_available == 1;
+  const vhAgrees  = vhAvail && (
+    (parseFloat(property.pct_flooded || 0) >= 10) === (parseFloat(property.vh_water_pct || 0) >= 0.10));
+  const vegLoss   = property.vegetation_loss == 1;
+  const subro     = property.subrogation_flag == 1;
 
   const breakdown = parseJsonField(property.confidence_factors);
   const ensembleVotes = parseJsonField(property.ensemble_votes);
@@ -179,6 +197,16 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
           </h2>
 
           {/* Badge + gauge row */}
+          {notAnalyzed ? (
+            <span style={{
+              display: 'inline-block', padding: '4px 12px', borderRadius: 999,
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+              color: 'var(--text-muted)', fontSize: '0.66rem', fontWeight: 700,
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+            }}>
+              Not analyzed yet
+            </span>
+          ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <span className={`badge badge-${ic}`}>{ic}</span>
@@ -198,9 +226,38 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               </span>
             </div>
           </div>
+          )}
         </div>
 
-        {/* ── Body ───────────────────────────────────────── */}
+        {/* ── Not-analyzed body: honest empty state, no fake zeros ── */}
+        {notAnalyzed ? (
+          <div style={{ padding: '20px 24px', flex: 1 }}>
+            <div style={{
+              background: 'rgba(168,212,230,0.05)', border: '1px solid rgba(168,212,230,0.18)',
+              borderRadius: 'var(--r-md)', padding: '16px 18px', lineHeight: 1.6,
+            }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', color: '#A8D4E6', textTransform: 'uppercase', marginBottom: 8 }}>
+                No flood analysis yet
+              </div>
+              <p style={{ fontSize: '0.8rem', color: '#ccc', margin: 0 }}>
+                This property is in your portfolio but hasn't been checked against
+                satellite data. Open the <b>Analysis</b> panel in the sidebar, enter
+                the flood/landfall date, and click <b>Run</b> — Altis will pull real
+                Sentinel-1 imagery and score every property, usually in 30–90 seconds.
+              </p>
+            </div>
+            {property.coverage_amount > 0 && (
+              <div style={{ marginTop: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 'var(--r-md)', padding: '4px 14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <Mrow label="Policy Number" value={property.policy_number || '—'} />
+                    <Mrow label="Coverage" value={`$${(+property.coverage_amount).toLocaleString()}`} />
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
         <div style={{ padding: '20px 24px', flex: 1 }}>
 
           {/* SAR imagery section */}
@@ -257,6 +314,24 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                   <Mrow label="Max Flood Depth"   value={depthLabel} />
                   <Mrow label="Area Flooded"       value={`${pct}%`} />
                   <Mrow label="Confidence Score"   value={`${conf}%`} />
+                  {rainMm != null && (
+                    <Mrow label="Event Rainfall" value={`${(rainMm / 25.4).toFixed(1)} in (${rainMm.toFixed(0)} mm)`} />
+                  )}
+                  {durDays != null && (
+                    <Mrow label="Est. Inundation Duration"
+                          value={durDays > 0 ? `~${durDays} days` : '< 1 satellite pass'} />
+                  )}
+                  {vhAvail && (
+                    <Mrow label="Dual-Pol Cross-Check"
+                          value={vhAgrees ? 'VH confirms ✓' : 'VH disagrees ⚠'} />
+                  )}
+                  {vegLoss && (
+                    <Mrow label="Vegetation Loss" value="Detected (NDVI drop)" />
+                  )}
+                  {floodZone && floodZone !== 'unavailable' && (
+                    <Mrow label="FEMA Flood Zone"
+                          value={sfha ? `${floodZone} — SFHA (NFIP likely)` : floodZone} />
+                  )}
                   <Mrow label="Data Source"        value="Sentinel-1 SAR" />
                   <Mrow label="Urban Shadow Zone"  value={urban ? 'Yes (-15pt penalty)' : 'No'} />
                   <Mrow label="Resolution"         value="10m native, 30m sampled" />
@@ -264,6 +339,50 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               </table>
             </div>
           </div>
+
+          {/* Estimated claim severity (reserving aid) */}
+          {sevLow != null && sevHigh != null && (
+            <div style={{
+              marginBottom: 24, background: 'rgba(212,176,104,0.05)',
+              border: '1px solid rgba(212,176,104,0.2)', borderRadius: 'var(--r-md)',
+              padding: '13px 15px',
+            }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#D4B068', textTransform: 'uppercase', marginBottom: 5 }}>
+                Estimated Claim Severity
+              </div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                {sevMid != null ? `$${sevMid.toLocaleString()}` : `$${sevLow.toLocaleString()} – $${sevHigh.toLocaleString()}`}
+              </div>
+              {sevMid != null && (
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                  range ${sevLow.toLocaleString()} – ${sevHigh.toLocaleString()}
+                </div>
+              )}
+              <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
+                Depth-damage curve × dwelling coverage; range reflects depth uncertainty.
+                Reserving aid — not an adjuster estimate.
+              </div>
+            </div>
+          )}
+
+          {/* Subrogation candidate */}
+          {subro && (
+            <div style={{
+              marginBottom: 24, background: 'rgba(76,175,130,0.05)',
+              border: '1px solid rgba(76,175,130,0.22)', borderRadius: 'var(--r-md)',
+              padding: '12px 14px',
+            }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#4CAF82', textTransform: 'uppercase', marginBottom: 5 }}>
+                Subrogation Candidate
+              </div>
+              <p style={{ fontSize: '0.74rem', color: '#ccc', lineHeight: 1.5, margin: 0 }}>
+                Flooding detected adjacent to a permanent water body / drainage channel.
+                Worth reviewing whether third-party infrastructure (levee, drainage,
+                road channeling) contributed — potential cost recovery. Screening flag,
+                not a legal determination.
+              </p>
+            </div>
+          )}
 
           {/* Ensemble disagreement warning */}
           {disagrees && (
@@ -472,6 +591,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
           </button>
 
         </div>
+        )}
       </div>
     </>
   );

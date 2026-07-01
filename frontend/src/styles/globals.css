@@ -111,9 +111,15 @@ html, body, #root {
   to { transform: rotate(360deg); }
 }
 
+@keyframes pulseBorder {
+  0%, 100% { border-color: rgba(255,179,71,0.15); box-shadow: 0 0 0 0 rgba(255,179,71,0); }
+  50%       { border-color: rgba(255,179,71,0.6);  box-shadow: 0 0 12px 0 rgba(255,179,71,0.12); }
+}
+
 .anim-fade-in        { animation: fadeIn      0.3s ease forwards; }
 .anim-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.16,1,0.3,1) forwards; }
 .anim-slide-in-up    { animation: slideInUp   0.3s ease forwards; }
+.pulse-attention     { animation: pulseBorder 2.2s ease-in-out infinite; }
 
 /* ── Mapbox overrides ────────────────────────────────────────────────── */
 .mapboxgl-canvas { outline: none; }

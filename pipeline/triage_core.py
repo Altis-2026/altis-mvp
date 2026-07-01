@@ -16,9 +16,9 @@ import math
 # Dual import: works whether the pipeline dir is on sys.path (batch script /
 # tests) or imported as a package (backend → `pipeline.triage_core`).
 try:
-    from config import TRIAGE, OPTICAL, ENSEMBLE
+    from config import TRIAGE, OPTICAL, ENSEMBLE, SAR_VH
 except ImportError:  # pragma: no cover - import path guard
-    from pipeline.config import TRIAGE, OPTICAL, ENSEMBLE
+    from pipeline.config import TRIAGE, OPTICAL, ENSEMBLE, SAR_VH
 
 CONFIDENCE_BASE = 65
 
@@ -93,10 +93,48 @@ def confidence_breakdown(row, event_config):
             add('Optical cross-check', OPTICAL['confirm_dry_bonus'],
                 'Sentinel-2 confirms dry ground — sensors agree')
 
+    # ── Dual-polarization (VH) cross-check — coherence-proxy from the same
+    #    Sentinel-1 pass. Abstains (no factor) when no VH scene was available,
+    #    so rows from older pipelines score identically.
+    if int(row.get('vh_available', 0)) == 1:
+        vh_pct = float(row.get('vh_water_pct', 0.0) or 0.0)
+        sar_says_flooded = pct >= OPTICAL['sar_flood_pct']
+        vh_says_flooded  = vh_pct >= SAR_VH['flood_pct']
+        vh_says_dry      = vh_pct < SAR_VH['dry_pct']
+
+        if sar_says_flooded and vh_says_flooded:
+            add('Dual-pol cross-check', SAR_VH['agree_bonus'],
+                'VH channel independently confirms the flood signal')
+        elif sar_says_flooded and vh_says_dry:
+            add('Dual-pol cross-check', SAR_VH['disagree_penalty'],
+                'VH channel does not corroborate — possible VV artifact')
+        elif not sar_says_flooded and vh_says_dry:
+            add('Dual-pol cross-check', SAR_VH['agree_dry_bonus'],
+                'VH channel confirms dry ground')
+
     raw = CONFIDENCE_BASE + sum(f['delta'] for f in factors)
     final = max(30, min(97, int(raw)))
     return {'base': CONFIDENCE_BASE, 'factors': factors,
             'raw_score': int(raw), 'final_score': final}
+
+
+def dualpol_review_override(row, cfg=SAR_VH):
+    """
+    Hard cross-check: when the VV channel calls flood but the (available) VH
+    channel reads dry, the safe action is manual Review — mirrors the ensemble
+    downgrade. Returns (override: bool, reason: str).
+    """
+    if not cfg.get('downgrade_to_review'):
+        return False, ''
+    if int(row.get('vh_available', 0)) != 1:
+        return False, ''
+    pct = float(row.get('pct_flooded', 0.0) or 0.0)
+    vh_pct = float(row.get('vh_water_pct', 0.0) or 0.0)
+    if pct >= OPTICAL['sar_flood_pct'] and vh_pct < cfg['dry_pct']:
+        return True, ('VV amplitude change indicates flooding but the VH channel '
+                      'does not corroborate — routed to manual review (dual-pol '
+                      'cross-check).')
+    return False, ''
 
 
 def calculate_confidence(row, event_config):

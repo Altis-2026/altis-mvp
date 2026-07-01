@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 const TRIAGE_CLASSES = ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review'];
 const MAX_ROWS = 150;
@@ -22,18 +22,44 @@ const TRIAGE_COLORS = {
   'Remote-Deny': '#6B8FA3', 'Review': '#FFB347',
 };
 
+function fmtMoney(v) {
+  const n = +v || 0;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+  return `$${n.toLocaleString()}`;
+}
+
+function ExpStat({ label, value, wide }) {
+  return (
+    <div style={wide ? { gridColumn: '1 / -1' } : undefined}>
+      <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginBottom: 1 }}>{label}</div>
+      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export default function AnalysisPanel({
   eventProperties = [], eventLabel,
   portfolioProperties = [], portfolioLabel, portfolioAnalyzed,
   onSelectProperty, onAddToCompare, compareIds, compareFull,
   onAnalyzePortfolio, analyzing,
-  onAnalyzeLive, liveAnalyzing, geeLive,
+  onAnalyzeLive, liveAnalyzing, geeLive, liveMeta,
 }) {
   const [liveDate, setLiveDate] = useState('2022-09-05');
   const hasEvent     = eventProperties.length > 0;
   const hasPortfolio = portfolioProperties.length > 0;
 
   const [source, setSource] = useState(hasEvent ? 'event' : 'portfolio');
+
+  // A freshly uploaded, not-yet-analyzed portfolio is why the user is here —
+  // switch to it so the Run-Analysis step is impossible to miss.
+  useEffect(() => {
+    if (hasPortfolio && !portfolioAnalyzed) setSource('portfolio');
+  }, [hasPortfolio, portfolioAnalyzed]);
+
+  const exposure = liveMeta?.exposure;
   const [search, setSearch] = useState('');
   const [triageFilter, setTriageFilter] = useState(new Set());
   const [minConfidence, setMinConfidence] = useState(0);
@@ -109,6 +135,34 @@ export default function AnalysisPanel({
           </div>
         )}
 
+        {/* ── Exposure summary (PIF zone-scan) after live analysis ── */}
+        {source === 'portfolio' && portfolioAnalyzed && exposure && (
+          <div style={{
+            marginBottom: 10, padding: '11px 13px',
+            background: 'linear-gradient(135deg, rgba(168,212,230,0.06), rgba(212,176,104,0.06))',
+            border: '1px solid rgba(168,212,230,0.18)', borderRadius: 'var(--r-md)',
+          }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: '#A8D4E6', textTransform: 'uppercase', marginBottom: 7 }}>
+              Portfolio Exposure — This Event
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 10px' }}>
+              <ExpStat label="Policies in flood zone"
+                       value={`${exposure.policies_in_zone} / ${exposure.policies_total}`} />
+              <ExpStat label="TIV at risk" value={fmtMoney(exposure.tiv_in_zone)} />
+              {exposure.est_loss_high_usd > 0 && (
+                <ExpStat label="Est. gross loss" wide
+                         value={exposure.est_loss_mid_usd
+                           ? `${fmtMoney(exposure.est_loss_mid_usd)} (${fmtMoney(exposure.est_loss_low_usd)}–${fmtMoney(exposure.est_loss_high_usd)})`
+                           : `${fmtMoney(exposure.est_loss_low_usd)} – ${fmtMoney(exposure.est_loss_high_usd)}`} />
+              )}
+            </div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: 6 }}>
+              {exposure.by_class?.Dispatch ?? 0} dispatch · {exposure.by_class?.Review ?? 0} review ·{' '}
+              {(exposure.by_class?.['Remote-Approve'] ?? 0) + (exposure.by_class?.['Remote-Deny'] ?? 0)} remote
+            </div>
+          </div>
+        )}
+
         {dataset.length > 0 && (
           <>
             <input
@@ -156,11 +210,12 @@ export default function AnalysisPanel({
                 </div>
               </>
             ) : source === 'portfolio' && !portfolioAnalyzed && (
-              <div style={{
+              <div className="pulse-attention" style={{
                 padding: '10px 12px', background: 'rgba(255,179,71,0.06)', border: '1px solid rgba(255,179,71,0.15)',
                 borderRadius: 'var(--r-md)', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5,
               }}>
-                Not yet analyzed against flood data.
+                <b style={{ color: '#FFB347' }}>Next step:</b> run the flood analysis below.
+                Uploading only maps your portfolio — analysis is what scores it.
                 {eventLabel && (
                   <button onClick={onAnalyzePortfolio} disabled={analyzing || liveAnalyzing} style={{
                     display: 'block', width: '100%', marginTop: 8, padding: '8px 0',
