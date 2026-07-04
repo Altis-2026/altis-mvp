@@ -85,6 +85,33 @@ IAN = {
     'zoom':               10,
 }
 
+# ─── NORTHERN RIVERS (LISMORE) FLOODS CONFIGURATION ──────────────────────────
+# The Feb-Mar 2022 riverine flooding of the Richmond River floodplain, NSW —
+# open-water riverine flooding, SAR's strongest detection case, live-verified
+# in this repo's demo portfolios. The dense demo parcels are grid points across
+# the floodplain localities (addresses labeled "Parcel N"), scored by the same
+# real pipeline as everything else.
+LISMORE = {
+    'event_name':         'Northern Rivers Floods',
+    'event_id':           'lismore',
+    'label':              'Northern Rivers Floods',
+    'sub':                'Lismore & Richmond River, NSW  •  Feb–Mar 2022',
+    'county':             'Northern Rivers, NSW (AU)',
+    'pre_start':          '2022-01-28',
+    'pre_end':            '2022-02-26',
+    'post_start':         '2022-02-28',
+    'post_end':           '2022-03-14',
+    # Bounding box [west, south, east, north] — Lismore→Coraki→Woodburn→Broadwater
+    'bbox':               [153.20, -29.10, 153.42, -28.78],
+    'study_name':         'Richmond River floodplain: Lismore, Coraki, Woodburn, Broadwater',
+    'days_since_event':   3,
+    'wse_radius_m':       300,    # riverine flooding
+    'cost_per_inspection': 750,
+    'lat':               -28.94,
+    'lon':               153.31,
+    'zoom':               10,
+}
+
 # ─── EVENT REGISTRY ───────────────────────────────────────────────────────────
 # Single source of truth for which events the backend/frontend can serve.
 # Add a new storm by adding its config dict above and registering it here.
@@ -97,7 +124,7 @@ EVENTS = {
         'lon':   cfg['lon'],
         'zoom':  cfg['zoom'],
     }
-    for cfg in (HARVEY, IAN)
+    for cfg in (LISMORE, HARVEY, IAN)
 }
 
 # ─── TRIAGE THRESHOLDS ────────────────────────────────────────────────────────

@@ -134,3 +134,39 @@ def test_duration_unknown_with_sparse_scenes():
 def test_duration_skips_missing_slices():
     # Slice 1 has no scene: only slices 0 and 2 contribute.
     assert _duration([0.5, None, 0.3], [5, 5, 4]) == 9
+
+
+# ── Column-mapping regressions (global best-score assignment) ────────────────
+# These header sets previously produced crossed mappings under greedy
+# field-order matching ('state' stealing 'Lat', 'address' stealing 'St').
+
+def test_mapping_carrier_xlsx_headers():
+    from backend.ingestion import suggest_column_mapping
+    m = suggest_column_mapping(
+        ['Claim ID', 'Insured', 'Property Address', 'Lat', 'Long', 'Dwelling Limit'])
+    got = {k: v['matched_column'] for k, v in m.items()}
+    assert got['policy_number'] == 'Claim ID'
+    assert got['address'] == 'Property Address'
+    assert got['coverage_amount'] == 'Dwelling Limit'
+    assert got['latitude'] == 'Lat'
+    assert got['longitude'] == 'Long'
+
+
+def test_mapping_messy_headers_with_punctuation():
+    from backend.ingestion import suggest_column_mapping
+    m = suggest_column_mapping(
+        ['Pol #', 'Insured', 'Street Addr', 'Town', 'St', 'Post Code', 'TIV ($)'])
+    got = {k: v['matched_column'] for k, v in m.items()}
+    assert got['policy_number'] == 'Pol #'
+    assert got['address'] == 'Street Addr'
+    assert got['state'] == 'St'
+    assert got['city'] == 'Town'
+    assert got['zip'] == 'Post Code'
+    assert got['coverage_amount'] == 'TIV ($)'
+
+
+def test_mapping_never_double_assigns_a_column():
+    from backend.ingestion import suggest_column_mapping
+    m = suggest_column_mapping(['Address', 'Location', 'Lat', 'Lon'])
+    cols = [v['matched_column'] for v in m.values() if v['matched_column']]
+    assert len(cols) == len(set(cols))

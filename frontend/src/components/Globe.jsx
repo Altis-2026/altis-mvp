@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -8,6 +8,19 @@ const TRIAGE_COLORS = {
   'Remote-Deny':    '#6B8FA3',
   'Review':         '#FFB347',
   'Portfolio':      '#E8D5A3',
+};
+
+/* FEMA National Flood Hazard Layer, served straight from FEMA's public ArcGIS
+   endpoint as dynamic raster tiles (layer 28 = flood hazard zones). US-only by
+   nature of the dataset. */
+const FEMA_NFHL_TILES =
+  'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export' +
+  '?dpi=96&transparent=true&format=png32&layers=show:28' +
+  '&bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&f=image';
+
+const CAT_COLORS = {
+  '5': '#FF2D2D', '4': '#FF5A36', '3': '#FF8C42',
+  '2': '#FFB347', '1': '#FFD97A', 'TS': '#A8D4E6', 'TD': '#6B8FA3',
 };
 
 export default function Globe({
@@ -20,12 +33,15 @@ export default function Globe({
   flyTarget,
   dimmed,
   leftInset = 0,
+  stormTrack = null,
 }) {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
   const rafRef       = useRef(null);
   const isRotating   = useRef(true);
   const pinsReady    = useRef(false);
+  const [showFema,  setShowFema]  = useState(false);
+  const [showTrack, setShowTrack] = useState(true);
 
   /* ── Initialize map ─────────────────────────────────────────── */
   useEffect(() => {
@@ -257,6 +273,61 @@ export default function Globe({
         }
       });
 
+      /* ── Storm track (NHC best track, simplified) ── */
+      map.addSource('storm-track', { type: 'geojson', data: emptyFC() });
+
+      map.addLayer({
+        id:     'storm-track-line',
+        type:   'line',
+        source: 'storm-track',
+        filter: ['==', ['get', 'kind'], 'track'],
+        paint: {
+          'line-color':     '#FF8C42',
+          'line-width':     2.5,
+          'line-dasharray': [3, 2],
+          'line-opacity':   0.85,
+        }
+      });
+
+      map.addLayer({
+        id:     'storm-track-fixes',
+        type:   'circle',
+        source: 'storm-track',
+        filter: ['==', ['get', 'kind'], 'fix'],
+        paint: {
+          'circle-color': ['match', ['get', 'category'],
+            '5', CAT_COLORS['5'], '4', CAT_COLORS['4'], '3', CAT_COLORS['3'],
+            '2', CAT_COLORS['2'], '1', CAT_COLORS['1'], 'TS', CAT_COLORS['TS'],
+            CAT_COLORS['TD']],
+          'circle-radius': ['interpolate', ['linear'], ['get', 'wind_kt'],
+                            25, 4, 90, 7, 140, 10],
+          'circle-opacity': 0.9,
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': 'rgba(0,0,8,0.8)',
+        }
+      });
+
+      map.addLayer({
+        id:     'storm-track-labels',
+        type:   'symbol',
+        source: 'storm-track',
+        filter: ['==', ['get', 'kind'], 'fix'],
+        minzoom: 5,
+        layout: {
+          'text-field':  ['concat', 'Cat ', ['get', 'category'], ' · ', ['get', 'time']],
+          'text-size':   10,
+          'text-offset': [0, 1.3],
+          'text-anchor': 'top',
+          'text-font':   ['DIN Offc Pro Medium', 'Arial Unicode MS Regular'],
+          'text-optional': true,
+        },
+        paint: {
+          'text-color':      '#FFCFA3',
+          'text-halo-color': 'rgba(0,0,8,0.92)',
+          'text-halo-width': 1.2,
+        }
+      });
+
       pinsReady.current = true;
 
       /* ── Flood overlay (raster, inserted below pins) */
@@ -404,6 +475,35 @@ export default function Globe({
     });
   }, [portfolioProperties]);
 
+  /* ── Storm track overlay ─────────────────────────────────────── */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !pinsReady.current) return;
+    const src = map.getSource('storm-track');
+    if (!src) return;
+    src.setData(stormTrack && showTrack ? stormTrack : emptyFC());
+  }, [stormTrack, showTrack]);
+
+  /* ── FEMA NFHL raster overlay (US flood zones) ───────────────── */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !pinsReady.current) return;
+    if (showFema) {
+      if (!map.getSource('fema-nfhl')) {
+        map.addSource('fema-nfhl', {
+          type: 'raster', tiles: [FEMA_NFHL_TILES], tileSize: 256,
+        });
+        map.addLayer({
+          id: 'fema-nfhl-layer', type: 'raster', source: 'fema-nfhl',
+          paint: { 'raster-opacity': 0.55 },
+        }, 'clusters');
+      }
+    } else {
+      if (map.getLayer('fema-nfhl-layer'))  map.removeLayer('fema-nfhl-layer');
+      if (map.getSource('fema-nfhl'))       map.removeSource('fema-nfhl');
+    }
+  }, [showFema]);
+
   /* ── Fly-to ──────────────────────────────────────────────────── */
   useEffect(() => {
     if (!flyTarget || !mapRef.current) return;
@@ -480,7 +580,39 @@ export default function Globe({
     transition: 'filter 0.4s ease',
   };
 
-  return <div ref={containerRef} style={containerStyle} />;
+  const toggleStyle = (active) => ({
+    padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
+    fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.08em',
+    textTransform: 'uppercase', fontFamily: 'var(--font)',
+    background: active ? 'rgba(168,212,230,0.16)' : 'rgba(4,6,14,0.75)',
+    border: `1px solid ${active ? 'rgba(168,212,230,0.45)' : 'rgba(255,255,255,0.12)'}`,
+    color: active ? '#A8D4E6' : 'var(--text-muted)',
+    backdropFilter: 'blur(10px)',
+    transition: 'all 0.15s ease',
+  });
+
+  return (
+    <>
+      <div ref={containerRef} style={containerStyle} />
+
+      {/* Map layer toggles */}
+      <div style={{
+        position: 'fixed', bottom: 22, right: 16, zIndex: 5,
+        display: 'flex', gap: 8, alignItems: 'center',
+      }}>
+        {stormTrack && (
+          <button onClick={() => setShowTrack(v => !v)} style={toggleStyle(showTrack)}
+                  title="NHC best track (simplified) for this event">
+            🌀 Storm track
+          </button>
+        )}
+        <button onClick={() => setShowFema(v => !v)} style={toggleStyle(showFema)}
+                title="FEMA National Flood Hazard Layer — US coverage only">
+          FEMA zones
+        </button>
+      </div>
+    </>
+  );
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────── */

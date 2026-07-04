@@ -69,6 +69,7 @@ export default function App() {
   const [liveAnalyzing, setLiveAnalyzing] = useState(false);
   const [liveEventDate, setLiveEventDate] = useState(null);
   const [liveMeta,      setLiveMeta]      = useState(null);
+  const [stormTrack,    setStormTrack]    = useState(null);
 
   useEffect(() => {
     api.geeStatus().then(d => setGeeLive(!!d.live_analysis)).catch(() => setGeeLive(false));
@@ -106,9 +107,13 @@ export default function App() {
     setTileUrl(null);
     setSelectedEvent(eventId);
     setPortfolioAnalyzed(false);
+    setStormTrack(null);
 
     const evt = events.find(e => e.id === eventId);
     if (evt) setFlyTarget({ center: [evt.lon, evt.lat], zoom: evt.zoom || 10 });
+
+    // NHC best-track overlay (only exists for hurricane events; 404 = none).
+    api.getStormTrack(eventId).then(setStormTrack).catch(() => setStormTrack(null));
 
     try {
       const [propsData, tilesData] = await Promise.all([
@@ -235,6 +240,7 @@ export default function App() {
         flyTarget={flyTarget}
         dimmed={drawerOpen}
         leftInset={leftInset}
+        stormTrack={stormTrack}
       />
 
       <Header
@@ -297,6 +303,7 @@ export default function App() {
             liveAnalyzing={liveAnalyzing}
             geeLive={geeLive}
             liveMeta={liveMeta}
+            portfolioId={portfolioId}
           />
         )}
         {activePanel === 'compare' && (

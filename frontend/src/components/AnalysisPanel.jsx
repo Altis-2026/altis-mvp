@@ -1,4 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
+import { api } from '../services/api.js';
+
+const RISK_COLORS = { 1: '#4CAF82', 2: '#A8D4E6', 3: '#FFD97A', 4: '#FFB347', 5: '#FF4444' };
 
 const TRIAGE_CLASSES = ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review'];
 const MAX_ROWS = 150;
@@ -46,7 +49,26 @@ export default function AnalysisPanel({
   onSelectProperty, onAddToCompare, compareIds, compareFull,
   onAnalyzePortfolio, analyzing,
   onAnalyzeLive, liveAnalyzing, geeLive, liveMeta,
+  portfolioId,
 }) {
+  /* Pre-event risk scan (1–5 static flood risk, no event date) */
+  const [riskData,    setRiskData]    = useState(null);
+  const [riskLoading, setRiskLoading] = useState(false);
+  const [riskError,   setRiskError]   = useState('');
+  useEffect(() => { setRiskData(null); setRiskError(''); }, [portfolioId]);
+
+  const runRiskScan = async () => {
+    if (!portfolioId || riskLoading) return;
+    setRiskLoading(true);
+    setRiskError('');
+    try {
+      setRiskData(await api.getRiskScore(portfolioId));
+    } catch (e) {
+      setRiskError('Risk scan failed — is live analysis (GEE) enabled?');
+    } finally {
+      setRiskLoading(false);
+    }
+  };
   const [liveDate, setLiveDate] = useState('2022-09-05');
   const hasEvent     = eventProperties.length > 0;
   const hasPortfolio = portfolioProperties.length > 0;
@@ -160,6 +182,76 @@ export default function AnalysisPanel({
               {exposure.by_class?.Dispatch ?? 0} dispatch · {exposure.by_class?.Review ?? 0} review ·{' '}
               {(exposure.by_class?.['Remote-Approve'] ?? 0) + (exposure.by_class?.['Remote-Deny'] ?? 0)} remote
             </div>
+          </div>
+        )}
+
+        {/* ── Pre-event risk scan (underwriting view, no storm needed) ── */}
+        {source === 'portfolio' && hasPortfolio && (
+          <div style={{
+            marginBottom: 10, padding: '10px 12px',
+            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 'var(--r-md)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ddd' }}>
+                  Pre-event risk scan
+                </div>
+                <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                  Static 1–5 flood risk — no storm date needed
+                </div>
+              </div>
+              <button onClick={runRiskScan} disabled={riskLoading || !geeLive} style={{
+                padding: '6px 12px', whiteSpace: 'nowrap', borderRadius: 'var(--r-sm)',
+                background: 'rgba(168,212,230,0.1)', border: '1px solid rgba(168,212,230,0.25)',
+                color: geeLive ? '#A8D4E6' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.68rem',
+                cursor: riskLoading ? 'wait' : 'pointer', fontFamily: 'var(--font)',
+              }}>
+                {riskLoading ? 'Scanning…' : riskData ? 'Re-scan' : 'Scan'}
+              </button>
+            </div>
+
+            {riskError && (
+              <div style={{ fontSize: '0.66rem', color: '#FF6B6B', marginTop: 8 }}>{riskError}</div>
+            )}
+
+            {riskData && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <div key={s} style={{
+                      flex: 1, textAlign: 'center', padding: '5px 0', borderRadius: 'var(--r-sm)',
+                      background: `${RISK_COLORS[s]}18`, border: `1px solid ${RISK_COLORS[s]}40`,
+                    }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: RISK_COLORS[s] }}>
+                        {riskData.summary?.by_score?.[s] ?? 0}
+                      </div>
+                      <div style={{ fontSize: '0.56rem', color: 'var(--text-muted)' }}>R{s}</div>
+                    </div>
+                  ))}
+                </div>
+                {[...(riskData.results || [])]
+                  .sort((a, b) => b.risk_points - a.risk_points).slice(0, 5)
+                  .map(r => (
+                    <div key={r.property_id} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 0' }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 4, flexShrink: 0, textAlign: 'center',
+                        lineHeight: '18px', fontSize: '0.6rem', fontWeight: 800,
+                        background: `${RISK_COLORS[r.risk_score]}25`, color: RISK_COLORS[r.risk_score],
+                      }}>
+                        {r.risk_score}
+                      </span>
+                      <span style={{ fontSize: '0.66rem', color: '#ccc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {(r.address || r.property_id).split(',')[0]}
+                      </span>
+                    </div>
+                  ))}
+                <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
+                  {riskData.summary?.high_risk ?? 0} properties rated 4–5 (renewal / re-rate candidates).
+                  Method: flood history + elevation vs drainage + FEMA zone (US).
+                </div>
+              </div>
+            )}
           </div>
         )}
 

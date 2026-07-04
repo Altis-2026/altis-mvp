@@ -110,17 +110,21 @@ def _parse_pdf_table(content: bytes) -> pd.DataFrame:
 
 CANONICAL_FIELD_ALIASES = {
     'policy_number':   ['policy number', 'policy #', 'policy no', 'policy_number',
-                         'pol number', 'policy id', 'policy'],
+                         'pol number', 'pol #', 'policy id', 'policy',
+                         'claim number', 'claim id', 'claim #', 'claim no'],
     'address':         ['address', 'street address', 'property address',
-                         'site address', 'location', 'full address'],
+                         'site address', 'location', 'full address',
+                         'street addr', 'loss address', 'loss location'],
     'coverage_amount': ['coverage amount', 'coverage amt', 'tiv',
                          'total insured value', 'coverage', 'sum insured',
-                         'limit', 'insured value'],
-    'city':            ['city', 'town'],
+                         'limit', 'insured value', 'dwelling limit',
+                         'dwelling coverage', 'coverage a', 'building limit'],
+    'city':            ['city', 'town', 'suburb', 'locality'],
     'state':           ['state', 'st', 'province'],
     'zip':             ['zip', 'zip code', 'postal code', 'zipcode', 'postcode'],
-    'latitude':        ['latitude', 'lat', 'lat dd', 'geo lat'],
-    'longitude':       ['longitude', 'lon', 'lng', 'long', 'lon dd', 'geo lon'],
+    'latitude':        ['latitude', 'lat', 'lat dd', 'geo lat', 'y coord'],
+    'longitude':       ['longitude', 'lon', 'lng', 'long', 'lon dd', 'geo lon',
+                         'x coord'],
 }
 
 REQUIRED_FIELDS = ('address',)
@@ -131,26 +135,46 @@ def suggest_column_mapping(columns: list[str]) -> dict[str, dict]:
     """
     For each canonical field, find the uploaded column whose header best
     matches one of its known aliases. Each uploaded column can only be
-    claimed by one field. Returns matched_column=None (never a low-quality
-    guess) when nothing clears MATCH_THRESHOLD.
+    claimed by one field.
+
+    Assignment is GLOBAL best-score-first (not greedy in field order): every
+    (field, column) pair is scored, then pairs are claimed strongest-first.
+    Greedy-by-field-order let an early field steal a later field's column —
+    e.g. `state` (alias 'st') grabbing a column literally named 'St' is
+    correct, but only if `address` hasn't already been forced onto it because
+    address ran first and 'Street Addr' hadn't been considered yet.
+
+    Returns matched_column=None (never a low-quality guess) when nothing
+    clears MATCH_THRESHOLD.
     """
-    used = set()
-    result = {}
+    def _norm(s: str) -> str:
+        # 'TIV ($)' → 'tiv', 'Street_Addr' → 'street addr': punctuation noise
+        # must not depress an otherwise-exact header match.
+        return re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9]+', ' ', s.lower())).strip()
 
+    pairs = []
     for field, aliases in CANONICAL_FIELD_ALIASES.items():
-        best_col, best_score = None, 0.0
         for col in columns:
-            if col in used:
-                continue
-            score = max(fuzz.WRatio(col.lower().strip(), alias) for alias in aliases)
-            if score > best_score:
-                best_score, best_col = score, col
+            ncol = _norm(col)
+            score = max(
+                (100.0 if ncol == alias else fuzz.WRatio(ncol, alias))
+                for alias in aliases)
+            if score >= MATCH_THRESHOLD:
+                pairs.append((score, field, col))
 
-        if best_score >= MATCH_THRESHOLD:
-            result[field] = {'matched_column': best_col, 'confidence': round(best_score / 100, 2)}
-            used.add(best_col)
-        else:
-            result[field] = {'matched_column': None, 'confidence': 0.0}
+    # Strongest matches claim first; ties broken deterministically by
+    # field/column name so suggestions are stable across runs.
+    pairs.sort(key=lambda p: (-p[0], p[1], p[2]))
+
+    result = {field: {'matched_column': None, 'confidence': 0.0}
+              for field in CANONICAL_FIELD_ALIASES}
+    used_cols, used_fields = set(), set()
+    for score, field, col in pairs:
+        if field in used_fields or col in used_cols:
+            continue
+        result[field] = {'matched_column': col, 'confidence': round(score / 100, 2)}
+        used_fields.add(field)
+        used_cols.add(col)
 
     return result
 

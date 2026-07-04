@@ -13,6 +13,10 @@ export const api = {
   getEvents:      ()       => get('/events'),
   getProperties:  (id)     => get(`/events/${id}/properties`),
   getTiles:       (id)     => get(`/events/${id}/tiles`),
+  getStormTrack:  (id)     => get(`/events/${id}/storm-track`),  // throws on 404 → caller treats as "no track"
+
+  /* Pre-event flood risk score (1–5), no event date needed */
+  getRiskScore:   (id)     => get(`/portfolio/${id}/risk-score`),
 
   /* SAR thumbnails — pass coords + eventDate to get REAL imagery (live path) */
   getSarThumbnails: (pid, view = 'sar', opts = {}) => {
