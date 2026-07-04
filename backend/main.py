@@ -290,6 +290,10 @@ async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
             'address':         r['addr'] or f"{r['lat']:.4f}, {r['lon']:.4f}",
             'coverage_amount': coverage_amount,
             'matched_address': r.get('matched', ''),
+            # Persisted for the zone-summary geographic breakdown.
+            'city':            str(row.get('city', '') or ''),
+            'state':           str(row.get('state', '') or ''),
+            'zip':             str(row.get('zip', '') or ''),
         }
 
         if r['lat'] is not None and r['lon'] is not None:
@@ -460,22 +464,62 @@ def analyze_portfolio_live_endpoint(portfolio_id: str, body: dict = Body(...)):
     user-specified event — anywhere on Earth. Body:
       { event_date: 'YYYY-MM-DD' (auto-windowed),  OR
         windows: {pre_start, pre_end, post_start, post_end[, days_since_event]},
+        pre_days?: int, post_days?: int   (window size around event_date),
+        bbox_filter?: [w,s,e,n]  (scope: analyze only in-zone properties;
+                                  out-of-zone rows are marked excluded, not
+                                  silently dropped),
         label?: str, wse_radius_m?: int }
 
     Persists results under the 'live' event key and returns them inline (same
-    shape as /analyze) plus run metadata (bbox, scene counts, DEM used).
+    shape as /analyze) plus run metadata (bbox, scene counts, signal status).
     """
-    from backend.live_pipeline import analyze_portfolio_live, LiveAnalysisError
+    from backend.live_pipeline import (
+        analyze_portfolio_live, derive_windows, LiveAnalysisError)
 
     props = get_portfolio(portfolio_id)
     if not props:
         raise HTTPException(404, f"Portfolio '{portfolio_id}' not found.")
 
+    event_date = body.get('event_date')
+    pre_days = int(body.get('pre_days') or 30)
+    post_days = int(body.get('post_days') or 14)
+
+    # Scope filter (zone-scan flow): analyze only properties inside the bbox.
+    bbox_filter = body.get('bbox_filter')
+    excluded = []
+    to_analyze = props
+    if bbox_filter and len(bbox_filter) == 4:
+        w, s, e, n = (float(v) for v in bbox_filter)
+        inside, outside = [], []
+        for p in props:
+            lat, lon = p.get('latitude'), p.get('longitude')
+            if lat is not None and lon is not None and s <= lat <= n and w <= lon <= e:
+                inside.append(p)
+            else:
+                outside.append(p)
+        if not inside:
+            raise HTTPException(422, "No properties inside the selected zone.")
+        to_analyze = inside
+        excluded = [{
+            **p,
+            'impact_class':     'No Coverage',
+            'max_depth_ft':     0.0,
+            'pct_flooded':      0.0,
+            'confidence_score': 0,
+            'adjuster_note':    'Outside the event zone — excluded from satellite '
+                                'analysis by scope selection.',
+            'color':            '#444444',
+        } for p in outside]
+
+    windows = body.get('windows')
+    if windows is None and event_date:
+        windows = derive_windows(event_date, pre_days=pre_days, post_days=post_days)
+
     try:
         out = analyze_portfolio_live(
-            props,
-            event_date=body.get('event_date'),
-            windows=body.get('windows'),
+            to_analyze,
+            event_date=event_date,
+            windows=windows,
             wse_radius_m=int(body.get('wse_radius_m', 300)),
             label=str(body.get('label', 'Custom event')),
         )
@@ -485,10 +529,17 @@ def analyze_portfolio_live_endpoint(portfolio_id: str, body: dict = Body(...)):
         msg = str(e)
         code = 503 if 'service-account' in msg or 'authentication' in msg else 422
         raise HTTPException(code, msg)
+    except ValueError as e:
+        # Typically "No Sentinel-1 images found" for a too-narrow window.
+        raise HTTPException(422, f"{e} Try widening the analysis window "
+                                 f"(days before/after the event date).")
 
-    results = out['results']
+    results = out['results'] + excluded
     save_analysis_results(portfolio_id, 'live', results)
     save_analysis_meta(portfolio_id, 'live', out['meta'])
+    if event_date:
+        save_analysis_meta(portfolio_id, 'settings', {
+            'event_date': event_date, 'pre_days': pre_days, 'post_days': post_days})
 
     return {
         "portfolio_id": portfolio_id,
@@ -512,6 +563,95 @@ def get_results(portfolio_id: str, event_id: str):
         "results":      results,
         "meta":         get_analysis_meta(portfolio_id, event_id),
         "stats":        _portfolio_stats(results),
+    }
+
+
+@app.get("/api/portfolio/{portfolio_id}/settings")
+def get_portfolio_settings(portfolio_id: str):
+    """Saved analysis settings (event date + window) for this portfolio."""
+    return get_analysis_meta(portfolio_id, 'settings') or {}
+
+
+@app.put("/api/portfolio/{portfolio_id}/settings")
+def put_portfolio_settings(portfolio_id: str, body: dict = Body(...)):
+    """Persist analysis settings so a re-run picks up where the user left off."""
+    if not get_portfolio(portfolio_id):
+        raise HTTPException(404, f"Portfolio '{portfolio_id}' not found.")
+    settings = {
+        'event_date': str(body.get('event_date') or ''),
+        'pre_days':   int(body.get('pre_days') or 7),
+        'post_days':  int(body.get('post_days') or 14),
+    }
+    save_analysis_meta(portfolio_id, 'settings', settings)
+    return settings
+
+
+@app.post("/api/portfolio/{portfolio_id}/zone-summary")
+def portfolio_zone_summary(portfolio_id: str, body: dict = Body(default={})):
+    """
+    Fast PIF zone check — pure coordinate/bbox math, NO Earth Engine calls, so
+    it returns in milliseconds. Body: { bbox?: [w,s,e,n] } — typically a
+    selected event's bounding box. Without a bbox, the portfolio's own extent
+    is used (every geocoded property counts as in-zone) and the response says
+    so via zone_source.
+    """
+    props = get_portfolio(portfolio_id)
+    if not props:
+        raise HTTPException(404, f"Portfolio '{portfolio_id}' not found.")
+
+    bbox = body.get('bbox')
+    zone_source = 'event'
+    geocoded = [p for p in props
+                if p.get('latitude') is not None and p.get('longitude') is not None]
+    failed = len(props) - len(geocoded)
+
+    if not bbox or len(bbox) != 4:
+        if not geocoded:
+            raise HTTPException(422, "No geocoded properties to summarize.")
+        lats = [p['latitude'] for p in geocoded]
+        lons = [p['longitude'] for p in geocoded]
+        bbox = [min(lons) - 0.05, min(lats) - 0.05, max(lons) + 0.05, max(lats) + 0.05]
+        zone_source = 'portfolio_extent'
+
+    w, s, e, n = (float(v) for v in bbox)
+
+    def _cov(p):
+        try:
+            return float(p.get('coverage_amount') or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _region(p):
+        state = (p.get('state') or '').strip()
+        city = (p.get('city') or '').strip()
+        if not (state or city):
+            # Fall back to the tail of the address string ("… Lismore NSW").
+            tail = [t.strip() for t in str(p.get('address', '')).split(',') if t.strip()]
+            return tail[-1] if tail else 'Unspecified'
+        return f"{city}, {state}".strip(', ') or 'Unspecified'
+
+    in_zone, out_zone = [], []
+    for p in geocoded:
+        (in_zone if (s <= p['latitude'] <= n and w <= p['longitude'] <= e)
+         else out_zone).append(p)
+
+    breakdown = {}
+    for p in in_zone:
+        breakdown[_region(p)] = breakdown.get(_region(p), 0) + 1
+
+    return {
+        'portfolio_id':   portfolio_id,
+        'zone_source':    zone_source,
+        'bbox':           [w, s, e, n],
+        'total':          len(props),
+        'geocoded':       len(geocoded),
+        'geocode_failed': failed,
+        'in_zone':        len(in_zone),
+        'out_zone':       len(out_zone),
+        'tiv_total':      int(sum(_cov(p) for p in geocoded)),
+        'tiv_in_zone':    int(sum(_cov(p) for p in in_zone)),
+        'tiv_out_zone':   int(sum(_cov(p) for p in out_zone)),
+        'by_region':      dict(sorted(breakdown.items(), key=lambda kv: -kv[1])),
     }
 
 

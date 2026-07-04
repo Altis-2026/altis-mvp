@@ -49,7 +49,7 @@ export default function AnalysisPanel({
   onSelectProperty, onAddToCompare, compareIds, compareFull,
   onAnalyzePortfolio, analyzing,
   onAnalyzeLive, liveAnalyzing, geeLive, liveMeta,
-  portfolioId,
+  portfolioId, savedSettings, zoneSummary,
 }) {
   /* Pre-event risk scan (1–5 static flood risk, no event date) */
   const [riskData,    setRiskData]    = useState(null);
@@ -70,8 +70,19 @@ export default function AnalysisPanel({
     }
   };
   const [liveDate, setLiveDate] = useState('2022-09-05');
+  const [preDays,  setPreDays]  = useState(7);
+  const [postDays, setPostDays] = useState(14);
   const hasEvent     = eventProperties.length > 0;
   const hasPortfolio = portfolioProperties.length > 0;
+
+  // Prefill from settings saved with the portfolio (upload-flow or last run).
+  useEffect(() => {
+    if (savedSettings?.eventDate) {
+      setLiveDate(savedSettings.eventDate);
+      if (savedSettings.preDays)  setPreDays(savedSettings.preDays);
+      if (savedSettings.postDays) setPostDays(savedSettings.postDays);
+    }
+  }, [savedSettings]);
 
   const [source, setSource] = useState(hasEvent ? 'event' : 'portfolio');
 
@@ -152,8 +163,50 @@ export default function AnalysisPanel({
         )}
 
         {!hasEvent && !hasPortfolio && (
-          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-            Select an event or upload a portfolio to see properties here.
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+            Upload your policy portfolio to see flood exposure across your book
+            of business — or select an event to explore its footprint. Unlike
+            static hazard scores, Altis delivers real-time satellite ground
+            truth within 48 hours of a flood event.
+          </div>
+        )}
+
+        {/* ── Pre-analysis zone summary (fast PIF check — no GEE) ── */}
+        {source === 'portfolio' && !portfolioAnalyzed && zoneSummary && (
+          <div style={{
+            marginBottom: 10, padding: '11px 13px',
+            background: 'rgba(255,107,107,0.04)',
+            border: '1px solid rgba(255,107,107,0.18)', borderRadius: 'var(--r-md)',
+          }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: '#FF9B9B', textTransform: 'uppercase', marginBottom: 7 }}>
+              {zoneSummary.zone_source === 'event'
+                ? 'Zone Check — Selected Event Footprint'
+                : 'Portfolio Footprint (select an event for a zone check)'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 10px' }}>
+              <ExpStat label="Geocoded"
+                       value={`${zoneSummary.geocoded} / ${zoneSummary.total}`} />
+              <ExpStat label="In zone / outside"
+                       value={`${zoneSummary.in_zone} / ${zoneSummary.out_zone}`} />
+              <ExpStat label="TIV in zone" value={fmtMoney(zoneSummary.tiv_in_zone)} />
+              <ExpStat label="TIV outside" value={fmtMoney(zoneSummary.tiv_out_zone)} />
+            </div>
+            {Object.keys(zoneSummary.by_region || {}).length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                {Object.entries(zoneSummary.by_region).slice(0, 4).map(([region, n]) => (
+                  <div key={region} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', color: 'var(--text-secondary)', padding: '2px 0' }}>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{region}</span>
+                    <span style={{ color: '#ddd', fontWeight: 700 }}>{n}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {zoneSummary.zone_source === 'event' && zoneSummary.out_zone > 0 && (
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
+                {zoneSummary.out_zone} properties sit outside the event footprint —
+                run "in-zone only" below to skip them and save compute time.
+              </div>
+            )}
           </div>
         )}
 
@@ -339,29 +392,86 @@ export default function AnalysisPanel({
                     Run real Sentinel-1 detection for this portfolio anywhere on Earth. Enter the
                     flood/landfall date — we composite the satellite imagery around it.
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <input
                       type="date" value={liveDate} onChange={e => setLiveDate(e.target.value)}
                       disabled={!geeLive || liveAnalyzing}
                       style={{
-                        flex: 1, padding: '6px 8px', fontSize: '0.72rem', colorScheme: 'dark',
+                        flex: 1.6, padding: '6px 8px', fontSize: '0.72rem', colorScheme: 'dark',
                         background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
                         borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
                       }}
                     />
-                    <button
-                      onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate)}
+                    <input
+                      type="number" min="3" max="60" value={preDays} title="Baseline days before event"
+                      onChange={e => setPreDays(e.target.value)}
                       disabled={!geeLive || liveAnalyzing}
                       style={{
-                        padding: '6px 12px', whiteSpace: 'nowrap',
+                        flex: 0.7, padding: '6px 6px', fontSize: '0.72rem',
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
+                      }}
+                    />
+                    <input
+                      type="number" min="3" max="45" value={postDays} title="Flood window days after event"
+                      onChange={e => setPostDays(e.target.value)}
+                      disabled={!geeLive || liveAnalyzing}
+                      style={{
+                        flex: 0.7, padding: '6px 6px', fontSize: '0.72rem',
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginBottom: 7 }}>
+                    date · days before (baseline) · days after (flood window)
+                  </div>
+
+                  {/* Scope choice: in-zone only vs full book */}
+                  {zoneSummary?.zone_source === 'event' && zoneSummary.out_zone > 0 ? (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate, {
+                          preDays: +preDays, postDays: +postDays, bboxFilter: zoneSummary.bbox })}
+                        disabled={!geeLive || liveAnalyzing}
+                        style={{
+                          flex: 1.4, padding: '7px 8px',
+                          background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(168,212,230,0.3)', borderRadius: 'var(--r-sm)',
+                          color: geeLive ? '#A8D4E6' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.68rem',
+                          cursor: (!geeLive || liveAnalyzing) ? 'default' : 'pointer', fontFamily: 'var(--font)',
+                        }}>
+                        {liveAnalyzing ? 'Analyzing…' : `Run in-zone only (${zoneSummary.in_zone})`}
+                      </button>
+                      <button
+                        onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate, {
+                          preDays: +preDays, postDays: +postDays })}
+                        disabled={!geeLive || liveAnalyzing}
+                        style={{
+                          flex: 1, padding: '7px 8px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.12)', borderRadius: 'var(--r-sm)',
+                          color: geeLive ? 'var(--text-secondary)' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.68rem',
+                          cursor: (!geeLive || liveAnalyzing) ? 'default' : 'pointer', fontFamily: 'var(--font)',
+                        }}>
+                        Run all ({zoneSummary.geocoded})
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate, {
+                        preDays: +preDays, postDays: +postDays })}
+                      disabled={!geeLive || liveAnalyzing}
+                      style={{
+                        width: '100%', padding: '7px 12px',
                         background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'rgba(255,255,255,0.04)',
                         border: '1px solid rgba(168,212,230,0.3)', borderRadius: 'var(--r-sm)',
                         color: geeLive ? '#A8D4E6' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.72rem',
                         cursor: (!geeLive || liveAnalyzing) ? 'default' : 'pointer', fontFamily: 'var(--font)',
                       }}>
-                      {liveAnalyzing ? 'Analyzing…' : 'Run'}
+                      {liveAnalyzing ? 'Analyzing…' : 'Run Full Analysis'}
                     </button>
-                  </div>
+                  )}
                   {liveAnalyzing && (
                     <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>
                       Pulling Sentinel-1 scenes & running detection — this can take 30–90s…

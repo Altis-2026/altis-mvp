@@ -123,6 +123,8 @@ EVENTS = {
         'lat':   cfg['lat'],
         'lon':   cfg['lon'],
         'zoom':  cfg['zoom'],
+        'bbox':  cfg['bbox'],          # zone-summary + globe event-zone box
+        'event_date': cfg['post_start'],  # prefill for live analysis settings
     }
     for cfg in (LISMORE, HARVEY, IAN)
 }

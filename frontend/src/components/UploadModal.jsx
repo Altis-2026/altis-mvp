@@ -21,11 +21,16 @@ function confidenceColor(confidence) {
 export default function UploadModal({ events, onClose, onSuccess }) {
   const [dragging,   setDragging]   = useState(false);
   const [file,       setFile]       = useState(null);
-  const [status,     setStatus]     = useState('idle'); // idle | uploading | preview | confirming | success | error
+  // idle | uploading | preview | settings | confirming | success | error
+  const [status,     setStatus]     = useState('idle');
   const [uploadData, setUploadData] = useState(null);
   const [mapping,    setMapping]    = useState({});
   const [result,     setResult]     = useState(null);
   const [errorMsg,   setErrorMsg]   = useState('');
+  /* Analysis settings collected in the upload flow itself */
+  const [eventDate,  setEventDate]  = useState('');
+  const [preDays,    setPreDays]    = useState(7);
+  const [postDays,   setPostDays]   = useState(14);
   const inputRef = useRef(null);
 
   const handleFile = useCallback((f) => {
@@ -66,23 +71,39 @@ export default function UploadModal({ events, onClose, onSuccess }) {
     }
   };
 
-  const handleConfirm = async () => {
+  const settingsPayload = (runNow) => (eventDate ? {
+    eventDate, preDays: +preDays || 7, postDays: +postDays || 14, runNow,
+  } : null);
+
+  const handleConfirm = async (runNow = false) => {
     if (!uploadData) return;
     setStatus('confirming');
     setErrorMsg('');
 
     try {
       const data = await api.confirmPortfolioUpload(uploadData.upload_id, mapping);
+      if (runNow && eventDate) {
+        // Straight into analysis — the modal closes and the run starts.
+        onSuccess?.(data, settingsPayload(true));
+        return;
+      }
       setResult(data);
       setStatus('success');
     } catch (err) {
       setErrorMsg(err.detail || 'Confirm failed. Check your column mapping and try again.');
-      setStatus('preview');
+      setStatus('settings');
     }
   };
 
   const handleSuccess = () => {
-    onSuccess?.(result);
+    onSuccess?.(result, settingsPayload(false));
+  };
+
+  /* Sentinel-1 revisit is ~6–12 days depending on latitude/orbit overlap. */
+  const passEstimate = (days) => {
+    const lo = Math.max(1, Math.floor(days / 12));
+    const hi = Math.max(1, Math.round(days / 6));
+    return lo === hi ? `${lo}` : `${lo}–${hi}`;
   };
 
   const downloadTemplate = async () => {
@@ -97,7 +118,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
 
   const usedColumns = new Set(Object.values(mapping).filter(Boolean));
   const canConfirm = !!mapping.address;
-  const modalWidth = status === 'preview' || status === 'confirming' ? 640 : 500;
+  const modalWidth = status === 'preview' ? 640 : 500;
 
   return (
     /* Backdrop */
@@ -136,12 +157,16 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               Portfolio Analysis
             </div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
-              {status === 'preview' || status === 'confirming' ? 'Review Column Mapping' : 'Upload Carrier Portfolio'}
+              {status === 'preview' ? 'Review Column Mapping'
+                : status === 'settings' || status === 'confirming' ? 'Analysis Settings'
+                : 'Upload Policy Portfolio'}
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
-              {status === 'preview' || status === 'confirming'
+              {status === 'preview'
                 ? "Confirm how Altis mapped your columns before we geocode. Override any field that looks wrong."
-                : "Upload a CSV, Excel, or PDF policy file and we'll geocode every property, fly the globe to your coverage area, and analyze against our satellite flood data."}
+                : status === 'settings' || status === 'confirming'
+                ? "Set the flood event date and satellite window, then run the analysis directly — no extra navigation."
+                : "Upload a CSV, Excel, or PDF policy file — we geocode every property and deliver real-time satellite ground truth across your book of business."}
             </p>
           </div>
           <button onClick={onClose} style={{
@@ -265,7 +290,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               Detecting columns and standardizing addresses
             </div>
           </div>
-        ) : (status === 'preview' || status === 'confirming') && uploadData ? (
+        ) : status === 'preview' && uploadData ? (
           /* Mapping review state */
           <div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 14 }}>
@@ -379,8 +404,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 ← Back
               </button>
               <button
-                onClick={handleConfirm}
-                disabled={!canConfirm || status === 'confirming'}
+                onClick={() => canConfirm && setStatus('settings')}
+                disabled={!canConfirm}
                 style={{
                   flex: 1, padding: '14px',
                   background: canConfirm ? '#A8D4E6' : 'rgba(255,255,255,0.05)',
@@ -388,6 +413,121 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                   color: canConfirm ? '#000' : 'var(--text-disabled)',
                   fontSize: '0.9rem', fontWeight: 800,
                   cursor: canConfirm ? 'pointer' : 'not-allowed',
+                  fontFamily: 'var(--font)', letterSpacing: '0.03em',
+                }}
+              >
+                Continue → Analysis Settings
+              </button>
+            </div>
+          </div>
+        ) : (status === 'settings' || status === 'confirming') && uploadData ? (
+          /* ── Analysis Settings step (event date + satellite window) ── */
+          <div>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Flood event date
+              </div>
+              <input
+                type="date" value={eventDate}
+                onChange={e => setEventDate(e.target.value)}
+                disabled={status === 'confirming'}
+                style={{
+                  width: '100%', padding: '10px 12px', fontSize: '0.86rem', colorScheme: 'dark',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 'var(--r-md)', color: '#fff', fontFamily: 'var(--font)',
+                }}
+              />
+              <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.45 }}>
+                The landfall / peak-flood date. Satellite imagery is composited around it.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Days before (baseline)
+                </div>
+                <input
+                  type="number" min="3" max="60" value={preDays}
+                  onChange={e => setPreDays(e.target.value)}
+                  disabled={status === 'confirming'}
+                  style={{
+                    width: '100%', padding: '10px 12px', fontSize: '0.86rem',
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 'var(--r-md)', color: '#fff', fontFamily: 'var(--font)',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  Days after (flood window)
+                </div>
+                <input
+                  type="number" min="3" max="45" value={postDays}
+                  onChange={e => setPostDays(e.target.value)}
+                  disabled={status === 'confirming'}
+                  style={{
+                    width: '100%', padding: '10px 12px', fontSize: '0.86rem',
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 'var(--r-md)', color: '#fff', fontFamily: 'var(--font)',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{
+              padding: '10px 13px', marginBottom: 18, borderRadius: 'var(--r-md)',
+              background: 'rgba(168,212,230,0.05)', border: '1px solid rgba(168,212,230,0.15)',
+              fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.55,
+            }}>
+              Sentinel-1 revisits every ~6–12 days: expect <b style={{ color: '#A8D4E6' }}>
+              ~{passEstimate(+preDays || 7)} baseline</b> and <b style={{ color: '#A8D4E6' }}>
+              ~{passEstimate(+postDays || 14)} post-event</b> satellite passes in this window.
+              A very narrow baseline can leave no pre-event scene — widen it if analysis
+              reports no imagery. Settings are saved with the portfolio for re-runs.
+            </div>
+
+            {errorMsg && (
+              <div style={{ padding: '10px 14px', background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.2)', borderRadius: 'var(--r-md)', fontSize: '0.78rem', color: '#FF4444', marginBottom: 16 }}>
+                {errorMsg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setStatus('preview')}
+                disabled={status === 'confirming'}
+                style={{
+                  flex: '0 0 auto', padding: '14px 18px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)', color: 'var(--text-secondary)',
+                  fontSize: '0.84rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
+                }}
+              >
+                ← Back
+              </button>
+              <button
+                onClick={() => handleConfirm(false)}
+                disabled={status === 'confirming'}
+                style={{
+                  flex: '0 0 auto', padding: '14px 16px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)', color: 'var(--text-secondary)',
+                  fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
+                }}
+              >
+                Geocode only
+              </button>
+              <button
+                onClick={() => handleConfirm(true)}
+                disabled={!eventDate || status === 'confirming'}
+                style={{
+                  flex: 1, padding: '14px',
+                  background: eventDate ? '#A8D4E6' : 'rgba(255,255,255,0.05)',
+                  border: 'none', borderRadius: 'var(--r-md)',
+                  color: eventDate ? '#000' : 'var(--text-disabled)',
+                  fontSize: '0.9rem', fontWeight: 800,
+                  cursor: eventDate ? 'pointer' : 'not-allowed',
                   fontFamily: 'var(--font)', letterSpacing: '0.03em',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                 }}
@@ -399,7 +539,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                     animation: 'spin 0.8s linear infinite',
                   }} />
                 )}
-                {status === 'confirming' ? 'Geocoding…' : 'Confirm & Geocode'}
+                {status === 'confirming' ? 'Geocoding…' : 'Confirm & Run Analysis'}
               </button>
             </div>
           </div>

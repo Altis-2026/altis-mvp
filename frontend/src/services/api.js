@@ -18,6 +18,21 @@ export const api = {
   /* Pre-event flood risk score (1–5), no event date needed */
   getRiskScore:   (id)     => get(`/portfolio/${id}/risk-score`),
 
+  /* Fast PIF zone summary — pure bbox math, no GEE, returns instantly */
+  zoneSummary: (id, bbox) =>
+    fetch(`${BASE}/portfolio/${id}/zone-summary`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bbox }),
+    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+
+  /* Per-portfolio analysis settings (event date + window) */
+  getPortfolioSettings: (id) => get(`/portfolio/${id}/settings`),
+  savePortfolioSettings: (id, settings) =>
+    fetch(`${BASE}/portfolio/${id}/settings`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    }).then(r => r.json()),
+
   /* SAR thumbnails — pass coords + eventDate to get REAL imagery (live path) */
   getSarThumbnails: (pid, view = 'sar', opts = {}) => {
     const q = new URLSearchParams({ view });

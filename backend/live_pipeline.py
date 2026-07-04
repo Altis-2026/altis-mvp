@@ -163,23 +163,55 @@ def analyze_portfolio_live(props: list, event_date: str = None,
     optical_water, optical_valid, optical_n = load_optical_water_mask(
         bbox, windows['post_start'], windows['post_end'])
 
-    # Dual-polarization cross-check (coherence proxy) — abstains if no VH.
-    pre_vh, _ = load_sar_vh_composite(
-        bbox, windows['pre_start'], windows['pre_end'], orbit)
-    post_vh, vh_n = load_sar_vh_composite(
-        bbox, windows['post_start'], windows['post_end'], orbit)
-    if pre_vh is None or post_vh is None:
+    # ── Auxiliary signals. Each one degrades independently: a failure logs a
+    #    clear reason into meta['signal_status'] and the analysis continues —
+    #    an auxiliary signal must never crash the core flood detection, and
+    #    its absence must be explainable, never a silent zero.
+    signal_status = {}
+
+    signal_status['optical'] = ('ok' if optical_n > 0
+                                else 'unavailable: no cloud-free Sentinel-2 scene in window')
+
+    pre_vh = post_vh = None
+    vh_n = 0
+    try:
+        pre_vh, _ = load_sar_vh_composite(
+            bbox, windows['pre_start'], windows['pre_end'], orbit)
+        post_vh, vh_n = load_sar_vh_composite(
+            bbox, windows['post_start'], windows['post_end'], orbit)
+        if pre_vh is None or post_vh is None:
+            pre_vh = post_vh = None
+            vh_n = 0
+            signal_status['dual_pol'] = 'unavailable: no VH-polarized scene in window'
+        else:
+            signal_status['dual_pol'] = 'ok'
+    except Exception as e:
         pre_vh = post_vh = None
         vh_n = 0
+        signal_status['dual_pol'] = f'error: {e}'
+        print(f"  [signal] dual-pol VH failed: {e}")
 
-    # Event-total rainfall (CHIRPS, mm) over pre_end → post_end.
-    rain_img, _ = load_rainfall_sum(bbox, windows['pre_end'], windows['post_end'])
+    rain_img = None
+    try:
+        rain_img, _ = load_rainfall_sum(bbox, windows['pre_end'], windows['post_end'])
+        signal_status['rainfall'] = 'ok'
+    except Exception as e:
+        signal_status['rainfall'] = f'error: {e}'
+        print(f"  [signal] CHIRPS rainfall failed: {e}")
 
-    # Vegetation loss: NDVI pre vs post (cloud-permitting).
-    ndvi_pre, _ = load_ndvi_median(bbox, windows['pre_start'], windows['pre_end'])
-    ndvi_post, _ = load_ndvi_median(bbox, windows['post_start'], windows['post_end'])
-    if ndvi_pre is None or ndvi_post is None:
+    ndvi_pre = ndvi_post = None
+    try:
+        ndvi_pre, _ = load_ndvi_median(bbox, windows['pre_start'], windows['pre_end'])
+        ndvi_post, _ = load_ndvi_median(bbox, windows['post_start'], windows['post_end'])
+        if ndvi_pre is None or ndvi_post is None:
+            ndvi_pre = ndvi_post = None
+            signal_status['vegetation'] = 'unavailable: no cloud-free pre/post optical pair'
+        else:
+            signal_status['vegetation'] = 'ok'
+    except Exception as e:
         ndvi_pre = ndvi_post = None
+        signal_status['vegetation'] = f'error: {e}'
+        print(f"  [signal] NDVI delta failed: {e}")
 
     # Inundation-duration slices over the post window (same orbit + threshold).
     post_s = datetime.strptime(windows['post_start'], "%Y-%m-%d")
@@ -191,12 +223,21 @@ def analyze_portfolio_live(props: list, event_date: str = None,
     post_slices, slice_meta = [], []
     for i in range(n_slices):
         s0, s1 = slice_edges[i], slice_edges[i + 1]
-        img, cnt = load_sar_slice(bbox, s0.strftime("%Y-%m-%d"),
-                                  s1.strftime("%Y-%m-%d"), orbit)
+        try:
+            img, cnt = load_sar_slice(bbox, s0.strftime("%Y-%m-%d"),
+                                      s1.strftime("%Y-%m-%d"), orbit)
+        except Exception as e:
+            img, cnt = None, 0
+            print(f"  [signal] duration slice {i} failed: {e}")
         post_slices.append(img)
         slice_meta.append({'start': s0.strftime("%Y-%m-%d"),
                            'end': s1.strftime("%Y-%m-%d"),
                            'days': (s1 - s0).days, 'scenes': cnt})
+    with_scenes = sum(1 for s in slice_meta if s['scenes'] > 0)
+    signal_status['duration'] = (
+        'ok' if with_scenes >= 2
+        else f'unavailable: only {with_scenes} post-window slice(s) have scenes')
+    print(f"  [signals] {signal_status}")
 
     combined = build_flood_depth_image(
         bbox, pre_img, post_img, dem, wse_radius_m,
@@ -209,10 +250,18 @@ def analyze_portfolio_live(props: list, event_date: str = None,
 
     # FEMA NFHL flood zones (US properties only; non-US resolve to None
     # instantly, service failures degrade to 'unavailable' without blocking).
-    from backend.fema import flood_zones_batch
+    from backend.fema import flood_zones_batch, is_us_coord
     coords = [(float(p['latitude']), float(p['longitude'])) for p in geocoded]
     fema_zones = flood_zones_batch(coords)
     fema_by_pid = {p['property_id']: z for p, z in zip(geocoded, fema_zones)}
+    us_count = sum(1 for lat, lon in coords if is_us_coord(lat, lon))
+    if us_count == 0:
+        signal_status['fema_nfhl'] = 'not applicable: no US properties (NFHL is US-only)'
+    elif all(z['flood_zone'] == 'unavailable' for z, (lat, lon) in
+             zip(fema_zones, coords) if is_us_coord(lat, lon)):
+        signal_status['fema_nfhl'] = 'error: FEMA NFHL service unreachable'
+    else:
+        signal_status['fema_nfhl'] = 'ok'
 
     # ── Triage scoring (identical calibrated logic as the demo events) ────
     event_cfg = {'days_since_event': days_since}
@@ -364,6 +413,7 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         'optical_scene_count': optical_n,
         'vh_scene_count':   vh_n,
         'duration_slices':  slice_meta,
+        'signal_status':    signal_status,
         'exposure':         exposure,
         'flooded_count':    flooded,
         'analyzed_count':   len(results),

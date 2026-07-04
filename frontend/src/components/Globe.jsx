@@ -34,6 +34,7 @@ export default function Globe({
   dimmed,
   leftInset = 0,
   stormTrack = null,
+  zoneBbox = null,
 }) {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
@@ -273,6 +274,37 @@ export default function Globe({
         }
       });
 
+      /* ── Event zone box (zone-summary scope, distinct red styling) ── */
+      map.addSource('event-zone', { type: 'geojson', data: emptyFC() });
+      map.addLayer({
+        id:     'event-zone-line',
+        type:   'line',
+        source: 'event-zone',
+        paint: {
+          'line-color':     '#FF6B6B',
+          'line-width':     1.8,
+          'line-dasharray': [4, 2],
+          'line-opacity':   0.7,
+        }
+      });
+      map.addLayer({
+        id:     'event-zone-label',
+        type:   'symbol',
+        source: 'event-zone',
+        layout: {
+          'text-field':  'EVENT ZONE',
+          'text-size':   11,
+          'text-anchor': 'top-left',
+          'text-offset': [0.5, 0.3],
+          'text-font':   ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        },
+        paint: {
+          'text-color':      '#FF9B9B',
+          'text-halo-color': 'rgba(0,0,8,0.92)',
+          'text-halo-width': 1.3,
+        }
+      });
+
       /* ── Storm track (NHC best track, simplified) ── */
       map.addSource('storm-track', { type: 'geojson', data: emptyFC() });
 
@@ -349,15 +381,16 @@ export default function Globe({
       );
     });
 
-    /* Pin click → open drawer */
+    /* Pin click → open drawer. Mapbox GL serializes feature properties
+       through JSON: null can arrive as the string "null" and booleans as
+       "true"/"false", which would make the drawer render NaN/garbage —
+       sanitize back to real types before handing to React. */
     map.on('click', 'pins', (e) => {
-      const p = e.features[0].properties;
-      onPropertySelect?.({ ...p });
+      onPropertySelect?.(cleanFeatureProps(e.features[0].properties));
     });
 
     map.on('click', 'portfolio-pins', (e) => {
-      const p = e.features[0].properties;
-      onPropertySelect?.({ ...p, isPortfolio: true });
+      onPropertySelect?.({ ...cleanFeatureProps(e.features[0].properties), isPortfolio: true });
     });
 
     /* Cursors */
@@ -474,6 +507,29 @@ export default function Globe({
       }],
     });
   }, [portfolioProperties]);
+
+  /* ── Event zone box (zone-summary scope) ─────────────────────── */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !pinsReady.current) return;
+    const src = map.getSource('event-zone');
+    if (!src) return;
+    if (!zoneBbox || zoneBbox.length !== 4) {
+      src.setData(emptyFC());
+      return;
+    }
+    const [w, s, e, n] = zoneBbox;
+    src.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]],
+        },
+      }],
+    });
+  }, [zoneBbox]);
 
   /* ── Storm track overlay ─────────────────────────────────────── */
   useEffect(() => {
@@ -618,6 +674,19 @@ export default function Globe({
 /* ── Helpers ─────────────────────────────────────────────────────── */
 function emptyFC() {
   return { type: 'FeatureCollection', features: [] };
+}
+
+/* Undo Mapbox GL's JSON round-trip on feature properties: "null" → null,
+   "true"/"false" → booleans. Leaves real strings/numbers untouched. */
+function cleanFeatureProps(p) {
+  const out = {};
+  for (const [k, v] of Object.entries(p || {})) {
+    if (v === 'null' || v === 'undefined') out[k] = null;
+    else if (v === 'true')  out[k] = true;
+    else if (v === 'false') out[k] = false;
+    else out[k] = v;
+  }
+  return out;
 }
 
 /* Pin radius: selected pin is largest; Dispatch pins are emphasised and all

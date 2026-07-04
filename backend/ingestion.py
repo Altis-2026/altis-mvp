@@ -287,6 +287,13 @@ def apply_mapping(df: pd.DataFrame, mapping: dict[str, Optional[str]]) -> pd.Dat
         col = mapping.get(field)
         out[field] = df[col] if col and col in df.columns else ''
 
+    # Locality parts are ALSO kept as standalone columns (besides being folded
+    # into the geocodable address) so downstream geographic breakdowns
+    # (zone-summary by state/city) don't have to re-parse address strings.
+    for field in ('city', 'state', 'zip'):
+        col = mapping.get(field)
+        out[field] = df[col].astype(str) if col and col in df.columns else ''
+
     addr_col = mapping.get('address')
     part_cols = [mapping.get(f) for f in ('city', 'state', 'zip')]
     part_cols = [c for c in part_cols if c and c in df.columns and c != addr_col]

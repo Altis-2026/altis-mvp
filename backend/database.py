@@ -127,6 +127,12 @@ def init_db():
         conn.execute("ALTER TABLE analysis_results ADD COLUMN extra_json TEXT")
     except sqlite3.OperationalError:
         pass  # column already exists
+    # Round-9: city/state/zip persisted for the zone-summary state breakdown.
+    for col in ('city', 'state', 'zip'):
+        try:
+            conn.execute(f"ALTER TABLE portfolio_properties ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS analysis_meta (
             portfolio_id TEXT,
@@ -189,11 +195,13 @@ def save_portfolio(portfolio_id: str, properties: list, center: dict,
     conn.executemany("""
         INSERT OR REPLACE INTO portfolio_properties
         (portfolio_id, property_id, policy_number, address,
-         coverage_amount, latitude, longitude, matched_address)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         coverage_amount, latitude, longitude, matched_address,
+         city, state, zip)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, [(portfolio_id, p['property_id'], p.get('policy_number', ''),
            p['address'], p.get('coverage_amount', 0),
-           p['latitude'], p['longitude'], p.get('matched_address', ''))
+           p['latitude'], p['longitude'], p.get('matched_address', ''),
+           p.get('city', ''), p.get('state', ''), p.get('zip', ''))
           for p in properties])
 
     conn.commit()

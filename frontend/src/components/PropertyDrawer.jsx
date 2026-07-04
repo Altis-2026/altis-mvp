@@ -86,19 +86,34 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
     ? `${depth} ft ± ${parseFloat(property.depth_ci_ft).toFixed(1)} ft`
     : `${depth} ft`;
 
-  // Round-7 enrichment fields (present only on live analyses)
-  const rainMm    = property.rain_mm != null && property.rain_mm !== '' ? +property.rain_mm : null;
-  const durDays   = property.duration_days != null && property.duration_days !== '' ? +property.duration_days : null;
-  const sevLow    = property.severity_low_usd != null && property.severity_low_usd !== '' ? +property.severity_low_usd : null;
-  const sevMid    = property.severity_mid_usd != null && property.severity_mid_usd !== '' ? +property.severity_mid_usd : null;
-  const sevHigh   = property.severity_high_usd != null ? +property.severity_high_usd : null;
-  const floodZone = property.flood_zone || null;
+  // Round-7 enrichment fields. `isLiveResult` distinguishes a live-analysis
+  // row (which computes all of these) from a pre-baked event row (which never
+  // did) — so "unavailable" states only render where the pipeline actually
+  // attempted the measurement, and every attempted metric shows either a
+  // value or a reason. Never a silent blank, never a placeholder zero.
+  const num = (v) => (v == null || v === '' || Number.isNaN(+v) ? null : +v);
+  const isLiveResult = property.rain_mm !== undefined;
+  const rainMm    = num(property.rain_mm);
+  const durDays   = num(property.duration_days);
+  const sevLow    = num(property.severity_low_usd);
+  const sevMid    = num(property.severity_mid_usd);
+  const sevHigh   = num(property.severity_high_usd);
+  const floodZone = property.flood_zone && property.flood_zone !== 'null' ? property.flood_zone : null;
   const sfha      = property.sfha_flag === true || property.sfha_flag === 1 || property.sfha_flag === '1';
   const vhAvail   = property.vh_available == 1;
   const vhAgrees  = vhAvail && (
     (parseFloat(property.pct_flooded || 0) >= 10) === (parseFloat(property.vh_water_pct || 0) >= 0.10));
   const vegLoss   = property.vegetation_loss == 1;
+  const ndviDelta = num(property.ndvi_delta);
   const subro     = property.subrogation_flag == 1;
+  const opticalOk = property.optical_available == 1;
+  const opticalPct = num(property.optical_water_pct);
+  const isUS      = property.latitude >= 17 && property.latitude <= 72 &&
+                    property.longitude >= -170 && property.longitude <= -65;
+
+  const unavailable = (reason) => (
+    <span style={{ color: 'var(--text-disabled)', fontStyle: 'italic' }}>{`Unavailable — ${reason}`}</span>
+  );
 
   const breakdown = parseJsonField(property.confidence_factors);
   const ensembleVotes = parseJsonField(property.ensemble_votes);
@@ -312,25 +327,38 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   <Mrow label="Max Flood Depth"   value={depthLabel} />
-                  <Mrow label="Area Flooded"       value={`${pct}%`} />
+                  <Mrow label="SAR Amplitude Change (Area Flooded)" value={`${pct}%`} />
                   <Mrow label="Confidence Score"   value={`${conf}%`} />
-                  {rainMm != null && (
-                    <Mrow label="Event Rainfall" value={`${(rainMm / 25.4).toFixed(1)} in (${rainMm.toFixed(0)} mm)`} />
-                  )}
-                  {durDays != null && (
-                    <Mrow label="Est. Inundation Duration"
-                          value={durDays > 0 ? `~${durDays} days` : '< 1 satellite pass'} />
-                  )}
-                  {vhAvail && (
-                    <Mrow label="Dual-Pol Cross-Check"
-                          value={vhAgrees ? 'VH confirms ✓' : 'VH disagrees ⚠'} />
-                  )}
-                  {vegLoss && (
-                    <Mrow label="Vegetation Loss" value="Detected (NDVI drop)" />
-                  )}
-                  {floodZone && floodZone !== 'unavailable' && (
-                    <Mrow label="FEMA Flood Zone"
-                          value={sfha ? `${floodZone} — SFHA (NFIP likely)` : floodZone} />
+                  <Mrow label="Optical Water (MNDWI)"
+                        value={opticalOk
+                          ? `${((opticalPct || 0) * 100).toFixed(0)}% of parcel`
+                          : unavailable('no cloud-free Sentinel-2 scene')} />
+                  {isLiveResult && (
+                    <>
+                      <Mrow label="Event Rainfall"
+                            value={rainMm != null
+                              ? `${(rainMm / 25.4).toFixed(1)} in (${rainMm.toFixed(0)} mm)`
+                              : unavailable('rainfall source failed — see backend log')} />
+                      <Mrow label="Est. Inundation Duration"
+                            value={durDays == null
+                              ? unavailable('fewer than 2 satellite passes in window')
+                              : durDays > 0 ? `~${durDays} days` : 'Drained before next pass'} />
+                      <Mrow label="Dual-Pol Cross-Check (VH)"
+                            value={vhAvail
+                              ? (vhAgrees ? 'VH confirms ✓' : 'VH disagrees ⚠ → Review')
+                              : unavailable('no VH-polarized scene in window')} />
+                      <Mrow label="Vegetation Change (NDVI Δ)"
+                            value={ndviDelta != null
+                              ? (vegLoss ? `${ndviDelta.toFixed(2)} — loss detected` : `${ndviDelta.toFixed(2)} — normal`)
+                              : unavailable('no cloud-free pre/post optical pair')} />
+                      <Mrow label="FEMA Flood Zone"
+                            value={floodZone === 'unavailable'
+                              ? unavailable('FEMA NFHL service unreachable')
+                              : floodZone
+                              ? (sfha ? `${floodZone} — SFHA (NFIP likely)` : floodZone)
+                              : isUS ? unavailable('no NFHL polygon at this point')
+                                     : 'N/A — outside US NFHL coverage'} />
+                    </>
                   )}
                   <Mrow label="Data Source"        value="Sentinel-1 SAR" />
                   <Mrow label="Urban Shadow Zone"  value={urban ? 'Yes (-15pt penalty)' : 'No'} />
@@ -362,6 +390,19 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                 Depth-damage curve × dwelling coverage; range reflects depth uncertainty.
                 Reserving aid — not an adjuster estimate.
               </div>
+            </div>
+          )}
+
+          {/* No severity estimate — say why instead of showing nothing */}
+          {isLiveResult && sevLow == null && (
+            <div style={{
+              marginBottom: 24, padding: '10px 14px', borderRadius: 'var(--r-md)',
+              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+              fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5,
+            }}>
+              No claim severity estimate: {parseFloat(property.max_depth_ft || 0) < 0.1
+                ? 'no significant flood depth detected at this property.'
+                : 'no dwelling coverage amount was present in the uploaded file.'}
             </div>
           )}
 
