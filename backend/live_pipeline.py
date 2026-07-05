@@ -340,6 +340,13 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         near_water = int(s.get('near_water_flag', 0) or 0)
         subrogation = bool(is_flooded and near_water)
 
+        # Surge-miss safeguard: storm surge can recede between satellite
+        # passes, so a low-lying waterfront parcel that reads dry gets a
+        # verification flag instead of a silently confident "no flood" —
+        # the honest mitigation for SAR's revisit-cadence blind spot.
+        surge_check = bool((not is_flooded) and near_water
+                           and row['rel_elev_ft'] <= 4.0)
+
         ndvi_valid = int(s.get('ndvi_valid', 0) or 0)
         ndvi_delta = float(s.get('ndvi_delta', 0.0) or 0.0)
         fema = fema_by_pid.get(pid, {'flood_zone': None, 'sfha': None})
@@ -370,6 +377,7 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'vegetation_loss':   int(ndvi_valid and ndvi_delta >= VEGETATION['loss_flag_delta']),
             'near_water_flag':   near_water,
             'subrogation_flag':  int(subrogation),
+            'surge_check_flag':  int(surge_check),
             'flood_zone':        fema['flood_zone'],
             'sfha_flag':         fema['sfha'],
             'severity_low_usd':  sev['low'] if sev else None,

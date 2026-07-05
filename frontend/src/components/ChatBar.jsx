@@ -3,7 +3,7 @@ import { api } from '../services/api.js';
 
 /* "Ask about this area" — floating chat bar below the globe.
    Grounds questions in whatever event/property is currently on screen. */
-export default function ChatBar({ eventMeta, eventStats, selectedProperty }) {
+export default function ChatBar({ eventMeta, eventStats, selectedProperty, portfolioId }) {
   const [open,     setOpen]     = useState(false);
   const [input,    setInput]    = useState('');
   const [messages, setMessages] = useState([]); // { role, content }
@@ -31,6 +31,7 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty }) {
         event_meta: eventMeta || null,
         event_stats: eventStats || null,
         property: selectedProperty || null,
+        portfolio_id: portfolioId || null,
       });
       setMessages(m => [...m, { role: 'assistant', content: reply }]);
     } catch (e) {

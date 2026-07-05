@@ -142,7 +142,8 @@ def test_chat_grounds_reply_in_context(client, monkeypatch):
 
     captured = {}
 
-    def fake_ask(message, history, event_meta, event_stats, property_row):
+    def fake_ask(message, history, event_meta, event_stats, property_row,
+                 portfolio_summary=None):
         captured.update(message=message, event_meta=event_meta, event_stats=event_stats)
         return f"{event_stats['dispatch']} properties need dispatch."
 

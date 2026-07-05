@@ -318,7 +318,7 @@ export default function App() {
       )}
 
       {(stats || liveMeta?.exposure) && (
-        <KPIBar stats={stats} exposure={liveMeta?.exposure} />
+        <KPIBar stats={stats} exposure={liveMeta?.exposure} leftInset={leftInset} />
       )}
 
       <Sidebar activePanel={activePanel} onSetPanel={setActivePanel} compareCount={compareList.length}>
@@ -430,6 +430,7 @@ export default function App() {
           eventMeta={selectedEventMeta}
           eventStats={stats}
           selectedProperty={selectedProperty}
+          portfolioId={portfolioAnalyzed ? portfolioId : null}
         />
       )}
 

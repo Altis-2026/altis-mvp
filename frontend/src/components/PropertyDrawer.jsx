@@ -3,6 +3,7 @@ import SarPair from './SarPair.jsx';
 import { api } from '../services/api.js';
 
 const TRIAGE_OPTIONS = ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review'];
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const COLORS = {
   'Dispatch':       '#FF4444',
@@ -112,6 +113,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   const vegLoss   = property.vegetation_loss == 1;
   const ndviDelta = num(property.ndvi_delta);
   const subro     = property.subrogation_flag == 1;
+  const surgeCheck = property.surge_check_flag == 1;
   const opticalOk = property.optical_available == 1;
   const opticalPct = num(property.optical_water_pct);
   const isUS      = property.latitude >= 17 && property.latitude <= 72 &&
@@ -281,6 +283,35 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
         ) : (
         <div style={{ padding: '20px 24px', flex: 1 }}>
 
+          {/* Property aerial — high-res basemap satellite of the parcel so an
+              ops user can see the actual structure alongside the flood data.
+              Labeled honestly: current basemap imagery, not post-event. */}
+          {property.latitude && property.longitude && MAPBOX_TOKEN && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{
+                fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em',
+                color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 12,
+              }}>
+                Property Aerial View
+              </div>
+              <img
+                src={`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/`
+                  + `${(+property.longitude).toFixed(6)},${(+property.latitude).toFixed(6)},17.5`
+                  + `/460x220@2x?access_token=${MAPBOX_TOKEN}`}
+                alt="Aerial view of property"
+                style={{
+                  width: '100%', borderRadius: 'var(--r-md)', display: 'block',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                }}
+                onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
+              />
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: 5 }}>
+                Current basemap imagery (pre-dates the event) — for structure/parcel
+                context, not damage assessment.
+              </div>
+            </div>
+          )}
+
           {/* SAR imagery section */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -410,6 +441,25 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               No claim severity estimate: {parseFloat(property.max_depth_ft || 0) < 0.1
                 ? 'no significant flood depth detected at this property.'
                 : 'no dwelling coverage amount was present in the uploaded file.'}
+            </div>
+          )}
+
+          {/* Surge-miss safeguard: low-lying waterfront read dry */}
+          {surgeCheck && (
+            <div style={{
+              marginBottom: 24, background: 'rgba(168,212,230,0.05)',
+              border: '1px solid rgba(168,212,230,0.22)', borderRadius: 'var(--r-md)',
+              padding: '12px 14px',
+            }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#A8D4E6', textTransform: 'uppercase', marginBottom: 5 }}>
+                Surge Verification Suggested
+              </div>
+              <p style={{ fontSize: '0.74rem', color: '#ccc', lineHeight: 1.5, margin: 0 }}>
+                This low-lying waterfront parcel reads dry, but storm surge can
+                recede between satellite passes. If this event involved coastal
+                surge, a quick spot-check (photos, call-out) is recommended before
+                closing remotely.
+              </p>
             </div>
           )}
 

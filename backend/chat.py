@@ -53,8 +53,12 @@ class ChatError(Exception):
 
 
 def _build_context(event_meta: dict | None, event_stats: dict | None,
-                    property_row: dict | None) -> str:
+                    property_row: dict | None,
+                    portfolio_summary: dict | None = None) -> str:
     parts = []
+    if portfolio_summary:
+        parts.append("ANALYZED PORTFOLIO (book of business): "
+                     + json.dumps(portfolio_summary, default=str))
     if event_meta:
         parts.append(f"EVENT: {event_meta.get('label', event_meta.get('id'))} "
                      f"({event_meta.get('sub', '')})")
@@ -79,14 +83,15 @@ def _build_context(event_meta: dict | None, event_stats: dict | None,
 
 
 def ask(message: str, history: list[dict] | None, event_meta: dict | None,
-        event_stats: dict | None, property_row: dict | None) -> str:
+        event_stats: dict | None, property_row: dict | None,
+        portfolio_summary: dict | None = None) -> str:
     if not OPENROUTER_API_KEY:
         raise ChatError(
             "Chat isn't configured — OPENROUTER_API_KEY is missing from the backend "
             "environment. Set it in your .env and restart the server."
         )
 
-    context = _build_context(event_meta, event_stats, property_row)
+    context = _build_context(event_meta, event_stats, property_row, portfolio_summary)
     messages = [{"role": "system", "content": SYSTEM_PROMPT + "\n\nCONTEXT:\n" + context}]
     for turn in (history or [])[-8:]:
         role = turn.get("role")

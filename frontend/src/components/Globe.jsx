@@ -43,6 +43,7 @@ export default function Globe({
   const pinsReady    = useRef(false);
   const [showFema,  setShowFema]  = useState(false);
   const [showTrack, setShowTrack] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(1.5);
 
   /* ── Initialize map ─────────────────────────────────────────── */
   useEffect(() => {
@@ -315,9 +316,9 @@ export default function Globe({
         filter: ['==', ['get', 'kind'], 'track'],
         paint: {
           'line-color':     '#FF8C42',
-          'line-width':     2.5,
+          'line-width':     3.5,
           'line-dasharray': [3, 2],
-          'line-opacity':   0.85,
+          'line-opacity':   1,
         }
       });
 
@@ -402,6 +403,10 @@ export default function Globe({
     /* Stop rotation on user interaction */
     map.on('mousedown',  stopRotation);
     map.on('touchstart', stopRotation);
+
+    /* Track zoom so layer hints (FEMA renders only at neighborhood scale)
+       can tell the user why nothing appeared yet. */
+    map.on('zoomend', () => setZoomLevel(map.getZoom()));
 
     return () => {
       stopRotation();
@@ -540,6 +545,22 @@ export default function Globe({
     src.setData(stormTrack && showTrack ? stormTrack : emptyFC());
   }, [stormTrack, showTrack]);
 
+  /* Clicking the storm-track toggle ON flies to the track — the landfall
+     segment is often hundreds of miles from the study area (Harvey came
+     ashore 200mi southwest of Houston), so without this the toggle looks
+     like it does nothing. */
+  const flyToTrack = useCallback(() => {
+    const map = mapRef.current;
+    const line = stormTrack?.features?.find(f => f.geometry.type === 'LineString');
+    if (!map || !line) return;
+    const lons = line.geometry.coordinates.map(c => c[0]);
+    const lats = line.geometry.coordinates.map(c => c[1]);
+    stopRotation();
+    map.fitBounds([[Math.min(...lons), Math.min(...lats)],
+                   [Math.max(...lons), Math.max(...lats)]],
+                  { padding: 90, duration: 1800, maxZoom: 8 });
+  }, [stormTrack, stopRotation]);
+
   /* ── FEMA NFHL raster overlay (US flood zones) ───────────────── */
   useEffect(() => {
     const map = mapRef.current;
@@ -660,7 +681,8 @@ export default function Globe({
           ask what the colors mean. */}
       {hasTriagePins && !dimmed && (
         <div className="anim-fade-in" style={{
-          position: 'fixed', bottom: 22, left: 72 + leftInset, zIndex: 5,
+          /* Sits above the chat bar (~72px tall) so they never overlap. */
+          position: 'fixed', bottom: 96, left: 16 + leftInset, zIndex: 5,
           padding: '10px 14px', borderRadius: 10,
           background: 'rgba(4,6,14,0.82)', border: '1px solid rgba(255,255,255,0.08)',
           backdropFilter: 'blur(12px)', transition: 'left 0.25s ease',
@@ -709,18 +731,36 @@ export default function Globe({
       {/* Map layer toggles */}
       <div style={{
         position: 'fixed', bottom: 22, right: 16, zIndex: 5,
-        display: 'flex', gap: 8, alignItems: 'center',
+        display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end',
       }}>
-        {stormTrack && (
-          <button onClick={() => setShowTrack(v => !v)} style={toggleStyle(showTrack)}
-                  title="NHC best track (simplified) for this event">
-            🌀 Storm track
-          </button>
+        {showFema && zoomLevel < 9 && (
+          <div style={{
+            maxWidth: 240, padding: '7px 11px', borderRadius: 8,
+            background: 'rgba(4,6,14,0.85)', border: '1px solid rgba(255,179,71,0.3)',
+            fontSize: '0.64rem', color: '#FFB347', lineHeight: 1.45,
+            backdropFilter: 'blur(10px)',
+          }}>
+            FEMA zones are parcel-scale — zoom into a US neighborhood to see them.
+          </div>
         )}
-        <button onClick={() => setShowFema(v => !v)} style={toggleStyle(showFema)}
-                title="FEMA National Flood Hazard Layer — US coverage only">
-          FEMA zones
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {stormTrack && (
+            <button
+              onClick={() => {
+                const next = !showTrack;
+                setShowTrack(next);
+                if (next) flyToTrack();   // the track is often off-screen
+              }}
+              style={toggleStyle(showTrack)}
+              title="NHC best track (simplified) for this event — click to fly to it">
+              🌀 Storm track
+            </button>
+          )}
+          <button onClick={() => setShowFema(v => !v)} style={toggleStyle(showFema)}
+                  title="FEMA National Flood Hazard Layer — US coverage only, renders when zoomed in">
+            FEMA zones
+          </button>
+        </div>
       </div>
     </>
   );

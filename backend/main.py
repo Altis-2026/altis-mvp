@@ -914,6 +914,47 @@ def chat(body: dict = Body(...)):
     if not message:
         raise HTTPException(400, "message is required.")
 
+    # When a portfolio is loaded, pull its stored analysis straight from the
+    # DB so the assistant can answer book-of-business questions (exposure,
+    # est. loss, worst properties, flags) without the frontend shipping the
+    # whole result set on every keystroke.
+    portfolio_summary = None
+    pid = body.get("portfolio_id")
+    if pid:
+        results = get_analysis_results(pid, 'live') or []
+        analyzed = [r for r in results if r.get('impact_class')]
+        if analyzed:
+            meta = get_analysis_meta(pid, 'live') or {}
+
+            def _n(v):
+                try:
+                    return float(v or 0)
+                except (TypeError, ValueError):
+                    return 0.0
+
+            top = sorted(analyzed, key=lambda r: -_n(r.get('severity_high_usd')))[:5]
+            portfolio_summary = {
+                'portfolio_id': pid,
+                'exposure': meta.get('exposure'),
+                'signal_status': meta.get('signal_status'),
+                'event_windows': meta.get('windows'),
+                'class_counts': {c: sum(1 for r in analyzed if r['impact_class'] == c)
+                                 for c in ('Dispatch', 'Review', 'Remote-Approve',
+                                           'Remote-Deny', 'No Coverage')},
+                'flags': {
+                    'subrogation_candidates': sum(1 for r in analyzed if r.get('subrogation_flag')),
+                    'surge_verification_suggested': sum(1 for r in analyzed if r.get('surge_check_flag')),
+                    'vegetation_damage': sum(1 for r in analyzed if r.get('vegetation_loss')),
+                    'sfha_properties': sum(1 for r in analyzed if r.get('sfha_flag')),
+                },
+                'largest_estimated_losses': [{
+                    'address': r.get('address'),
+                    'depth_ft': r.get('max_depth_ft'),
+                    'severity_range_usd': [r.get('severity_low_usd'), r.get('severity_high_usd')],
+                    'class': r.get('impact_class'),
+                } for r in top if r.get('severity_high_usd') is not None],
+            }
+
     try:
         reply = ask(
             message=message,
@@ -921,6 +962,7 @@ def chat(body: dict = Body(...)):
             event_meta=body.get("event_meta"),
             event_stats=body.get("event_stats"),
             property_row=body.get("property"),
+            portfolio_summary=portfolio_summary,
         )
     except ChatError as e:
         raise HTTPException(502, str(e))

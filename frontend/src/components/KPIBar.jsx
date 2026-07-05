@@ -38,7 +38,7 @@ function money(v) {
   return `$${n.toLocaleString()}`;
 }
 
-export default function KPIBar({ stats, exposure }) {
+export default function KPIBar({ stats, exposure, leftInset = 72 }) {
   if (!stats && !exposure) return null;
 
   const savings = stats?.estimated_savings
@@ -51,7 +51,8 @@ export default function KPIBar({ stats, exposure }) {
       style={{
         position:   'fixed',
         top:        72,
-        left:       72,
+        left:       leftInset + 16,
+        transition: 'left 0.25s ease',
         zIndex:     'var(--z-ui)',
         display:    'flex',
         background: 'rgba(4,6,12,0.9)',
