@@ -39,12 +39,18 @@ function ConfidenceGauge({ value, color }) {
   );
 }
 
-/* Measurement row */
-function Mrow({ label, value }) {
+/* Measurement row — plain-English label first, optional technical term as a
+   small sublabel so the science stays visible without leading with jargon. */
+function Mrow({ label, tech, value }) {
   return (
     <tr>
       <td style={{ fontSize: '0.76rem', color: 'var(--text-muted)', padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         {label}
+        {tech && (
+          <div style={{ fontSize: '0.58rem', color: 'var(--text-disabled)', marginTop: 1, letterSpacing: '0.03em' }}>
+            {tech}
+          </div>
+        )}
       </td>
       <td style={{ fontSize: '0.76rem', color: '#ccc', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.04)', fontVariantNumeric: 'tabular-nums' }}>
         {value}
@@ -327,31 +333,31 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   <Mrow label="Max Flood Depth"   value={depthLabel} />
-                  <Mrow label="SAR Amplitude Change (Area Flooded)" value={`${pct}%`} />
+                  <Mrow label="Flooded Area" tech="SAR amplitude change" value={`${pct}%`} />
                   <Mrow label="Confidence Score"   value={`${conf}%`} />
-                  <Mrow label="Optical Water (MNDWI)"
+                  <Mrow label="Water Visible from Optical" tech="Sentinel-2 MNDWI"
                         value={opticalOk
                           ? `${((opticalPct || 0) * 100).toFixed(0)}% of parcel`
                           : unavailable('no cloud-free Sentinel-2 scene')} />
                   {isLiveResult && (
                     <>
-                      <Mrow label="Event Rainfall"
+                      <Mrow label="Event Rainfall" tech="CHIRPS precipitation total"
                             value={rainMm != null
                               ? `${(rainMm / 25.4).toFixed(1)} in (${rainMm.toFixed(0)} mm)`
                               : unavailable('rainfall source failed — see backend log')} />
-                      <Mrow label="Est. Inundation Duration"
+                      <Mrow label="Time Underwater" tech="multi-pass inundation duration"
                             value={durDays == null
                               ? unavailable('fewer than 2 satellite passes in window')
                               : durDays > 0 ? `~${durDays} days` : 'Drained before next pass'} />
-                      <Mrow label="Dual-Pol Cross-Check (VH)"
+                      <Mrow label="Second Radar Channel" tech="VH dual-polarization cross-check"
                             value={vhAvail
-                              ? (vhAgrees ? 'VH confirms ✓' : 'VH disagrees ⚠ → Review')
+                              ? (vhAgrees ? 'Confirms ✓' : 'Disagrees ⚠ → Review')
                               : unavailable('no VH-polarized scene in window')} />
-                      <Mrow label="Vegetation Change (NDVI Δ)"
+                      <Mrow label="Vegetation Damage" tech="NDVI pre/post delta"
                             value={ndviDelta != null
-                              ? (vegLoss ? `${ndviDelta.toFixed(2)} — loss detected` : `${ndviDelta.toFixed(2)} — normal`)
+                              ? (vegLoss ? `Detected (Δ ${ndviDelta.toFixed(2)})` : 'None detected')
                               : unavailable('no cloud-free pre/post optical pair')} />
-                      <Mrow label="FEMA Flood Zone"
+                      <Mrow label="FEMA Flood Zone" tech="NFHL regulatory zone"
                             value={floodZone === 'unavailable'
                               ? unavailable('FEMA NFHL service unreachable')
                               : floodZone
@@ -360,8 +366,9 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                                      : 'N/A — outside US NFHL coverage'} />
                     </>
                   )}
-                  <Mrow label="Data Source"        value="Sentinel-1 SAR" />
-                  <Mrow label="Urban Shadow Zone"  value={urban ? 'Yes (-15pt penalty)' : 'No'} />
+                  <Mrow label="Data Source"        value="Sentinel-1 radar" />
+                  <Mrow label="Dense Urban Area" tech="radar shadow risk"
+                        value={urban ? 'Yes — confidence reduced' : 'No'} />
                   <Mrow label="Resolution"         value="10m native, 30m sampled" />
                 </tbody>
               </table>

@@ -4,7 +4,18 @@ const BASE = '/api';
 
 async function get(path) {
   const r = await fetch(`${BASE}${path}`);
-  if (!r.ok) throw new Error(`API ${path}: ${r.status}`);
+  if (!r.ok) {
+    // Surface the backend's human-readable reason, not just a status code.
+    let detail = `Request failed (${r.status})`;
+    try {
+      const j = await r.json();
+      if (j?.detail) detail = j.detail;
+    } catch { /* non-JSON error body */ }
+    const err = new Error(detail);
+    err.detail = detail;
+    err.status = r.status;
+    throw err;
+  }
   return r.json();
 }
 

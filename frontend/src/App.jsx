@@ -72,6 +72,7 @@ export default function App() {
   const [stormTrack,    setStormTrack]    = useState(null);
   const [savedSettings, setSavedSettings] = useState(null);  // {eventDate, preDays, postDays}
   const [zoneSummary,   setZoneSummary]   = useState(null);  // fast PIF check
+  const [liveError,     setLiveError]     = useState('');    // inline, never alert()
 
   useEffect(() => {
     api.geeStatus().then(d => setGeeLive(!!d.live_analysis)).catch(() => setGeeLive(false));
@@ -241,11 +242,13 @@ export default function App() {
       setLiveMeta(data.meta || null);
       setLiveEventDate(eventDate);
       setSavedSettings({ eventDate, preDays, postDays });
+      setLiveError('');
       const bounds = computeBounds(data.results || []);
       if (bounds) setFlyTarget({ bounds });
     } catch (err) {
       console.error('Live analysis failed:', err);
-      alert(err?.detail || 'Live analysis failed. See console for details.');
+      setLiveError(err?.detail || String(err?.message || err) ||
+                   'Live analysis failed — check the backend terminal.');
     } finally {
       setLiveAnalyzing(false);
     }
@@ -368,6 +371,8 @@ export default function App() {
             portfolioId={portfolioId}
             savedSettings={savedSettings}
             zoneSummary={zoneSummary}
+            liveError={liveError}
+            onDismissError={() => setLiveError('')}
           />
         )}
         {activePanel === 'compare' && (

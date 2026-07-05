@@ -1,25 +1,37 @@
 /* Header.jsx — Fixed top bar with logo, event label, upload button */
 import { useState } from 'react';
 
-/* Altis brand mark — satellite with solar panels + dish, teal-on-black. */
-const AltisLogo = () => (
-  <svg width="24" height="24" viewBox="0 0 64 64">
-    <g transform="translate(32,30) rotate(-35)">
-      <rect x="-26" y="-7" width="14" height="14" rx="1.2" fill="#A8D4E6" opacity="0.55"/>
-      <rect x="12"  y="-7" width="14" height="14" rx="1.2" fill="#A8D4E6" opacity="0.55"/>
-      <line x1="-12" y1="0" x2="-7" y2="0" stroke="#A8D4E6" strokeWidth="2"/>
-      <line x1="7"   y1="0" x2="12" y2="0" stroke="#A8D4E6" strokeWidth="2"/>
-      <g opacity="0.85">
-        <line x1="-22" y1="-4" x2="-18" y2="-4" stroke="#000004" strokeWidth="1.4"/>
-        <line x1="-22" y1="0"  x2="-18" y2="0"  stroke="#000004" strokeWidth="1.4"/>
-        <line x1="-22" y1="4"  x2="-18" y2="4"  stroke="#000004" strokeWidth="1.4"/>
-        <line x1="18" y1="-4" x2="22" y2="-4" stroke="#000004" strokeWidth="1.4"/>
-        <line x1="18" y1="0"  x2="22" y2="0"  stroke="#000004" strokeWidth="1.4"/>
-        <line x1="18" y1="4"  x2="22" y2="4"  stroke="#000004" strokeWidth="1.4"/>
+/* Altis brand mark — gradient satellite (panels/body/dish), matching the
+   official ice-blue-on-black logo. */
+const AltisLogo = ({ size = 26 }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="altisIce" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stopColor="#DDF1FB"/>
+        <stop offset="1" stopColor="#8FC4E8"/>
+      </linearGradient>
+    </defs>
+    <g transform="translate(33,29) rotate(45)">
+      <g stroke="#000004" strokeWidth="1.3">
+        <rect x="-27" y="-7.5" width="15" height="15" rx="1.5" fill="url(#altisIce)"/>
+        <line x1="-22" y1="-7.5" x2="-22" y2="7.5"/>
+        <line x1="-17" y1="-7.5" x2="-17" y2="7.5"/>
+        <line x1="-27" y1="-2.5" x2="-12" y2="-2.5"/>
+        <line x1="-27" y1="2.5"  x2="-12" y2="2.5"/>
+        <rect x="12" y="-7.5" width="15" height="15" rx="1.5" fill="url(#altisIce)"/>
+        <line x1="17" y1="-7.5" x2="17" y2="7.5"/>
+        <line x1="22" y1="-7.5" x2="22" y2="7.5"/>
+        <line x1="12" y1="-2.5" x2="27" y2="-2.5"/>
+        <line x1="12" y1="2.5"  x2="27" y2="2.5"/>
       </g>
-      <rect x="-7" y="-8" width="14" height="16" rx="2" fill="#A8D4E6"/>
-      <circle cx="0" cy="-15" r="6" fill="none" stroke="#A8D4E6" strokeWidth="2"/>
-      <line x1="0" y1="-9" x2="0" y2="-15" stroke="#A8D4E6" strokeWidth="1.6"/>
+      <line x1="-12" y1="0" x2="-7" y2="0" stroke="url(#altisIce)" strokeWidth="2.4"/>
+      <line x1="7"   y1="0" x2="12" y2="0" stroke="url(#altisIce)" strokeWidth="2.4"/>
+      <rect x="-7" y="-9" width="14" height="18" rx="3.5" fill="url(#altisIce)"/>
+      <rect x="-3.5" y="-13" width="7" height="5" rx="2" fill="url(#altisIce)"/>
+      <path d="M -12 12 A 9.5 9.5 0 0 1 7 12 L -12 12 Z"
+            transform="rotate(180 -2.5 15)" fill="url(#altisIce)"/>
+      <line x1="-2.5" y1="17" x2="-2.5" y2="23.5" stroke="url(#altisIce)" strokeWidth="1.8"/>
+      <circle cx="-2.5" cy="24.5" r="2" fill="url(#altisIce)"/>
     </g>
   </svg>
 );
@@ -43,9 +55,18 @@ export default function Header({ selectedEvent, onUploadClick, onGridClick, load
       {/* Left: Logo + event label */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'all' }}>
         <AltisLogo />
-        <span style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '0.12em', color: '#fff' }}>
-          ALTIS
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+          <span style={{
+            fontSize: '1.05rem', fontWeight: 800, letterSpacing: '0.12em',
+            background: 'linear-gradient(135deg, #DDF1FB, #8FC4E8)',
+            WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+          }}>
+            ALTIS
+          </span>
+          <span style={{ fontSize: '0.56rem', fontWeight: 600, letterSpacing: '0.14em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            Real-time satellite ground truth
+          </span>
+        </div>
         {selectedEvent && (
           <>
             <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.9rem' }}>|</span>

@@ -647,9 +647,64 @@ export default function Globe({
     transition: 'all 0.15s ease',
   });
 
+  const hasTriagePins = properties.length > 0 ||
+    portfolioProperties.some(p => p.impact_class);
+  const hasAnyPins = properties.length > 0 || portfolioProperties.length > 0;
+
   return (
     <>
       <div ref={containerRef} style={containerStyle} />
+
+      {/* Pin legend — plain claims-operations language, shown whenever
+          triaged pins are on the map so a first-time viewer never has to
+          ask what the colors mean. */}
+      {hasTriagePins && !dimmed && (
+        <div className="anim-fade-in" style={{
+          position: 'fixed', bottom: 22, left: 72 + leftInset, zIndex: 5,
+          padding: '10px 14px', borderRadius: 10,
+          background: 'rgba(4,6,14,0.82)', border: '1px solid rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(12px)', transition: 'left 0.25s ease',
+        }}>
+          <div style={{ fontSize: '0.56rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 7 }}>
+            Triage decision
+          </div>
+          {[['#FF4444', 'Dispatch — send an adjuster'],
+            ['#FFB347', 'Review — needs a human call'],
+            ['#4CAF82', 'Approve remotely'],
+            ['#6B8FA3', 'No flood detected — resolve remotely'],
+          ].map(([c, label]) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '2px 0' }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: c, flexShrink: 0 }} />
+              <span style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* First-run guide — three steps, gone as soon as anything is loaded */}
+      {!hasAnyPins && (
+        <div className="anim-fade-in" style={{
+          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 5, display: 'flex', gap: 22, padding: '14px 26px',
+          background: 'rgba(4,6,14,0.8)', border: '1px solid rgba(168,212,230,0.14)',
+          borderRadius: 12, backdropFilter: 'blur(14px)', pointerEvents: 'none',
+        }}>
+          {[['1', 'Upload your policy portfolio'],
+            ['2', 'Set the flood date & run analysis'],
+            ['3', 'Review exposure & dispatch queue'],
+          ].map(([n, label]) => (
+            <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <span style={{
+                width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                background: 'linear-gradient(135deg, #DDF1FB, #8FC4E8)', color: '#000',
+                fontSize: '0.68rem', fontWeight: 800, display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+              }}>{n}</span>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Map layer toggles */}
       <div style={{

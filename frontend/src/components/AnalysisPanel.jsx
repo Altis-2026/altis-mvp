@@ -1,7 +1,20 @@
 import { useState, useMemo, useEffect } from 'react';
 import { api } from '../services/api.js';
+import { validateEventDate, clampDays } from '../lib/validation.js';
 
 const RISK_COLORS = { 1: '#4CAF82', 2: '#A8D4E6', 3: '#FFD97A', 4: '#FFB347', 5: '#FF4444' };
+
+/* Honest staged status shown while the real pipeline runs (typical order and
+   duration; not a fake percent bar). */
+const ANALYSIS_STAGES = [
+  'Locating Sentinel-1 radar passes…',
+  'Compositing pre-event baseline…',
+  'Detecting flood extent from radar change…',
+  'Estimating water depth from elevation…',
+  'Cross-checking optical + second radar channel…',
+  'Measuring rainfall & inundation duration…',
+  'Scoring and triaging every policy…',
+];
 
 const TRIAGE_CLASSES = ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review'];
 const MAX_ROWS = 150;
@@ -50,6 +63,7 @@ export default function AnalysisPanel({
   onAnalyzePortfolio, analyzing,
   onAnalyzeLive, liveAnalyzing, geeLive, liveMeta,
   portfolioId, savedSettings, zoneSummary,
+  liveError, onDismissError,
 }) {
   /* Pre-event risk scan (1–5 static flood risk, no event date) */
   const [riskData,    setRiskData]    = useState(null);
@@ -83,6 +97,21 @@ export default function AnalysisPanel({
       if (savedSettings.postDays) setPostDays(savedSettings.postDays);
     }
   }, [savedSettings]);
+
+  const dateError = validateEventDate(liveDate);
+  const runOpts = () => ({
+    preDays:  clampDays(preDays, 3, 60, 7),
+    postDays: clampDays(postDays, 3, 45, 14),
+  });
+
+  // Rotate the staged status line while the pipeline runs.
+  const [stageIdx, setStageIdx] = useState(0);
+  useEffect(() => {
+    if (!liveAnalyzing) { setStageIdx(0); return; }
+    const t = setInterval(() =>
+      setStageIdx(i => Math.min(i + 1, ANALYSIS_STAGES.length - 1)), 9000);
+    return () => clearInterval(t);
+  }, [liveAnalyzing]);
 
   const [source, setSource] = useState(hasEvent ? 'event' : 'portfolio');
 
@@ -426,14 +455,34 @@ export default function AnalysisPanel({
                   <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginBottom: 7 }}>
                     date · days before (baseline) · days after (flood window)
                   </div>
+                  {liveDate && dateError && (
+                    <div style={{ fontSize: '0.66rem', color: '#FFB347', marginBottom: 7, lineHeight: 1.4 }}>
+                      {dateError}
+                    </div>
+                  )}
+                  {liveError && (
+                    <div style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8,
+                      padding: '8px 10px', borderRadius: 'var(--r-sm)',
+                      background: 'rgba(255,68,68,0.07)', border: '1px solid rgba(255,68,68,0.22)',
+                    }}>
+                      <span style={{ flex: 1, fontSize: '0.68rem', color: '#FF9B9B', lineHeight: 1.45 }}>
+                        {liveError}
+                      </span>
+                      <button onClick={onDismissError} style={{
+                        background: 'none', border: 'none', color: '#FF9B9B',
+                        cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1, padding: 0,
+                      }}>✕</button>
+                    </div>
+                  )}
 
                   {/* Scope choice: in-zone only vs full book */}
                   {zoneSummary?.zone_source === 'event' && zoneSummary.out_zone > 0 ? (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button
                         onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate, {
-                          preDays: +preDays, postDays: +postDays, bboxFilter: zoneSummary.bbox })}
-                        disabled={!geeLive || liveAnalyzing}
+                          ...runOpts(), bboxFilter: zoneSummary.bbox })}
+                        disabled={!geeLive || liveAnalyzing || !!dateError}
                         style={{
                           flex: 1.4, padding: '7px 8px',
                           background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'rgba(255,255,255,0.04)',
@@ -444,9 +493,8 @@ export default function AnalysisPanel({
                         {liveAnalyzing ? 'Analyzing…' : `Run in-zone only (${zoneSummary.in_zone})`}
                       </button>
                       <button
-                        onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate, {
-                          preDays: +preDays, postDays: +postDays })}
-                        disabled={!geeLive || liveAnalyzing}
+                        onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate, runOpts())}
+                        disabled={!geeLive || liveAnalyzing || !!dateError}
                         style={{
                           flex: 1, padding: '7px 8px',
                           background: 'rgba(255,255,255,0.04)',
@@ -459,9 +507,8 @@ export default function AnalysisPanel({
                     </div>
                   ) : (
                     <button
-                      onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate, {
-                        preDays: +preDays, postDays: +postDays })}
-                      disabled={!geeLive || liveAnalyzing}
+                      onClick={() => onAnalyzeLive && onAnalyzeLive(liveDate, runOpts())}
+                      disabled={!geeLive || liveAnalyzing || !!dateError}
                       style={{
                         width: '100%', padding: '7px 12px',
                         background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'rgba(255,255,255,0.04)',
@@ -473,8 +520,16 @@ export default function AnalysisPanel({
                     </button>
                   )}
                   {liveAnalyzing && (
-                    <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>
-                      Pulling Sentinel-1 scenes & running detection — this can take 30–90s…
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                      <span style={{
+                        width: 11, height: 11, flexShrink: 0, borderRadius: '50%',
+                        border: '2px solid rgba(168,212,230,0.2)', borderTopColor: '#A8D4E6',
+                        display: 'inline-block', animation: 'spin 0.8s linear infinite',
+                      }} />
+                      <span className="anim-fade-in" key={stageIdx}
+                            style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>
+                        {ANALYSIS_STAGES[stageIdx]} <span style={{ color: 'var(--text-muted)' }}>(typically 1–3 min total)</span>
+                      </span>
                     </div>
                   )}
                 </div>

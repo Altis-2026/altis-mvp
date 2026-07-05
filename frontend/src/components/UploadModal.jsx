@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { api } from '../services/api.js';
+import { validateEventDate, clampDays } from '../lib/validation.js';
 
 const ACCEPTED_EXT = ['.csv', '.xlsx', '.xls', '.pdf'];
 
@@ -71,8 +72,13 @@ export default function UploadModal({ events, onClose, onSuccess }) {
     }
   };
 
-  const settingsPayload = (runNow) => (eventDate ? {
-    eventDate, preDays: +preDays || 7, postDays: +postDays || 14, runNow,
+  const dateError = eventDate ? validateEventDate(eventDate) : '';
+
+  const settingsPayload = (runNow) => (eventDate && !dateError ? {
+    eventDate,
+    preDays:  clampDays(preDays, 3, 60, 7),
+    postDays: clampDays(postDays, 3, 45, 14),
+    runNow,
   } : null);
 
   const handleConfirm = async (runNow = false) => {
@@ -437,8 +443,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                   borderRadius: 'var(--r-md)', color: '#fff', fontFamily: 'var(--font)',
                 }}
               />
-              <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.45 }}>
-                The landfall / peak-flood date. Satellite imagery is composited around it.
+              <div style={{ fontSize: '0.66rem', color: dateError ? '#FFB347' : 'var(--text-muted)', marginTop: 5, lineHeight: 1.45 }}>
+                {dateError || 'The landfall / peak-flood date. Satellite imagery is composited around it.'}
               </div>
             </div>
 
@@ -520,14 +526,14 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               </button>
               <button
                 onClick={() => handleConfirm(true)}
-                disabled={!eventDate || status === 'confirming'}
+                disabled={!eventDate || !!dateError || status === 'confirming'}
                 style={{
                   flex: 1, padding: '14px',
-                  background: eventDate ? '#A8D4E6' : 'rgba(255,255,255,0.05)',
+                  background: eventDate && !dateError ? 'linear-gradient(135deg, #DDF1FB, #8FC4E8)' : 'rgba(255,255,255,0.05)',
                   border: 'none', borderRadius: 'var(--r-md)',
-                  color: eventDate ? '#000' : 'var(--text-disabled)',
+                  color: eventDate && !dateError ? '#000' : 'var(--text-disabled)',
                   fontSize: '0.9rem', fontWeight: 800,
-                  cursor: eventDate ? 'pointer' : 'not-allowed',
+                  cursor: eventDate && !dateError ? 'pointer' : 'not-allowed',
                   fontFamily: 'var(--font)', letterSpacing: '0.03em',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                 }}
