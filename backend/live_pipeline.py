@@ -7,17 +7,21 @@ Engine and returns the same triage shape as the pre-computed demo events — so
 the rest of the app (results endpoint, dispatch queue, drawer, PDF) works
 identically whether the data came from a baked CSV or a fresh Colombia run.
 
-Authentication is via a GEE service-account key (pipeline.config
-.GEE_SERVICE_ACCOUNT_KEY). If no key is configured, `gee_available()` is False
-and the caller returns an honest "live analysis needs credentials" response
-rather than pretending. Nothing here fabricates results.
+Authentication is via a GEE service-account key — either a file on disk
+(pipeline.config.GEE_SERVICE_ACCOUNT_KEY, for local dev) or the key's raw
+JSON content in an env var (GEE_SERVICE_ACCOUNT_KEY_JSON, for containerized
+deploys where mounting a secret file is awkward). If neither is configured,
+`gee_available()` is False and the caller returns an honest "live analysis
+needs credentials" response rather than pretending. Nothing here fabricates
+results.
 """
 import json
 import math
 from datetime import datetime, timedelta
 
 from pipeline.config import (
-    GEE_PROJECT, GEE_SERVICE_ACCOUNT_KEY, TRIAGE, ENSEMBLE,
+    GEE_PROJECT, GEE_SERVICE_ACCOUNT_KEY, GEE_SERVICE_ACCOUNT_KEY_JSON,
+    TRIAGE, ENSEMBLE,
 )
 
 COLOR_MAP = {
@@ -36,8 +40,8 @@ class LiveAnalysisError(Exception):
 
 
 def gee_available() -> bool:
-    """True when a service-account key is configured and the file exists."""
-    return bool(GEE_SERVICE_ACCOUNT_KEY)
+    """True when a service-account key is configured, as a file or raw JSON."""
+    return bool(GEE_SERVICE_ACCOUNT_KEY or GEE_SERVICE_ACCOUNT_KEY_JSON)
 
 
 def init_ee() -> bool:
@@ -49,17 +53,23 @@ def init_ee() -> bool:
     global _ee_ready
     if _ee_ready:
         return True
-    if not GEE_SERVICE_ACCOUNT_KEY:
+    if not gee_available():
         raise LiveAnalysisError(
             "Live satellite analysis requires a Google Earth Engine service-account "
-            "key. Set GEE_SERVICE_ACCOUNT_KEY (or drop the key at secrets/ee-sa-key.json) "
-            "and restart the backend.")
+            "key. Set GEE_SERVICE_ACCOUNT_KEY_JSON (the key's raw JSON content — the "
+            "deploy-friendly form) or GEE_SERVICE_ACCOUNT_KEY / secrets/ee-sa-key.json "
+            "(a file path, for local dev) and restart the backend.")
     try:
         import ee
-        with open(GEE_SERVICE_ACCOUNT_KEY) as f:
-            email = json.load(f)['client_email']
-        ee.Initialize(ee.ServiceAccountCredentials(email, GEE_SERVICE_ACCOUNT_KEY),
-                      project=GEE_PROJECT)
+        if GEE_SERVICE_ACCOUNT_KEY_JSON:
+            key_data = GEE_SERVICE_ACCOUNT_KEY_JSON
+            email = json.loads(key_data)['client_email']
+            creds = ee.ServiceAccountCredentials(email, key_data=key_data)
+        else:
+            with open(GEE_SERVICE_ACCOUNT_KEY) as f:
+                email = json.load(f)['client_email']
+            creds = ee.ServiceAccountCredentials(email, GEE_SERVICE_ACCOUNT_KEY)
+        ee.Initialize(creds, project=GEE_PROJECT)
         _ee_ready = True
         return True
     except Exception as e:

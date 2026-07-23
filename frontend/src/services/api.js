@@ -1,9 +1,45 @@
 /* api.js — All Altis backend API calls */
 
-const BASE = '/api';
+// Local dev: relative '/api', proxied to localhost:8000 by vite.config.js.
+// Production build: set VITE_API_BASE_URL to the deployed backend's origin
+// (e.g. https://altis-api.up.railway.app/api) — frontend and backend are
+// deployed as two separate services, so a relative path would otherwise
+// resolve against the frontend's own domain and 404.
+const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
+// ── Demo access code (see AccessGate.jsx) ──────────────────────────────────
+// The backend's shared-secret gate (X-Demo-Password header) is optional —
+// off entirely unless the host sets DEMO_PASSWORD. When it's on, AccessGate
+// collects the code once and stores it here (+ sessionStorage, so a reload
+// within the tab doesn't re-prompt) for every request below to attach.
+const _STORAGE_KEY = 'altis_demo_code';
+let _demoCode = (typeof sessionStorage !== 'undefined'
+  && sessionStorage.getItem(_STORAGE_KEY)) || null;
+
+export function setDemoCode(code) {
+  _demoCode = code || null;
+  if (typeof sessionStorage !== 'undefined') {
+    if (_demoCode) sessionStorage.setItem(_STORAGE_KEY, _demoCode);
+    else sessionStorage.removeItem(_STORAGE_KEY);
+  }
+}
+export function getDemoCode() { return _demoCode; }
+
+function authHeaders(extra = {}) {
+  return _demoCode ? { ...extra, 'X-Demo-Password': _demoCode } : extra;
+}
+
+// Every network call in this file goes through this wrapper so the access
+// code (when set) is attached uniformly — callers below are unaffected.
+function authFetch(path, options = {}) {
+  return fetch(`${BASE}${path}`, {
+    ...options,
+    headers: authHeaders(options.headers || {}),
+  });
+}
 
 async function get(path) {
-  const r = await fetch(`${BASE}${path}`);
+  const r = await authFetch(path);
   if (!r.ok) {
     // Surface the backend's human-readable reason, not just a status code.
     let detail = `Request failed (${r.status})`;
@@ -31,7 +67,7 @@ export const api = {
 
   /* Fast PIF zone summary — pure bbox math, no GEE, returns instantly */
   zoneSummary: (id, bbox) =>
-    fetch(`${BASE}/portfolio/${id}/zone-summary`, {
+    authFetch(`/portfolio/${id}/zone-summary`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bbox }),
     }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
@@ -39,7 +75,7 @@ export const api = {
   /* Per-portfolio analysis settings (event date + window) */
   getPortfolioSettings: (id) => get(`/portfolio/${id}/settings`),
   savePortfolioSettings: (id, settings) =>
-    fetch(`${BASE}/portfolio/${id}/settings`, {
+    authFetch(`/portfolio/${id}/settings`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings),
     }).then(r => r.json()),
@@ -54,17 +90,17 @@ export const api = {
   },
 
   /* Portfolio */
-  downloadTemplate: ()     => fetch(`${BASE}/portfolio/template`),
+  downloadTemplate: ()     => authFetch('/portfolio/template'),
 
   uploadPortfolio: (file) => {
     const form = new FormData();
     form.append('file', file);
-    return fetch(`${BASE}/portfolio/upload`, { method: 'POST', body: form })
+    return authFetch('/portfolio/upload', { method: 'POST', body: form })
       .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); });
   },
 
   confirmPortfolioUpload: (uploadId, mapping) =>
-    fetch(`${BASE}/portfolio/${uploadId}/confirm`, {
+    authFetch(`/portfolio/${uploadId}/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mapping }),
@@ -72,13 +108,13 @@ export const api = {
 
   getPortfolio:     (id)         => get(`/portfolio/${id}`),
   listPortfolios:   ()           => get('/portfolios'),
-  analyzePortfolio: (id, evtId)  => fetch(`${BASE}/portfolio/${id}/analyze/${evtId}`,
+  analyzePortfolio: (id, evtId)  => authFetch(`/portfolio/${id}/analyze/${evtId}`,
                                           { method: 'POST' }).then(r => r.json()),
   getResults:       (id, evtId)  => get(`/portfolio/${id}/results/${evtId}`),
 
   /* Live, global satellite analysis (real Sentinel-1, any location + date) */
   geeStatus:    ()                 => get('/gee-status'),
-  analyzeLive:  (id, payload)      => fetch(`${BASE}/portfolio/${id}/analyze-live`, {
+  analyzeLive:  (id, payload)      => authFetch(`/portfolio/${id}/analyze-live`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
@@ -89,7 +125,7 @@ export const api = {
 
   /* Adjuster feedback loop */
   submitFeedback: (propertyId, payload) =>
-    fetch(`${BASE}/property/${propertyId}/feedback`, {
+    authFetch(`/property/${propertyId}/feedback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -98,29 +134,39 @@ export const api = {
 
   /* Pipeline runs (monitor → pipeline loop) */
   getRuns:   ()        => get('/runs'),
-  createRun: (payload) => fetch(`${BASE}/runs`, {
+  createRun: (payload) => authFetch('/runs', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
-  setRunStatus: (runId, status) => fetch(`${BASE}/runs/${runId}/status`, {
+  setRunStatus: (runId, status) => authFetch(`/runs/${runId}/status`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   }).then(r => r.json()),
 
   /* Reports */
-  getValidationReport: (evtId) => fetch(`${BASE}/validation/${evtId}`)
+  getValidationReport: (evtId) => authFetch(`/validation/${evtId}`)
     .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
-  getAccuracyCalibration: (evtId) => fetch(`${BASE}/accuracy/${evtId}`)
+  getAccuracyCalibration: (evtId) => authFetch(`/accuracy/${evtId}`)
     .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
-  eventReportUrl: (evtId) => `${BASE}/events/${evtId}/report`,
+  // JS-driven download (fetch + blob), not a raw <a href>: a plain browser
+  // navigation can't carry our X-Demo-Password header, so the link would
+  // 401 the instant the access gate is turned on.
+  downloadEventReport: (evtId) => authFetch(`/events/${evtId}/report`)
+    .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.blob(); }),
+  // Reinsurance-format catastrophe report for an analyzed portfolio. Only
+  // ever reachable via direct URL before — that would 401 the moment the
+  // demo access gate is on, since a bare navigation can't carry our header.
+  downloadCatReport: (portfolioId, evtId = 'live') =>
+    authFetch(`/portfolio/${portfolioId}/cat-report/${evtId}`)
+      .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.blob(); }),
 
   /* Chat ("Ask about this area") */
-  sendChatMessage: (payload) => fetch(`${BASE}/chat`, {
+  sendChatMessage: (payload) => authFetch('/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
 
-  /* Health */
+  /* Health — also used by AccessGate to detect whether the demo gate is on */
   health: () => get('/health'),
 };

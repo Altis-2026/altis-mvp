@@ -27,6 +27,14 @@ _GEE_KEY_CANDIDATES = [
 GEE_SERVICE_ACCOUNT_KEY = next(
     (p for p in _GEE_KEY_CANDIDATES if p and os.path.exists(p)), None)
 
+# Container-friendly alternative: the key's raw JSON *content* (not a path) in
+# a single env var. Most hosts (Railway, Render, Fly, Cloud Run, App Runner)
+# make it easy to paste a secret value but awkward to mount a secret file, so
+# this is the portable path for production — GEE_SERVICE_ACCOUNT_KEY above
+# still works unchanged for local dev with a key file on disk. Whichever is
+# set wins; the JSON-content form takes priority since it's the deploy path.
+GEE_SERVICE_ACCOUNT_KEY_JSON = os.getenv('GEE_SERVICE_ACCOUNT_KEY_JSON')
+
 # ─── MAPBOX (global geocoding) ───────────────────────────────────────────────
 # Mapbox geocodes worldwide (unlike the US-only Census geocoder), so uploaded
 # portfolios resolve anywhere — Colombia, Spain, anywhere. Reuses the same token

@@ -29,9 +29,18 @@ def get_flood_tile_url(event_id: str) -> Optional[str]:
     """
     try:
         import ee
-        from pipeline.config import GEE_PROJECT, HARVEY, IAN
+        from pipeline.config import HARVEY, IAN
+        from backend.live_pipeline import init_ee, gee_available, LiveAnalysisError
 
-        ee.Initialize(project=GEE_PROJECT)
+        # Same service-account auth as live analysis (file path locally, raw
+        # JSON env var in a container) rather than requiring an interactive
+        # `earthengine authenticate` session the deployed server can't run.
+        if not gee_available():
+            return None
+        try:
+            init_ee()
+        except LiveAnalysisError:
+            return None
 
         event_map = {'harvey': HARVEY, 'ian': IAN}
         cfg = event_map.get(event_id)

@@ -106,6 +106,46 @@ export default function ReportsPanel({
   const [loadingReport,  setLoadingReport] = useState(false);
   const [calibration,    setCalibration]   = useState(null);
   const [calibError,     setCalibError]    = useState('');
+  const [downloading,    setDownloading]   = useState(false);
+  const [catDownloading, setCatDownloading] = useState(false);
+  const [catError,       setCatError]      = useState('');
+
+  const _saveBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadReport = async () => {
+    if (!reportEventId || downloading) return;
+    setDownloading(true);
+    try {
+      _saveBlob(await api.downloadEventReport(reportEventId), `altis_audit_${reportEventId}.pdf`);
+    } catch (err) {
+      setReportError(err?.detail || 'Could not download the report.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const hasAnalyzedPortfolio = portfolioId && portfolioProperties.length > 0
+    && portfolioProperties[0]?.impact_class;
+
+  const downloadCatReport = async () => {
+    if (!portfolioId || catDownloading) return;
+    setCatDownloading(true);
+    setCatError('');
+    try {
+      _saveBlob(await api.downloadCatReport(portfolioId), `altis_cat_report_${portfolioId}.pdf`);
+    } catch (err) {
+      setCatError(err?.detail || 'Could not download the catastrophe report.');
+    } finally {
+      setCatDownloading(false);
+    }
+  };
 
   const loadReport = async () => {
     if (!reportEventId) return;
@@ -159,25 +199,50 @@ export default function ReportsPanel({
           ↓ Export portfolio results {portfolioLabel ? `(${portfolioLabel})` : ''}
         </button>
 
-        <a
-          href={reportEventId ? api.eventReportUrl(reportEventId) : undefined}
-          target="_blank" rel="noopener noreferrer"
+        <button
+          onClick={downloadReport}
+          disabled={!reportEventId || downloading}
           style={{
-            ...exportBtnStyle(!reportEventId),
-            textDecoration: 'none',
+            ...exportBtnStyle(!reportEventId || downloading),
             display: 'flex', alignItems: 'center', gap: 8,
-            color: !reportEventId ? 'var(--text-disabled)' : '#A8D4E6',
-            background: !reportEventId ? 'rgba(255,255,255,0.02)' : 'rgba(168,212,230,0.08)',
+            color: (!reportEventId || downloading) ? 'var(--text-disabled)' : '#A8D4E6',
+            background: (!reportEventId || downloading) ? 'rgba(255,255,255,0.02)' : 'rgba(168,212,230,0.08)',
             border: '1px solid rgba(168,212,230,0.2)',
           }}
         >
           <span style={{ fontSize: '0.9rem' }}>📄</span>
-          Download audit PDF {events.find(e => e.id === reportEventId)?.label ? `(${events.find(e => e.id === reportEventId).label})` : ''}
-        </a>
-        <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', margin: '-2px 2px 0', lineHeight: 1.4 }}>
+          {downloading ? 'Downloading…' : 'Download audit PDF'} {events.find(e => e.id === reportEventId)?.label ? `(${events.find(e => e.id === reportEventId).label})` : ''}
+        </button>
+        <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', margin: '-2px 2px 0 2px', lineHeight: 1.4 }}>
           Methodology, scene sources + dates, triage table, top dispatch priorities,
           and FEMA-validated precision/recall — one carrier-ready document.
         </div>
+
+        {hasAnalyzedPortfolio && (
+          <>
+            <button
+              onClick={downloadCatReport}
+              disabled={catDownloading}
+              style={{
+                ...exportBtnStyle(catDownloading),
+                display: 'flex', alignItems: 'center', gap: 8, marginTop: 10,
+                color: catDownloading ? 'var(--text-disabled)' : '#D4B068',
+                background: catDownloading ? 'rgba(255,255,255,0.02)' : 'rgba(212,176,104,0.08)',
+                border: '1px solid rgba(212,176,104,0.2)',
+              }}
+            >
+              <span style={{ fontSize: '0.9rem' }}>🗂</span>
+              {catDownloading ? 'Downloading…' : 'Download catastrophe report'} ({portfolioLabel || portfolioId})
+            </button>
+            <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', margin: '4px 2px 0', lineHeight: 1.4 }}>
+              Reinsurance-format: exposure, estimated loss range, triage distribution,
+              methodology — for the analyzed portfolio's most recent live run.
+            </div>
+            {catError && (
+              <div style={{ fontSize: '0.68rem', color: '#FF6B6B', margin: '4px 2px 0' }}>{catError}</div>
+            )}
+          </>
+        )}
 
         {/* Validation section */}
         <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--teal)', textTransform: 'uppercase', margin: '22px 0 10px' }}>

@@ -23,10 +23,17 @@ from triage_core import (
     classify_triage, ensemble_votes, ensemble_disagreement,
 )
 
+# Lazy/conditional construction: newer openai-SDK versions raise immediately
+# on OpenAI(api_key=None) rather than waiting for an actual API call, which
+# would crash this module on import (and therefore crash tests / any caller
+# that imports it) on a fresh checkout before .env is configured. The one
+# call site below already catches broadly and falls back to a deterministic
+# note, so a missing client degrades the same way a network failure would —
+# never a hard crash.
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=OPENROUTER_API_KEY,
-)
+) if OPENROUTER_API_KEY else None
 
 
 
@@ -62,6 +69,9 @@ def generate_notes_batch(batch_rows):
         "No preamble, no markdown. Just the JSON array.\n"
         'Example: ["Note one.", "Note two."]'
     )
+
+    if client is None:
+        raise RuntimeError("OPENROUTER_API_KEY not configured")
 
     response = client.chat.completions.create(
         model="anthropic/claude-3-5-haiku",

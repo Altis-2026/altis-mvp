@@ -25,13 +25,16 @@ Endpoints:
 """
 import os
 import io
+import secrets
 import uuid
 import asyncio
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Body
+from fastapi import (
+    FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Body, Depends, Header,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 
@@ -55,11 +58,47 @@ from pipeline.config import EVENTS
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="Altis Flood Intelligence API", version="2.0")
+# Lightweight shared-secret gate for a public demo/investor link — NOT a real
+# multi-tenant auth system (see DEPLOYMENT.md hardening checklist for that).
+# Only active when DEMO_PASSWORD is set, so local dev and any host that
+# hasn't configured it stay open exactly as before.
+#
+# A custom header + a small in-app password screen (frontend AccessGate),
+# rather than HTTP Basic Auth, deliberately: Basic Auth's WWW-Authenticate
+# response header makes the *browser itself* pop a native login dialog on
+# ANY request that reaches a protected route outside our JS fetch layer —
+# a stray <a href> or a future dev forgetting to route through api.js would
+# silently trigger it. A custom header never does that; a request either
+# carries the right header (attached explicitly in code) or gets a clean
+# JSON 401 the frontend handles on its own terms.
+#
+# Wired in via FastAPI(dependencies=[...]) at app-construction time — the
+# documented mechanism for a truly global dependency — rather than mutating
+# app.router.dependencies after the fact, whose effect on already-declared
+# routes isn't a guarantee worth resting an auth gate on.
+_demo_pass = os.getenv('DEMO_PASSWORD')
 
+
+def require_demo_auth(x_demo_password: str = Header(default=None)):
+    if not _demo_pass:
+        return  # gate disabled — no DEMO_PASSWORD configured
+    if not (x_demo_password and secrets.compare_digest(x_demo_password, _demo_pass)):
+        raise HTTPException(401, "Access code required.")
+
+
+app = FastAPI(
+    title="Altis Flood Intelligence API", version="2.0",
+    dependencies=[Depends(require_demo_auth)] if _demo_pass else [],
+)
+
+# CORS origins: comma-separated env var in production (lock to the deployed
+# frontend's exact domain); defaults to "*" for local dev, where the browser
+# is always talking to localhost so an open policy is harmless.
+_allowed_origins = os.getenv('ALLOWED_ORIGINS', '*')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=(['*'] if _allowed_origins.strip() == '*'
+                   else [o.strip() for o in _allowed_origins.split(',') if o.strip()]),
     allow_methods=["*"],
     allow_headers=["*"],
 )

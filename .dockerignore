@@ -1,0 +1,28 @@
+# Never bake secrets or local state into the image — they're injected as
+# environment variables (or, for GEE, an env var / mounted volume) at deploy
+# time on whatever platform is hosting it.
+.env
+.env.*
+secrets/
+*.pem
+*-sa-key.json
+
+# Local dev artifacts — irrelevant or actively wrong inside the container.
+altis.db
+cache/
+frontend/
+node_modules/
+.git/
+.github/
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+
+# Docs / non-runtime files — smaller image, faster builds/pushes.
+docs/
+samples/
+tests/
+archive/
+*.md

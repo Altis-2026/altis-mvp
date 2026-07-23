@@ -14,10 +14,18 @@ import numpy as np
 from pathlib import Path
 
 BASE_DIR    = Path(__file__).parent.parent
-OUTPUT_DIR  = BASE_DIR / 'outputs'
-DB_PATH     = BASE_DIR / 'altis.db'
-CACHE_DIR   = BASE_DIR / 'cache' / 'sar'
+OUTPUT_DIR  = BASE_DIR / 'outputs'   # pre-baked event CSVs ship with the code
 
+# Writable state (the SQLite DB + cached thumbnails) lives under DATA_DIR,
+# which defaults to the repo directory for local dev (unchanged behavior) but
+# can be pointed at a mounted persistent volume in production — e.g. Railway
+# volume at /data — so portfolios and cached imagery survive a redeploy
+# instead of vanishing with the container's ephemeral filesystem.
+DATA_DIR    = Path(os.getenv('DATA_DIR', str(BASE_DIR)))
+DB_PATH     = DATA_DIR / 'altis.db'
+CACHE_DIR   = DATA_DIR / 'cache' / 'sar'
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── In-memory event data (loaded once at startup) ────────────────────────────
