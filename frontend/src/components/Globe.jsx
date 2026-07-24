@@ -1,5 +1,27 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile.js';
+import { useTheme } from '../hooks/useTheme.js';
+import { getTheme } from '../theme.js';
+import Tutorial from './Tutorial.jsx';
+
+/* Globe atmosphere per theme. Dark keeps the deep-space starfield brand look;
+   light turns the surrounding space into a soft daylight sky so the whole
+   canvas reads bright, not a dark globe on a light chrome. */
+const DARK_FOG = {
+  'color':          'rgba(2, 4, 10, 0.9)',
+  'high-color':     'rgba(2, 4, 10, 0.9)',
+  'horizon-blend':  0.35,
+  'space-color':    'rgba(0, 0, 4, 1)',
+  'star-intensity': 0.88,
+};
+const LIGHT_FOG = {
+  'color':          'rgba(214, 232, 246, 0.85)', // soft horizon haze
+  'high-color':     'rgba(154, 197, 232, 1)',    // gentle daytime sky blue
+  'horizon-blend':  0.15,
+  'space-color':    'rgba(242, 246, 249, 1)',    // exactly the light --bg
+  'star-intensity': 0,
+};
+const fogFor = (theme) => (theme === 'light' ? LIGHT_FOG : DARK_FOG);
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -46,7 +68,31 @@ export default function Globe({
   const [showTrack, setShowTrack] = useState(true);
   const [showHeat,  setShowHeat]  = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.5);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [guideVisible, setGuideVisible] = useState(false); // faded-in yet?
+  const [guideGone,    setGuideGone]    = useState(false); // fully dismissed
   const isMobile = useIsMobile();
+  const theme = useTheme();
+
+  /* Restyle the globe atmosphere the instant the theme toggles. */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => map.setFog(fogFor(theme));
+    if (map.isStyleLoaded()) apply();
+    else map.once('style.load', apply);
+  }, [theme]);
+
+  /* First-run guide: fade in on arrival, linger, then fade itself out so it
+     never lingers over the map. Only relevant before anything is loaded. */
+  useEffect(() => {
+    const anyPins = properties.length > 0 || portfolioProperties.length > 0;
+    if (anyPins) return;
+    const inT   = setTimeout(() => setGuideVisible(true), 60);
+    const fadeT = setTimeout(() => setGuideVisible(false), 7000);
+    const goneT = setTimeout(() => setGuideGone(true), 7800);
+    return () => { clearTimeout(inT); clearTimeout(fadeT); clearTimeout(goneT); };
+  }, [properties.length, portfolioProperties.length]);
 
   /* ── Initialize map ─────────────────────────────────────────── */
   useEffect(() => {
@@ -73,14 +119,8 @@ export default function Globe({
     mapRef.current = map;
 
     map.on('style.load', () => {
-      /* Deep space atmosphere with starfield */
-      map.setFog({
-        color:           'rgba(2, 4, 10, 0.9)',
-        'high-color':    'rgba(2, 4, 10, 0.9)',
-        'horizon-blend': 0.35,
-        'space-color':   'rgba(0, 0, 4, 1)',
-        'star-intensity': 0.88,
-      });
+      /* Atmosphere matches the current theme (dark starfield / light sky). */
+      map.setFog(fogFor(getTheme()));
 
       /* ── Event properties source (clustered) */
       map.addSource('properties', {
@@ -765,13 +805,16 @@ export default function Globe({
         </div>
       )}
 
-      {/* First-run guide — three steps, gone as soon as anything is loaded */}
-      {!hasAnyPins && (
-        <div className="anim-fade-in" style={{
-          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+      {/* First-run guide — fades in, lingers a few seconds, fades away on its
+          own (and disappears the moment anything is loaded). */}
+      {!hasAnyPins && !guideGone && (
+        <div style={{
+          position: 'fixed', bottom: 90, left: '50%',
+          transform: `translateX(-50%) translateY(${guideVisible ? 0 : 8}px)`,
           zIndex: 5, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, padding: '12px 18px', maxWidth: '94vw',
           background: 'var(--panel)', border: '1px solid rgba(168,212,230,0.14)',
           borderRadius: 12, backdropFilter: 'blur(14px)', pointerEvents: 'none',
+          opacity: guideVisible ? 1 : 0, transition: 'opacity 0.7s ease, transform 0.7s ease',
         }}>
           {[['1', 'Upload your policy portfolio'],
             ['2', 'Set the flood date & run analysis'],
@@ -828,8 +871,27 @@ export default function Globe({
                   title="FEMA National Flood Hazard Layer. US coverage only, renders when zoomed in">
             FEMA zones
           </button>
+          <button
+            onClick={() => setShowTutorial(true)}
+            style={{
+              ...toggleStyle(false),
+              display: 'flex', alignItems: 'center', gap: 5,
+              background: 'var(--teal-dim)', border: '1px solid var(--teal-border)',
+              color: 'var(--teal)',
+            }}
+            title="A quick guided walkthrough of everything Altis can do">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4"/>
+              <line x1="12" y1="17" x2="12" y2="17"/>
+            </svg>
+            Tutorial
+          </button>
         </div>
       </div>
+
+      <Tutorial open={showTutorial} onClose={() => setShowTutorial(false)} />
     </>
   );
 }
