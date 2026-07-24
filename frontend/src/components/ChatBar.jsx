@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '../services/api.js';
 import { AltisLogo } from './Brand.jsx';
+import { useIsMobile } from '../hooks/useIsMobile.js';
 
 /* The Altis assistant — one place to ask anything: operate the product,
    query the book, read trends. Voice-enabled: hold a real conversation
@@ -26,8 +27,10 @@ const SpeechRecognitionImpl =
     ? (window.SpeechRecognition || window.webkitSpeechRecognition)
     : null;
 
-export default function ChatBar({ eventMeta, eventStats, selectedProperty, portfolioId }) {
-  const [open,      setOpen]      = useState(false);
+export default function ChatBar({ eventMeta, eventStats, selectedProperty, portfolioId, panelOpen }) {
+  const isMobile = useIsMobile();
+  const [expanded, setExpanded] = useState(false); // transcript panel visible
+  const [focused,  setFocused]  = useState(false); // input focused → show chips
   const [input,     setInput]     = useState('');
   const [messages,  setMessages]  = useState([]); // { role, content }
   const [sending,   setSending]   = useState(false);
@@ -65,7 +68,8 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
     const text = (forcedText ?? input).trim();
     if (!text || sending) return;
     setError(null);
-    setOpen(true);
+    setExpanded(true);   // show the transcript once there's a conversation
+    setFocused(false);   // hide the starter chips
     const next = [...messages, { role: 'user', content: text }];
     setMessages(next);
     setInput('');
@@ -123,7 +127,6 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
     };
     r.onerror = () => setListening(false);
     recogRef.current = r;
-    setOpen(true);
     setListening(true);
     setInput('');
     r.start();
@@ -142,69 +145,114 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
     !eventMeta && !portfolioId ? 'What can Altis do?' : null,
   ].filter(Boolean).slice(0, 3);
 
+  const hasConversation = messages.length > 0 || error;
+  // On a phone the transcript, side panels, and the property drawer each want
+  // the whole screen; keep the assistant out of the way (state preserved via
+  // display:none) whenever one of those is open.
+  const hidden = isMobile && (panelOpen || !!selectedProperty);
+
   return (
     <div style={{
-      position: 'fixed', left: '50%', bottom: 22, transform: 'translateX(-50%)',
-      zIndex: 25, width: 'min(600px, 92vw)', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', gap: 8,
+      position: 'fixed', bottom: isMobile ? 12 : 22, zIndex: 25,
+      ...(isMobile
+        ? { left: RAIL_W + 4, right: 8 }
+        : { left: '50%', transform: 'translateX(-50%)', width: 'min(600px, 92vw)' }),
+      display: hidden ? 'none' : 'flex', flexDirection: 'column',
+      alignItems: 'stretch', gap: 8,
     }}>
-      {open && (messages.length > 0 || error || sending) && (
+      {expanded && (hasConversation || sending) && (
         <div
-          ref={scrollRef}
           className="glass anim-slide-in-up"
           style={{
-            width: '100%', maxHeight: 320, overflowY: 'auto', borderRadius: 'var(--r-lg)',
-            padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10,
+            width: '100%', display: 'flex', flexDirection: 'column',
+            maxHeight: isMobile ? '52vh' : 360, borderRadius: 'var(--r-lg)', overflow: 'hidden',
           }}
         >
-          {messages.map((m, i) => (
-            <div key={i} style={{
-              display: 'flex', gap: 8, alignItems: 'flex-start',
-              justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
-            }}>
-              {m.role === 'assistant' && (
-                <div style={{ flexShrink: 0, marginTop: 2 }}>
-                  <AltisLogo size={18} idSuffix={`Msg${i}`} />
-                </div>
-              )}
-              <div style={{
-                maxWidth: '85%', fontSize: '0.8rem', lineHeight: 1.55,
-                padding: '8px 12px', borderRadius: 'var(--r-md)',
-                whiteSpace: 'pre-wrap',
-                color: m.role === 'user' ? 'var(--bg)' : 'var(--text-primary)',
-                background: m.role === 'user' ? 'var(--teal)' : 'var(--wa-04)',
-                border: m.role === 'user' ? 'none' : '1px solid var(--border)',
-              }}>
-                {m.content}
-              </div>
-            </div>
-          ))}
-          {sending && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <AltisLogo size={18} idSuffix="Think" />
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                Altis is thinking…
+          {/* Transcript header — minimize / clear */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '8px 10px 8px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <AltisLogo size={16} idSuffix="Hdr" />
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
+                Altis assistant
               </span>
             </div>
-          )}
-          {error && (
-            <div style={{
-              fontSize: '0.72rem', color: 'var(--dispatch)', background: 'var(--dispatch-dim)',
-              border: '1px solid rgba(255,68,68,0.25)', borderRadius: 'var(--r-sm)', padding: '6px 10px',
-            }}>
-              {error}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {messages.length > 0 && (
+                <button onClick={() => { setMessages([]); setError(null); setExpanded(false); }}
+                  aria-label="Clear conversation" title="Clear conversation" style={iconBtn}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  </svg>
+                </button>
+              )}
+              <button onClick={() => setExpanded(false)}
+                aria-label="Minimize assistant" title="Minimize" style={iconBtn}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </button>
             </div>
-          )}
+          </div>
+
+          {/* Scrolling messages */}
+          <div ref={scrollRef} style={{
+            flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 14px',
+            display: 'flex', flexDirection: 'column', gap: 10,
+          }}>
+            {messages.map((m, i) => (
+              <div key={i} style={{
+                display: 'flex', gap: 8, alignItems: 'flex-start',
+                justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
+              }}>
+                {m.role === 'assistant' && (
+                  <div style={{ flexShrink: 0, marginTop: 2 }}>
+                    <AltisLogo size={18} idSuffix={`Msg${i}`} />
+                  </div>
+                )}
+                <div style={{
+                  maxWidth: '85%', fontSize: '0.8rem', lineHeight: 1.55,
+                  padding: '8px 12px', borderRadius: 'var(--r-md)',
+                  whiteSpace: 'pre-wrap',
+                  color: m.role === 'user' ? 'var(--bg)' : 'var(--text-primary)',
+                  background: m.role === 'user' ? 'var(--teal)' : 'var(--wa-04)',
+                  border: m.role === 'user' ? 'none' : '1px solid var(--border)',
+                }}>
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {sending && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <AltisLogo size={18} idSuffix="Think" />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  Altis is thinking…
+                </span>
+              </div>
+            )}
+            {error && (
+              <div style={{
+                fontSize: '0.72rem', color: 'var(--dispatch)', background: 'var(--dispatch-dim)',
+                border: '1px solid rgba(255,68,68,0.25)', borderRadius: 'var(--r-sm)', padding: '6px 10px',
+              }}>
+                {error}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Suggestion chips — context-aware starting points, gone once talking */}
-      {open && messages.length === 0 && !sending && !error && (
+      {/* Suggestion chips — context-aware starting points on focus */}
+      {focused && !expanded && messages.length === 0 && !sending && (
         <div className="anim-fade-in" style={{
-          display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center',
+          display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'center',
         }}>
           {suggestions.map(s => (
-            <button key={s} onClick={() => send(s)} style={{
+            <button key={s} onMouseDown={e => e.preventDefault()} onClick={() => send(s)} style={{
               padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
               background: 'var(--panel)', border: '1px solid rgba(168,212,230,0.2)',
               color: 'var(--teal)', fontSize: '0.68rem', fontWeight: 600,
@@ -225,13 +273,30 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
           border: listening ? '1px solid rgba(168,212,230,0.55)' : undefined,
         }}
       >
-        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-          <AltisLogo size={20} idSuffix="Bar" />
-        </div>
+        {/* Logo, or an expand toggle when a minimized conversation exists */}
+        {hasConversation ? (
+          <button
+            onClick={() => setExpanded(v => !v)}
+            aria-label={expanded ? 'Minimize conversation' : 'Show conversation'}
+            title={expanded ? 'Minimize conversation' : 'Show conversation'}
+            style={{ ...iconBtn, flexShrink: 0 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                 style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+              <path d="M18 15l-6-6-6 6"/>
+            </svg>
+          </button>
+        ) : (
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+            <AltisLogo size={20} idSuffix="Bar" />
+          </div>
+        )}
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          onFocus={() => setOpen(true)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
           onKeyDown={onKeyDown}
           placeholder={
             listening ? 'Listening…'
@@ -312,8 +377,16 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
   );
 }
 
+const RAIL_W = 56; // matches the sidebar rail so the bar clears it on phones
+
 const roundBtn = (bg) => ({
   width: 30, height: 30, borderRadius: '50%', border: 'none', flexShrink: 0,
   background: bg, cursor: 'pointer', display: 'flex', alignItems: 'center',
   justifyContent: 'center', transition: 'background 0.15s',
 });
+
+const iconBtn = {
+  width: 28, height: 28, borderRadius: 'var(--r-sm)', border: 'none',
+  background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};

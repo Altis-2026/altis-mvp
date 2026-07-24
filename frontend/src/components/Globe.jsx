@@ -835,8 +835,9 @@ export default function Globe({
 
       {/* Map layer toggles */}
       <div style={{
-        position: 'fixed', bottom: isMobile ? 148 : 22, right: isMobile ? 8 : 16, zIndex: 5,
+        position: 'fixed', bottom: isMobile ? 150 : 22, right: isMobile ? 8 : 16, zIndex: 5,
         display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end',
+        maxWidth: isMobile ? 'calc(100vw - 72px)' : 'none', // stay clear of the left rail
       }}>
         {showFema && zoomLevel < 9 && (
           <div style={{
@@ -848,7 +849,7 @@ export default function Globe({
             FEMA zones are parcel-scale. Zoom into a US neighborhood to see them.
           </div>
         )}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {hasAnyPins && (
             <button onClick={() => setShowHeat(v => !v)} style={toggleStyle(showHeat)}
                     title="Dollar-weighted exposure concentration: estimated loss where analyzed, coverage otherwise. Pins stay on.">
