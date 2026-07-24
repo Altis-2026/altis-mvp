@@ -9,7 +9,7 @@ import { api } from '../services/api.js';
 
 const STATUS_STYLE = {
   queued:   { color: '#FFB347', bg: 'rgba(255,179,71,0.12)', border: 'rgba(255,179,71,0.3)' },
-  running:  { color: '#A8D4E6', bg: 'rgba(168,212,230,0.12)', border: 'rgba(168,212,230,0.3)' },
+  running:  { color: 'var(--teal)', bg: 'rgba(168,212,230,0.12)', border: 'rgba(168,212,230,0.3)' },
   complete: { color: '#4CAF82', bg: 'rgba(76,175,130,0.12)', border: 'rgba(76,175,130,0.3)' },
   failed:   { color: '#FF4444', bg: 'rgba(255,68,68,0.12)', border: 'rgba(255,68,68,0.3)' },
 };
@@ -64,7 +64,7 @@ export default function OperationsPanel({ selectedEventMeta }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '0 18px 12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>Operations</div>
+          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>Operations</div>
           <button onClick={refresh} style={linkBtn}>↻ Refresh</button>
         </div>
         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>
@@ -78,17 +78,17 @@ export default function OperationsPanel({ selectedEventMeta }) {
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4CAF82', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-            <strong style={{ color: '#fff' }}>Monitor active</strong>
+            <strong style={{ color: 'var(--text-primary)' }}>Monitor active</strong>
           </span>
-          {' '}— watching NHC cyclones + USGS flood gauges. New events auto-queue a run.
+          {' '}· watching NHC cyclones and USGS flood gauges. New events auto-queue a run.
           <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>{queued} run{queued === 1 ? '' : 's'} queued</div>
         </div>
 
         <button onClick={queueForEvent} disabled={!selectedEventMeta || busy} style={{
           width: '100%', marginTop: 10, padding: '9px 0', borderRadius: 'var(--r-sm)',
-          background: selectedEventMeta ? 'rgba(168,212,230,0.12)' : 'rgba(255,255,255,0.03)',
-          border: `1px solid ${selectedEventMeta ? 'rgba(168,212,230,0.3)' : 'rgba(255,255,255,0.06)'}`,
-          color: selectedEventMeta ? '#A8D4E6' : 'var(--text-disabled)',
+          background: selectedEventMeta ? 'rgba(168,212,230,0.12)' : 'var(--wa-03)',
+          border: `1px solid ${selectedEventMeta ? 'rgba(168,212,230,0.3)' : 'var(--wa-06)'}`,
+          color: selectedEventMeta ? 'var(--teal)' : 'var(--text-disabled)',
           fontSize: '0.72rem', fontWeight: 700, fontFamily: 'var(--font)',
           cursor: selectedEventMeta && !busy ? 'pointer' : 'not-allowed',
         }}>
@@ -110,10 +110,10 @@ export default function OperationsPanel({ selectedEventMeta }) {
           return (
             <div key={run.id} style={{
               marginBottom: 6, padding: '11px 12px', borderRadius: 'var(--r-md)',
-              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+              background: 'var(--wa-02)', border: '1px solid var(--wa-06)',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ fontSize: '0.76rem', color: '#eee', fontWeight: 600, lineHeight: 1.35, flex: 1 }}>
+                <div style={{ fontSize: '0.76rem', color: 'var(--text-bright)', fontWeight: 600, lineHeight: 1.35, flex: 1 }}>
                   {run.title}
                 </div>
                 <button onClick={() => advance(run)} title="Advance status" style={{

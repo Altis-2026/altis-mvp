@@ -58,33 +58,31 @@ export default function AccessGate({ children }) {
     <div style={{
       position: 'fixed', inset: 0, zIndex: 999,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#000004', fontFamily: "'Plus Jakarta Sans', sans-serif",
+      background: 'var(--bg)', fontFamily: "'Plus Jakarta Sans', sans-serif",
     }}>
       <div style={{ width: 'min(360px, 88vw)', textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
           <AltisLogo size={54} idSuffix="Gate" />
         </div>
-        <div style={{
+        <div className="wordmark" style={{
           fontSize: '1.3rem', fontWeight: 800, letterSpacing: '0.14em', marginBottom: 6,
-          background: 'linear-gradient(135deg, #DDF1FB, #8FC4E8)',
-          WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
         }}>
           ALTIS
         </div>
         <div style={{
           fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.14em',
-          color: '#3A5060', textTransform: 'uppercase', marginBottom: 36,
+          color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 36,
         }}>
           Real-time satellite ground truth
         </div>
 
         {status === 'checking' && (
-          <div style={{ color: '#8B9AA3', fontSize: '0.82rem' }}>Loading…</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Loading…</div>
         )}
 
         {status === 'offline' && (
           <div>
-            <p style={{ color: '#8B9AA3', fontSize: '0.82rem', lineHeight: 1.6, marginBottom: 18 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.6, marginBottom: 18 }}>
               Couldn't reach the Altis server. It may still be starting up.
             </p>
             <button onClick={probe} style={retryBtnStyle}>Retry</button>
@@ -102,8 +100,8 @@ export default function AccessGate({ children }) {
               disabled={busy}
               style={{
                 width: '100%', padding: '13px 16px', fontSize: '0.9rem',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 10, color: '#fff', textAlign: 'center',
+                background: 'var(--wa-04)', border: '1px solid var(--wa-12)',
+                borderRadius: 10, color: 'var(--text-primary)', textAlign: 'center',
                 fontFamily: 'inherit', marginBottom: 12, boxSizing: 'border-box',
               }}
             />
@@ -113,9 +111,9 @@ export default function AccessGate({ children }) {
             <button type="submit" disabled={busy || !code.trim()} style={{
               width: '100%', padding: '13px', border: 'none', borderRadius: 10,
               background: (busy || !code.trim())
-                ? 'rgba(255,255,255,0.06)'
+                ? 'var(--wa-06)'
                 : 'linear-gradient(135deg, #DDF1FB, #8FC4E8)',
-              color: (busy || !code.trim()) ? '#3A5060' : '#000',
+              color: (busy || !code.trim()) ? 'var(--text-muted)' : '#000',
               fontSize: '0.86rem', fontWeight: 800, fontFamily: 'inherit',
               cursor: (busy || !code.trim()) ? 'default' : 'pointer',
             }}>
@@ -130,6 +128,6 @@ export default function AccessGate({ children }) {
 
 const retryBtnStyle = {
   padding: '10px 24px', border: '1px solid rgba(168,212,230,0.3)', borderRadius: 8,
-  background: 'rgba(168,212,230,0.08)', color: '#A8D4E6', fontSize: '0.8rem',
+  background: 'rgba(168,212,230,0.08)', color: 'var(--teal)', fontSize: '0.8rem',
   fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
 };

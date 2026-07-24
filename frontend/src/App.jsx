@@ -230,7 +230,7 @@ export default function App() {
     try {
       const payload = {
         event_date: eventDate,
-        label: `${pid} — ${eventDate}`,
+        label: `${pid} · ${eventDate}`,
       };
       if (preDays)  payload.pre_days  = preDays;
       if (postDays) payload.post_days = postDays;
@@ -248,7 +248,7 @@ export default function App() {
     } catch (err) {
       console.error('Live analysis failed:', err);
       setLiveError(err?.detail || String(err?.message || err) ||
-                   'Live analysis failed — check the backend terminal.');
+                   'Live analysis failed. Check the backend terminal.');
     } finally {
       setLiveAnalyzing(false);
     }
@@ -280,10 +280,10 @@ export default function App() {
     const which = kind || (properties.length ? 'event' : 'portfolio');
     if (which === 'portfolio' && portfolioProps.length) {
       setGrid({ kind: 'portfolio', rows: portfolioProps,
-                title: `${activePortfolio?.id || 'Portfolio'} — ${portfolioProps.length} properties` });
+                title: `${activePortfolio?.id || 'Portfolio'} · ${portfolioProps.length} properties` });
     } else if (properties.length) {
       setGrid({ kind: 'event', rows: properties,
-                title: `${selectedEventMeta?.label || 'Event'} — ${properties.length} properties` });
+                title: `${selectedEventMeta?.label || 'Event'} · ${properties.length} properties` });
     }
   }, [properties, portfolioProps, activePortfolio, selectedEventMeta]);
 
@@ -422,6 +422,8 @@ export default function App() {
           title={grid.title}
           rows={grid.rows}
           kind={grid.kind}
+          eventLabel={liveMeta?.label || selectedEventMeta?.label}
+          eventDate={liveEventDate || selectedEventMeta?.event_date}
           onClose={() => setGrid(null)}
           onRowClick={(p) => { setSelectedProperty(p); setGrid(null); }}
         />

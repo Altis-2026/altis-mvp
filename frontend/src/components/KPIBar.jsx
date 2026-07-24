@@ -2,7 +2,7 @@
 
 function KPI({ label, value, color = '#fff', sub }) {
   return (
-    <div style={{ textAlign: 'center', padding: '10px 20px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+    <div style={{ textAlign: 'center', padding: '10px 20px', borderRight: '1px solid var(--wa-05)' }}>
       <div style={{
         fontSize:      '0.64rem',
         fontWeight:    700,
@@ -38,7 +38,10 @@ function money(v) {
   return `$${n.toLocaleString()}`;
 }
 
+import { useIsNarrow } from '../hooks/useIsMobile.js';
+
 export default function KPIBar({ stats, exposure, leftInset = 72 }) {
+  const narrow = useIsNarrow();
   if (!stats && !exposure) return null;
 
   const savings = stats?.estimated_savings
@@ -50,13 +53,16 @@ export default function KPIBar({ stats, exposure, leftInset = 72 }) {
       className="anim-slide-in-up"
       style={{
         position:   'fixed',
-        top:        72,
-        left:       leftInset + 16,
+        top:        narrow ? 64 : 72,
+        left:       narrow ? 64 : leftInset + 16,
+        right:      narrow ? 8 : 'auto',
+        maxWidth:   narrow ? 'none' : `calc(100vw - ${leftInset + 32}px)`,
+        overflowX:  'auto',
         transition: 'left 0.25s ease',
         zIndex:     'var(--z-ui)',
         display:    'flex',
-        background: 'rgba(4,6,12,0.9)',
-        border:     '1px solid rgba(255,255,255,0.06)',
+        background: 'var(--panel-strong)',
+        border:     '1px solid var(--wa-06)',
         borderRadius: 'var(--r-lg)',
         backdropFilter: 'blur(20px)',
         overflow:   'hidden',

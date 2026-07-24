@@ -24,6 +24,36 @@
   --text-muted:     #3A5060;
   --text-disabled:  #1E2E38;
 
+  /* Body text a notch brighter than secondary (long-form copy in drawers) */
+  --text-body:      #CCCCCC;
+  --text-bright:    #DDDDDD;
+
+  /* Hairlines / fills. In dark mode these are white-alpha (identical to the
+     literals they replaced); the light theme remaps them to ink-alpha. */
+  --wa-02:  rgba(255,255,255,0.02);
+  --wa-03:  rgba(255,255,255,0.03);
+  --wa-04:  rgba(255,255,255,0.04);
+  --wa-05:  rgba(255,255,255,0.05);
+  --wa-06:  rgba(255,255,255,0.06);
+  --wa-07:  rgba(255,255,255,0.07);
+  --wa-08:  rgba(255,255,255,0.08);
+  --wa-10:  rgba(255,255,255,0.1);
+  --wa-12:  rgba(255,255,255,0.12);
+  --wa-15:  rgba(255,255,255,0.15);
+  --wa-20:  rgba(255,255,255,0.2);
+
+  /* Floating panel fills (chips, toolbars, drawers over the globe) */
+  --panel:        rgba(4,6,14,0.8);
+  --panel-strong: rgba(4,6,14,0.92);
+  --panel-solid:  rgba(6,8,16,0.97);
+  --input-bg:     rgba(0,0,0,0.3);
+  --header-fade:  rgba(0,0,6,0.7);
+
+  /* Labels drawn over the (always-dark) satellite imagery. Same in both
+     themes on purpose; the map is imagery, not chrome. */
+  --map-label:      #CFE8F2;
+  --map-label-halo: rgba(0,0,8,0.92);
+
   /* Typography */
   --font:        'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:        'JetBrains Mono', 'Fira Code', monospace;
@@ -40,6 +70,53 @@
   --z-drawer: 20;
   --z-modal:  30;
   --z-header: 40;
+}
+
+/* ── Light theme ──────────────────────────────────────────────────────
+   Professional daylight palette for carrier conference rooms and iPads.
+   Accent stays in the Altis ice-blue family, darkened for contrast on
+   white. The globe itself stays satellite imagery in both themes. */
+:root[data-theme="light"] {
+  --teal:           #2E7DA6;
+  --teal-dim:       rgba(46, 125, 166, 0.1);
+  --teal-border:    rgba(46, 125, 166, 0.25);
+  --dispatch:       #D93636;
+  --dispatch-dim:   rgba(217, 54, 54, 0.09);
+  --approve:        #1F8A5D;
+  --approve-dim:    rgba(31, 138, 93, 0.09);
+  --deny:           #56788E;
+  --deny-dim:       rgba(86, 120, 142, 0.1);
+  --review:         #C07A14;
+  --review-dim:     rgba(192, 122, 20, 0.1);
+  --bg:             #F2F6F9;
+  --surface:        rgba(255, 255, 255, 0.94);
+  --surface-hover:  rgba(244, 248, 251, 0.97);
+  --border:         rgba(12, 34, 54, 0.12);
+  --border-focus:   rgba(46, 125, 166, 0.45);
+  --text-primary:   #0E1B26;
+  --text-secondary: #3E5364;
+  --text-muted:     #64798C;
+  --text-disabled:  #A4B4C2;
+  --text-body:      #2A3B49;
+  --text-bright:    #1C2D3B;
+
+  --wa-02:  rgba(12,34,54,0.03);
+  --wa-03:  rgba(12,34,54,0.045);
+  --wa-04:  rgba(12,34,54,0.055);
+  --wa-05:  rgba(12,34,54,0.07);
+  --wa-06:  rgba(12,34,54,0.08);
+  --wa-07:  rgba(12,34,54,0.09);
+  --wa-08:  rgba(12,34,54,0.1);
+  --wa-10:  rgba(12,34,54,0.13);
+  --wa-12:  rgba(12,34,54,0.16);
+  --wa-15:  rgba(12,34,54,0.2);
+  --wa-20:  rgba(12,34,54,0.26);
+
+  --panel:        rgba(255,255,255,0.88);
+  --panel-strong: rgba(255,255,255,0.95);
+  --panel-solid:  rgba(252,254,255,0.98);
+  --input-bg:     rgba(12,34,54,0.06);
+  --header-fade:  rgba(242,246,249,0.85);
 }
 
 *, *::before, *::after {
@@ -75,6 +152,20 @@ html, body, #root {
 .badge-Remote-Approve { color: var(--approve);  background: var(--approve-dim);  border-color: rgba(76,175,130,0.25); }
 .badge-Remote-Deny    { color: var(--deny);     background: var(--deny-dim);     border-color: rgba(107,143,163,0.25); }
 .badge-Review         { color: var(--review);   background: var(--review-dim);   border-color: rgba(255,179,71,0.25); }
+
+/* ── Brand wordmark — ice gradient on dark, deeper blue on light ────── */
+.wordmark {
+  background: linear-gradient(135deg, #DDF1FB, #8FC4E8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+:root[data-theme="light"] .wordmark {
+  background: linear-gradient(135deg, #2E7DA6, #14547A);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 
 /* ── Glass surface ───────────────────────────────────────────────────── */
 .glass {

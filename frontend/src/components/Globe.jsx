@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useIsMobile } from '../hooks/useIsMobile.js';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -45,6 +46,7 @@ export default function Globe({
   const [showTrack, setShowTrack] = useState(true);
   const [showHeat,  setShowHeat]  = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.5);
+  const isMobile = useIsMobile();
 
   /* ── Initialize map ─────────────────────────────────────────── */
   useEffect(() => {
@@ -535,7 +537,7 @@ export default function Globe({
       features: [{
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [(minLon + maxLon) / 2, maxLat] },
-        properties: { label: `PORTFOLIO — ${valid.length} PROPERTIES` },
+        properties: { label: `PORTFOLIO · ${valid.length} PROPERTIES` },
       }],
     });
   }, [portfolioProperties]);
@@ -721,9 +723,9 @@ export default function Globe({
     padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
     fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.08em',
     textTransform: 'uppercase', fontFamily: 'var(--font)',
-    background: active ? 'rgba(168,212,230,0.16)' : 'rgba(4,6,14,0.75)',
+    background: active ? 'var(--teal-dim)' : 'var(--panel)',
     border: `1px solid ${active ? 'rgba(168,212,230,0.45)' : 'rgba(255,255,255,0.12)'}`,
-    color: active ? '#A8D4E6' : 'var(--text-muted)',
+    color: active ? 'var(--teal)' : 'var(--text-muted)',
     backdropFilter: 'blur(10px)',
     transition: 'all 0.15s ease',
   });
@@ -739,21 +741,21 @@ export default function Globe({
       {/* Pin legend — plain claims-operations language, shown whenever
           triaged pins are on the map so a first-time viewer never has to
           ask what the colors mean. */}
-      {hasTriagePins && !dimmed && (
+      {hasTriagePins && !dimmed && !isMobile && (
         <div className="anim-fade-in" style={{
           /* Sits above the chat bar (~72px tall) so they never overlap. */
           position: 'fixed', bottom: 96, left: 16 + leftInset, zIndex: 5,
           padding: '10px 14px', borderRadius: 10,
-          background: 'rgba(4,6,14,0.82)', border: '1px solid rgba(255,255,255,0.08)',
+          background: 'var(--panel)', border: '1px solid rgba(255,255,255,0.08)',
           backdropFilter: 'blur(12px)', transition: 'left 0.25s ease',
         }}>
           <div style={{ fontSize: '0.56rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 7 }}>
             Triage decision
           </div>
-          {[['#FF4444', 'Dispatch — send an adjuster'],
-            ['#FFB347', 'Review — needs a human call'],
+          {[['#FF4444', 'Dispatch: send an adjuster'],
+            ['#FFB347', 'Review: needs a human call'],
             ['#4CAF82', 'Approve remotely'],
-            ['#6B8FA3', 'No flood detected — resolve remotely'],
+            ['#6B8FA3', 'No flood detected: resolve remotely'],
           ].map(([c, label]) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '2px 0' }}>
               <span style={{ width: 9, height: 9, borderRadius: '50%', background: c, flexShrink: 0 }} />
@@ -767,8 +769,8 @@ export default function Globe({
       {!hasAnyPins && (
         <div className="anim-fade-in" style={{
           position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 5, display: 'flex', gap: 22, padding: '14px 26px',
-          background: 'rgba(4,6,14,0.8)', border: '1px solid rgba(168,212,230,0.14)',
+          zIndex: 5, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, padding: '12px 18px', maxWidth: '94vw',
+          background: 'var(--panel)', border: '1px solid rgba(168,212,230,0.14)',
           borderRadius: 12, backdropFilter: 'blur(14px)', pointerEvents: 'none',
         }}>
           {[['1', 'Upload your policy portfolio'],
@@ -790,23 +792,23 @@ export default function Globe({
 
       {/* Map layer toggles */}
       <div style={{
-        position: 'fixed', bottom: 22, right: 16, zIndex: 5,
+        position: 'fixed', bottom: isMobile ? 148 : 22, right: isMobile ? 8 : 16, zIndex: 5,
         display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end',
       }}>
         {showFema && zoomLevel < 9 && (
           <div style={{
             maxWidth: 240, padding: '7px 11px', borderRadius: 8,
-            background: 'rgba(4,6,14,0.85)', border: '1px solid rgba(255,179,71,0.3)',
+            background: 'var(--panel)', border: '1px solid rgba(255,179,71,0.3)',
             fontSize: '0.64rem', color: '#FFB347', lineHeight: 1.45,
             backdropFilter: 'blur(10px)',
           }}>
-            FEMA zones are parcel-scale — zoom into a US neighborhood to see them.
+            FEMA zones are parcel-scale. Zoom into a US neighborhood to see them.
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {hasAnyPins && (
             <button onClick={() => setShowHeat(v => !v)} style={toggleStyle(showHeat)}
-                    title="Dollar-weighted exposure concentration — estimated loss where analyzed, coverage otherwise. Pins stay on.">
+                    title="Dollar-weighted exposure concentration: estimated loss where analyzed, coverage otherwise. Pins stay on.">
               ◉ Exposure heat
             </button>
           )}
@@ -818,12 +820,12 @@ export default function Globe({
                 if (next) flyToTrack();   // the track is often off-screen
               }}
               style={toggleStyle(showTrack)}
-              title="NHC best track (simplified) for this event — click to fly to it">
+              title="NHC best track (simplified) for this event. Click to fly to it">
               🌀 Storm track
             </button>
           )}
           <button onClick={() => setShowFema(v => !v)} style={toggleStyle(showFema)}
-                  title="FEMA National Flood Hazard Layer — US coverage only, renders when zoomed in">
+                  title="FEMA National Flood Hazard Layer. US coverage only, renders when zoomed in">
             FEMA zones
           </button>
         </div>

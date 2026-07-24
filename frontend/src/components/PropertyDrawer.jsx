@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import SarPair from './SarPair.jsx';
 import { api } from '../services/api.js';
+import { useIsMobile } from '../hooks/useIsMobile.js';
 
 const TRIAGE_OPTIONS = ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review'];
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -21,18 +22,17 @@ function ConfidenceGauge({ value, color }) {
 
   return (
     <svg width="72" height="72" viewBox="0 0 72 72" style={{ flexShrink: 0 }}>
-      <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5"/>
+      <circle cx="36" cy="36" r={r} fill="none" strokeWidth="5" style={{ stroke: "var(--wa-06)" }}/>
       <circle
         cx="36" cy="36" r={r}
         fill="none"
-        stroke={color || '#A8D4E6'}
         strokeWidth="5"
         strokeDasharray={`${dash} ${circ - dash}`}
         strokeDashoffset={circ * 0.25}
         strokeLinecap="round"
-        style={{ transition: 'stroke-dasharray 0.6s ease' }}
+        style={{ stroke: color || 'var(--teal)', transition: 'stroke-dasharray 0.6s ease' }}
       />
-      <text x="36" y="40" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="800"
+      <text x="36" y="40" textAnchor="middle" fontSize="14" fontWeight="800" style={{ fill: "var(--text-primary)" }}
             fontFamily="Plus Jakarta Sans, sans-serif">
         {pct}%
       </text>
@@ -45,7 +45,7 @@ function ConfidenceGauge({ value, color }) {
 function Mrow({ label, tech, value }) {
   return (
     <tr>
-      <td style={{ fontSize: '0.76rem', color: 'var(--text-muted)', padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <td style={{ fontSize: '0.76rem', color: 'var(--text-muted)', padding: '5px 0', borderTop: '1px solid var(--wa-04)' }}>
         {label}
         {tech && (
           <div style={{ fontSize: '0.58rem', color: 'var(--text-disabled)', marginTop: 1, letterSpacing: '0.03em' }}>
@@ -53,7 +53,7 @@ function Mrow({ label, tech, value }) {
           </div>
         )}
       </td>
-      <td style={{ fontSize: '0.76rem', color: '#ccc', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.04)', fontVariantNumeric: 'tabular-nums' }}>
+      <td style={{ fontSize: '0.76rem', color: 'var(--text-body)', textAlign: 'right', borderTop: '1px solid var(--wa-04)', fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </td>
     </tr>
@@ -61,6 +61,7 @@ function Mrow({ label, tech, value }) {
 }
 
 export default function PropertyDrawer({ property, eventId, liveEventDate, onClose, onAddToCompare, isInCompare, compareFull, onFeedbackSaved, eventLabel, durationSlices }) {
+  const isMobile = useIsMobile();
   const [sarView, setSarView] = useState('sar'); // 'sar' | 'optical'
 
   /* One-click drafted claim-file note */
@@ -149,7 +150,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                     property.longitude >= -170 && property.longitude <= -65;
 
   const unavailable = (reason) => (
-    <span style={{ color: 'var(--text-disabled)', fontStyle: 'italic' }}>{`Unavailable — ${reason}`}</span>
+    <span style={{ color: 'var(--text-disabled)', fontStyle: 'italic' }}>{`Unavailable: ${reason}`}</span>
   );
 
   const breakdown = parseJsonField(property.confidence_factors);
@@ -201,12 +202,12 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
           top:        0,
           right:      0,
           bottom:     0,
-          width:      '36%',
-          minWidth:   380,
-          maxWidth:   520,
+          width:      isMobile ? '100%' : '36%',
+          minWidth:   isMobile ? 0 : 380,
+          maxWidth:   isMobile ? 'none' : 520,
           zIndex:     'var(--z-drawer)',
-          background: 'rgba(4,6,14,0.95)',
-          borderLeft: '1px solid rgba(255,255,255,0.06)',
+          background: 'var(--panel-strong)',
+          borderLeft: '1px solid var(--wa-06)',
           backdropFilter: 'blur(20px)',
           overflowY:  'auto',
           display:    'flex',
@@ -217,10 +218,10 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
         {/* ── Header ─────────────────────────────────────── */}
         <div style={{
           padding:       '24px 24px 20px',
-          borderBottom:  '1px solid rgba(255,255,255,0.05)',
+          borderBottom:  '1px solid var(--wa-05)',
           position:      'sticky',
           top:           0,
-          background:    'rgba(4,6,14,0.98)',
+          background:    'var(--panel-strong)',
           zIndex:        1,
         }}>
           {/* Close + property ID */}
@@ -242,7 +243,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
 
           {/* Address */}
           <h2 style={{
-            fontSize: '1.15rem', fontWeight: 700, color: '#fff',
+            fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)',
             letterSpacing: '-0.01em', lineHeight: 1.3, marginBottom: 14,
           }}>
             {property.address}
@@ -252,7 +253,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
           {notAnalyzed ? (
             <span style={{
               display: 'inline-block', padding: '4px 12px', borderRadius: 999,
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+              background: 'var(--wa-06)', border: '1px solid var(--wa-12)',
               color: 'var(--text-muted)', fontSize: '0.66rem', fontWeight: 700,
               letterSpacing: '0.08em', textTransform: 'uppercase',
             }}>
@@ -266,7 +267,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                 <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#FFB347', display: 'inline-block' }} />
                   <span style={{ fontSize: '0.62rem', color: '#FFB347', letterSpacing: '0.05em', fontWeight: 600 }}>
-                    URBAN SAR ZONE — ELEVATED UNCERTAINTY
+                    URBAN SAR ZONE: ELEVATED UNCERTAINTY
                   </span>
                 </div>
               )}
@@ -288,18 +289,18 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               background: 'rgba(168,212,230,0.05)', border: '1px solid rgba(168,212,230,0.18)',
               borderRadius: 'var(--r-md)', padding: '16px 18px', lineHeight: 1.6,
             }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', color: '#A8D4E6', textTransform: 'uppercase', marginBottom: 8 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 8 }}>
                 No flood analysis yet
               </div>
-              <p style={{ fontSize: '0.8rem', color: '#ccc', margin: 0 }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-body)', margin: 0 }}>
                 This property is in your portfolio but hasn't been checked against
                 satellite data. Open the <b>Analysis</b> panel in the sidebar, enter
-                the flood/landfall date, and click <b>Run</b> — Altis will pull real
+                the flood/landfall date, and click <b>Run</b>. Altis will pull real
                 Sentinel-1 imagery and score every property, usually in 30–90 seconds.
               </p>
             </div>
             {property.coverage_amount > 0 && (
-              <div style={{ marginTop: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 'var(--r-md)', padding: '4px 14px' }}>
+              <div style={{ marginTop: 16, background: 'var(--wa-02)', border: '1px solid var(--wa-05)', borderRadius: 'var(--r-md)', padding: '4px 14px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     <Mrow label="Policy Number" value={property.policy_number || '—'} />
@@ -330,12 +331,12 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                 alt="Aerial view of property"
                 style={{
                   width: '100%', borderRadius: 'var(--r-md)', display: 'block',
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  border: '1px solid var(--wa-07)',
                 }}
                 onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
               />
               <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: 5 }}>
-                Current basemap imagery (pre-dates the event) — for structure/parcel
+                Current basemap imagery (pre-dates the event), for structure/parcel
                 context, not damage assessment.
               </div>
             </div>
@@ -355,9 +356,9 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                   <button key={v} onClick={() => setSarView(v)} style={{
                     padding: '4px 10px',
                     background: sarView === v ? 'rgba(168,212,230,0.1)' : 'transparent',
-                    border: `1px solid ${sarView === v ? 'rgba(168,212,230,0.25)' : 'rgba(255,255,255,0.07)'}`,
+                    border: `1px solid ${sarView === v ? 'rgba(168,212,230,0.25)' : 'var(--wa-07)'}`,
                     borderRadius: 'var(--r-sm)',
-                    color: sarView === v ? '#A8D4E6' : 'var(--text-muted)',
+                    color: sarView === v ? 'var(--teal)' : 'var(--text-muted)',
                     fontSize: '0.66rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
                     textTransform: 'uppercase', letterSpacing: '0.04em',
                   }}>
@@ -385,8 +386,8 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               Raw Measurements
             </div>
             <div style={{
-              background: 'rgba(255,255,255,0.02)',
-              border:     '1px solid rgba(255,255,255,0.05)',
+              background: 'var(--wa-02)',
+              border:     '1px solid var(--wa-05)',
               borderRadius: 'var(--r-md)',
               padding:    '4px 14px',
             }}>
@@ -404,7 +405,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                       <Mrow label="Event Rainfall" tech="CHIRPS precipitation total"
                             value={rainMm != null
                               ? `${(rainMm / 25.4).toFixed(1)} in (${rainMm.toFixed(0)} mm)`
-                              : unavailable('rainfall source failed — see backend log')} />
+                              : unavailable('rainfall source failed, see backend log')} />
                       <Mrow label="Time Underwater" tech="multi-pass inundation duration"
                             value={durDays == null
                               ? unavailable('fewer than 2 satellite passes in window')
@@ -421,14 +422,14 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                             value={floodZone === 'unavailable'
                               ? unavailable('FEMA NFHL service unreachable')
                               : floodZone
-                              ? (sfha ? `${floodZone} — SFHA (NFIP likely)` : floodZone)
+                              ? (sfha ? `${floodZone} (SFHA, NFIP likely)` : floodZone)
                               : isUS ? unavailable('no NFHL polygon at this point')
-                                     : 'N/A — outside US NFHL coverage'} />
+                                     : 'N/A, outside US NFHL coverage'} />
                     </>
                   )}
                   <Mrow label="Data Source"        value="Sentinel-1 radar" />
                   <Mrow label="Dense Urban Area" tech="radar shadow risk"
-                        value={urban ? 'Yes — confidence reduced' : 'No'} />
+                        value={urban ? 'Yes, confidence reduced' : 'No'} />
                   <Mrow label="Resolution"         value="10m native, 30m sampled" />
                 </tbody>
               </table>
@@ -452,7 +453,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                   Inundation Timeline
                 </div>
                 <div style={{
-                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                  background: 'var(--wa-02)', border: '1px solid var(--wa-05)',
                   borderRadius: 'var(--r-md)', padding: '14px 14px 10px',
                 }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 64 }}>
@@ -469,7 +470,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                           <div style={{
                             width: '100%', height: h, borderRadius: 3,
                             background: noPass
-                              ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.06), rgba(255,255,255,0.06) 3px, transparent 3px, transparent 6px)'
+                              ? 'repeating-linear-gradient(45deg, var(--wa-06), var(--wa-06) 3px, transparent 3px, transparent 6px)'
                               : 'linear-gradient(180deg, #A8D4E6, #4A7FA8)',
                             opacity: noPass ? 1 : 0.55 + 0.45 * (v / maxV),
                             transition: 'height 0.5s ease',
@@ -502,7 +503,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#D4B068', textTransform: 'uppercase', marginBottom: 5 }}>
                 Estimated Claim Severity
               </div>
-              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                 {sevMid != null ? `$${sevMid.toLocaleString()}` : `$${sevLow.toLocaleString()} – $${sevHigh.toLocaleString()}`}
               </div>
               {sevMid != null && (
@@ -512,7 +513,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               )}
               <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
                 Depth-damage curve × dwelling coverage; range reflects depth uncertainty.
-                Reserving aid — not an adjuster estimate.
+                Reserving aid, not an adjuster estimate.
               </div>
             </div>
           )}
@@ -521,7 +522,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
           {isLiveResult && sevLow == null && (
             <div style={{
               marginBottom: 24, padding: '10px 14px', borderRadius: 'var(--r-md)',
-              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+              background: 'var(--wa-02)', border: '1px solid var(--wa-06)',
               fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5,
             }}>
               No claim severity estimate: {parseFloat(property.max_depth_ft || 0) < 0.1
@@ -537,10 +538,10 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               border: '1px solid rgba(168,212,230,0.22)', borderRadius: 'var(--r-md)',
               padding: '12px 14px',
             }}>
-              <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#A8D4E6', textTransform: 'uppercase', marginBottom: 5 }}>
+              <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 5 }}>
                 Surge Verification Suggested
               </div>
-              <p style={{ fontSize: '0.74rem', color: '#ccc', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-body)', lineHeight: 1.5, margin: 0 }}>
                 This low-lying waterfront parcel reads dry, but storm surge can
                 recede between satellite passes. If this event involved coastal
                 surge, a quick spot-check (photos, call-out) is recommended before
@@ -559,10 +560,10 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#4CAF82', textTransform: 'uppercase', marginBottom: 5 }}>
                 Subrogation Candidate
               </div>
-              <p style={{ fontSize: '0.74rem', color: '#ccc', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-body)', lineHeight: 1.5, margin: 0 }}>
                 Flooding detected adjacent to a permanent water body / drainage channel.
                 Worth reviewing whether third-party infrastructure (levee, drainage,
-                road channeling) contributed — potential cost recovery. Screening flag,
+                road channeling) contributed, with potential cost recovery. Screening flag,
                 not a legal determination.
               </p>
             </div>
@@ -576,16 +577,16 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               padding: '12px 14px',
             }}>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#FFB347', textTransform: 'uppercase', marginBottom: 6 }}>
-                Sensor disagreement — flagged for Review
+                Sensor disagreement, flagged for Review
               </div>
-              <p style={{ fontSize: '0.74rem', color: '#ccc', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-body)', lineHeight: 1.5, margin: 0 }}>
                 {property.ensemble_note || 'Independent flood signals (SAR / optical / DEM-hydrology) disagree on this property.'}
               </p>
               {ensembleVotes && (
                 <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
                   {Object.entries(ensembleVotes).map(([k, v]) => (
                     <div key={k} style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
-                      {k.replace('_', ' ')}: <span style={{ color: '#ddd', fontWeight: 600 }}>{v}</span>
+                      {k.replace('_', ' ')}: <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>{v}</span>
                     </div>
                   ))}
                 </div>
@@ -603,7 +604,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                 Why This Decision
               </div>
               <div style={{
-                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                background: 'var(--wa-02)', border: '1px solid var(--wa-05)',
                 borderRadius: 'var(--r-md)', padding: '4px 14px',
               }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -611,13 +612,13 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                     <Mrow label="Base score" value={breakdown.base} />
                     {breakdown.factors.map((f, i) => (
                       <tr key={i}>
-                        <td style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', padding: '5px 0', borderTop: '1px solid var(--wa-04)' }}>
                           {f.factor}
                           <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 2 }}>{f.reason}</div>
                         </td>
                         <td style={{
                           fontSize: '0.76rem', textAlign: 'right', verticalAlign: 'top', paddingTop: 5,
-                          borderTop: '1px solid rgba(255,255,255,0.04)', fontVariantNumeric: 'tabular-nums',
+                          borderTop: '1px solid var(--wa-04)', fontVariantNumeric: 'tabular-nums',
                           color: f.delta > 0 ? '#4CAF82' : '#FF6B6B', fontWeight: 700,
                         }}>
                           {f.delta > 0 ? '+' : ''}{f.delta}
@@ -647,7 +648,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               }}>
                 Adjuster Note
               </div>
-              <p style={{ fontSize: '0.88rem', color: '#bbb', lineHeight: 1.65, fontStyle: 'italic' }}>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-body)', lineHeight: 1.65, fontStyle: 'italic' }}>
                 "{property.adjuster_note}"
               </p>
             </div>
@@ -664,10 +665,10 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             </div>
             {draft ? (
               <div style={{
-                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(168,212,230,0.18)',
+                background: 'var(--wa-02)', border: '1px solid rgba(168,212,230,0.18)',
                 borderRadius: 'var(--r-md)', padding: '14px',
               }}>
-                <p style={{ fontSize: '0.78rem', color: '#ccc', lineHeight: 1.65, margin: '0 0 12px', userSelect: 'text' }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-body)', lineHeight: 1.65, margin: '0 0 12px', userSelect: 'text' }}>
                   {draft.note}
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -681,14 +682,14 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                   </button>
                   <button onClick={runDraftNote} disabled={drafting} style={{
                     padding: '8px 14px', borderRadius: 'var(--r-md)',
-                    background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'transparent', border: '1px solid var(--wa-12)',
                     color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 600,
                     cursor: drafting ? 'wait' : 'pointer', fontFamily: 'var(--font)',
                   }}>
                     {drafting ? 'Redrafting…' : 'Redraft'}
                   </button>
                   <span style={{ fontSize: '0.6rem', color: 'var(--text-disabled)', marginLeft: 'auto' }}>
-                    {draft.source === 'llm' ? 'AI-drafted — review before use' : 'Template draft'}
+                    {draft.source === 'llm' ? 'AI-drafted, review before use' : 'Template draft'}
                   </span>
                 </div>
               </div>
@@ -697,7 +698,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                 <button onClick={runDraftNote} disabled={drafting} style={{
                   width: '100%', padding: '11px 0', borderRadius: 'var(--r-md)',
                   background: 'rgba(168,212,230,0.08)', border: '1px solid rgba(168,212,230,0.25)',
-                  color: '#A8D4E6', fontSize: '0.78rem', fontWeight: 700,
+                  color: 'var(--teal)', fontSize: '0.78rem', fontWeight: 700,
                   cursor: drafting ? 'wait' : 'pointer', fontFamily: 'var(--font)',
                   letterSpacing: '0.02em', transition: 'background 0.15s',
                 }}>
@@ -724,12 +725,12 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                 background: 'rgba(76,175,130,0.08)', border: '1px solid rgba(76,175,130,0.25)',
                 borderRadius: 'var(--r-md)', padding: '12px 14px', fontSize: '0.76rem', color: '#9FE3C0',
               }}>
-                ✓ Verdict recorded{verdict === 'down' && corrected ? ` — corrected to ${corrected}` : ''}.
+                ✓ Verdict recorded{verdict === 'down' && corrected ? `, corrected to ${corrected}` : ''}.
                 This feeds Altis's calibration as property-level ground truth.
               </div>
             ) : (
               <div style={{
-                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                background: 'var(--wa-02)', border: '1px solid var(--wa-05)',
                 borderRadius: 'var(--r-md)', padding: '14px',
               }}>
                 <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
@@ -759,7 +760,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                     </div>
                     <select value={corrected} onChange={e => setCorrected(e.target.value)} style={{
                       width: '100%', padding: '7px 9px', fontSize: '0.74rem', marginBottom: 8,
-                      background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--wa-10)',
                       borderRadius: 'var(--r-sm)', fontFamily: 'var(--font)', cursor: 'pointer',
                     }}>
                       <option value="">— Select correct triage —</option>
@@ -771,7 +772,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                       rows={2}
                       style={{
                         width: '100%', padding: '8px 10px', fontSize: '0.74rem', resize: 'vertical',
-                        background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--wa-10)',
                         borderRadius: 'var(--r-sm)', fontFamily: 'var(--font)', marginBottom: 10,
                       }}
                     />
@@ -811,7 +812,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             />
           </div>
           <div style={{ fontSize: '0.6rem', color: 'var(--text-disabled)', textAlign: 'center', marginBottom: 16 }}>
-            Guidewire ClaimCenter integration — v2
+            Guidewire ClaimCenter integration coming in v2
           </div>
 
           <button
@@ -820,9 +821,9 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             style={{
               width: '100%', padding: '10px 0',
               background: isInCompare ? 'rgba(168,212,230,0.1)' : 'transparent',
-              border: `1px solid ${isInCompare ? 'rgba(168,212,230,0.3)' : 'rgba(255,255,255,0.1)'}`,
+              border: `1px solid ${isInCompare ? 'rgba(168,212,230,0.3)' : 'var(--wa-10)'}`,
               borderRadius: 'var(--r-md)',
-              color: isInCompare ? '#A8D4E6' : compareFull ? 'var(--text-disabled)' : 'var(--text-secondary)',
+              color: isInCompare ? 'var(--teal)' : compareFull ? 'var(--text-disabled)' : 'var(--text-secondary)',
               fontSize: '0.78rem', fontWeight: 600, fontFamily: 'var(--font)',
               cursor: (isInCompare || compareFull) ? 'default' : 'pointer',
               letterSpacing: '0.02em',
@@ -871,8 +872,8 @@ function verdictBtn(active, color) {
   return {
     flex: 1, padding: '10px 0', borderRadius: 'var(--r-md)', cursor: 'pointer',
     fontFamily: 'var(--font)', fontSize: '0.78rem', fontWeight: 700,
-    background: active ? `${color}22` : 'rgba(255,255,255,0.03)',
-    border: `1px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
+    background: active ? `${color}22` : 'var(--wa-03)',
+    border: `1px solid ${active ? color : 'var(--wa-10)'}`,
     color: active ? color : 'var(--text-secondary)',
     transition: 'all 0.15s ease',
   };

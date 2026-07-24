@@ -12,7 +12,7 @@ function ImgBox({ label, src, loading, compact }) {
         {label}
       </div>
       <div style={{
-        width: '100%', aspectRatio: '3/2', background: 'rgba(255,255,255,0.03)',
+        width: '100%', aspectRatio: '3/2', background: 'var(--wa-03)',
         borderRadius: 'var(--r-sm)', overflow: 'hidden', border: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
@@ -143,9 +143,9 @@ export default function SarPair({ propertyId, view = 'sar', lat, lon, eventDate,
             <button key={v} onClick={() => setMode(v)} style={{
               padding: '3px 9px',
               background: mode === v ? 'rgba(168,212,230,0.1)' : 'transparent',
-              border: `1px solid ${mode === v ? 'rgba(168,212,230,0.25)' : 'rgba(255,255,255,0.07)'}`,
+              border: `1px solid ${mode === v ? 'rgba(168,212,230,0.25)' : 'var(--wa-07)'}`,
               borderRadius: 'var(--r-sm)',
-              color: mode === v ? '#A8D4E6' : 'var(--text-muted)',
+              color: mode === v ? 'var(--teal)' : 'var(--text-muted)',
               fontSize: '0.6rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
               textTransform: 'uppercase', letterSpacing: '0.06em',
             }}>
@@ -168,8 +168,8 @@ export default function SarPair({ propertyId, view = 'sar', lat, lon, eventDate,
         <div style={{ fontSize: '0.62rem', marginTop: 6, textAlign: 'center',
                       color: real ? 'var(--approve)' : 'var(--text-muted)' }}>
           {loading ? 'Loading imagery…'
-            : real ? '● Live Sentinel imagery — this exact location & date'
-            : 'Synthetic preview — run live analysis (with GEE) for real imagery'}
+            : real ? '● Live Sentinel imagery for this exact location and date'
+            : 'Synthetic preview. Run live analysis (with GEE) for real imagery'}
         </div>
       )}
       {swipe && (

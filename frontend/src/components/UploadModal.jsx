@@ -16,7 +16,7 @@ const FIELDS = [
 function confidenceColor(confidence) {
   if (confidence >= 0.8) return { color: '#4CAF82', bg: 'rgba(76,175,130,0.1)',  border: 'rgba(76,175,130,0.25)' };
   if (confidence >= 0.5) return { color: '#FFB347', bg: 'rgba(255,179,71,0.1)',  border: 'rgba(255,179,71,0.25)' };
-  return                          { color: '#3A5060', bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)' };
+  return                          { color: '#3A5060', bg: 'var(--wa-03)', border: 'var(--wa-08)' };
 }
 
 export default function UploadModal({ events, onClose, onSuccess }) {
@@ -124,7 +124,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
 
   const usedColumns = new Set(Object.values(mapping).filter(Boolean));
   const canConfirm = !!mapping.address;
-  const modalWidth = status === 'preview' ? 640 : 500;
+  const modalWidth = `min(${status === 'preview' ? 640 : 500}px, 94vw)`;
 
   return (
     /* Backdrop */
@@ -146,8 +146,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
           width:     modalWidth,
           maxHeight: '85vh',
           overflowY: 'auto',
-          background: 'rgba(6,8,16,0.97)',
-          border:    '1px solid rgba(255,255,255,0.08)',
+          background: 'var(--panel-solid)',
+          border:    '1px solid var(--wa-08)',
           borderRadius: 'var(--r-xl)',
           backdropFilter: 'blur(24px)',
           padding:   32,
@@ -162,7 +162,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
             <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.14em', color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 6 }}>
               Portfolio Analysis
             </div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               {status === 'preview' ? 'Review Column Mapping'
                 : status === 'settings' || status === 'confirming' ? 'Analysis Settings'
                 : 'Upload Policy Portfolio'}
@@ -171,8 +171,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               {status === 'preview'
                 ? "Confirm how Altis mapped your columns before we geocode. Override any field that looks wrong."
                 : status === 'settings' || status === 'confirming'
-                ? "Set the flood event date and satellite window, then run the analysis directly — no extra navigation."
-                : "Upload a CSV, Excel, or PDF policy file — we geocode every property and deliver real-time satellite ground truth across your book of business."}
+                ? "Set the flood event date and satellite window, then run the analysis directly from here."
+                : "Upload a CSV, Excel, or PDF policy file. We geocode every property and deliver real-time satellite ground truth across your book of business."}
             </p>
           </div>
           <button onClick={onClose} style={{
@@ -194,12 +194,12 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               onDrop={handleDrop}
               onClick={() => inputRef.current?.click()}
               style={{
-                border:       `2px dashed ${dragging ? '#A8D4E6' : file ? 'rgba(76,175,130,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                border:       `2px dashed ${dragging ? 'var(--teal)' : file ? 'rgba(76,175,130,0.4)' : 'var(--wa-10)'}`,
                 borderRadius: 'var(--r-lg)',
                 padding:      '36px 24px',
                 textAlign:    'center',
                 cursor:       'pointer',
-                background:   dragging ? 'rgba(168,212,230,0.04)' : file ? 'rgba(76,175,130,0.03)' : 'rgba(255,255,255,0.01)',
+                background:   dragging ? 'rgba(168,212,230,0.04)' : file ? 'rgba(76,175,130,0.03)' : 'var(--wa-02)',
                 transition:   'all 0.2s ease',
                 marginBottom: 16,
               }}
@@ -219,7 +219,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                     {file.name}
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    {(file.size / 1024).toFixed(1)} KB — Click to change
+                    {(file.size / 1024).toFixed(1)} KB. Click to change
                   </div>
                 </>
               ) : (
@@ -229,7 +229,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                     Drop your file here or click to browse
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    .csv, .xlsx, .xls, or .pdf — any column layout
+                    .csv, .xlsx, .xls, or .pdf with any column layout
                   </div>
                 </>
               )}
@@ -263,7 +263,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               style={{
                 width:      '100%',
                 padding:    '14px',
-                background: file ? '#A8D4E6' : 'rgba(255,255,255,0.05)',
+                background: file ? 'var(--teal)' : 'var(--wa-05)',
                 border:     'none',
                 borderRadius: 'var(--r-md)',
                 color:      file ? '#000' : 'var(--text-disabled)',
@@ -275,7 +275,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 transition: 'background 0.2s',
               }}
               onMouseEnter={e => { if (file) e.currentTarget.style.background = '#BEE0EF'; }}
-              onMouseLeave={e => { if (file) e.currentTarget.style.background = '#A8D4E6'; }}
+              onMouseLeave={e => { if (file) e.currentTarget.style.background = 'var(--teal)'; }}
             >
               Parse File
             </button>
@@ -285,11 +285,11 @@ export default function UploadModal({ events, onClose, onSuccess }) {
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <div style={{
               width: 40, height: 40, border: '3px solid rgba(168,212,230,0.15)',
-              borderTopColor: '#A8D4E6', borderRadius: '50%',
+              borderTopColor: 'var(--teal)', borderRadius: '50%',
               animation: 'spin 0.8s linear infinite',
               margin: '0 auto 16px',
             }} />
-            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff', marginBottom: 6 }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
               Parsing file…
             </div>
             <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
@@ -300,7 +300,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
           /* Mapping review state */
           <div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 14 }}>
-              {uploadData.row_count} row{uploadData.row_count === 1 ? '' : 's'} parsed from <strong style={{ color: '#fff' }}>{uploadData.filename}</strong>
+              {uploadData.row_count} row{uploadData.row_count === 1 ? '' : 's'} parsed from <strong style={{ color: 'var(--text-primary)' }}>{uploadData.filename}</strong>
             </div>
 
             {/* Mapping table */}
@@ -314,9 +314,9 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '10px 14px',
                     borderTop: i === 0 ? 'none' : '1px solid var(--border)',
-                    background: 'rgba(255,255,255,0.015)',
+                    background: 'var(--wa-02)',
                   }}>
-                    <div style={{ fontSize: '0.78rem', color: '#fff', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', fontWeight: 600 }}>
                       {f.label}{f.required && <span style={{ color: '#FF4444' }}> *</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -324,7 +324,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                         value={mapping[f.key] || ''}
                         onChange={e => setMapping(m => ({ ...m, [f.key]: e.target.value || null }))}
                         style={{
-                          background: 'rgba(0,0,0,0.3)', color: '#fff',
+                          background: 'var(--input-bg)', color: 'var(--text-primary)',
                           border: `1px solid ${colors.border}`, borderRadius: 'var(--r-sm)',
                           padding: '5px 8px', fontSize: '0.74rem', fontFamily: 'var(--font)',
                           minWidth: 160, cursor: 'pointer',
@@ -357,7 +357,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 background: 'rgba(255,179,71,0.08)', border: '1px solid rgba(255,179,71,0.2)',
                 borderRadius: 'var(--r-md)', fontSize: '0.76rem', color: '#FFB347',
               }}>
-                {uploadData.flagged_count} address{uploadData.flagged_count === 1 ? '' : 'es'} didn't standardize cleanly — they'll still be geocoded, but double-check them after confirming.
+                {uploadData.flagged_count} address{uploadData.flagged_count === 1 ? '' : 'es'} didn't standardize cleanly. They'll still be geocoded, but double-check them after confirming.
               </div>
             )}
 
@@ -368,7 +368,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
             <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflowX: 'auto', marginBottom: 20, maxHeight: 220, overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <tr style={{ background: 'var(--wa-03)' }}>
                     <th style={previewTh}>Policy #</th>
                     <th style={previewTh}>Address</th>
                     <th style={previewTh}>Standardized</th>
@@ -402,7 +402,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 disabled={status === 'confirming'}
                 style={{
                   flex: '0 0 auto', padding: '14px 18px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+                  background: 'var(--wa-04)', border: '1px solid var(--border)',
                   borderRadius: 'var(--r-md)', color: 'var(--text-secondary)',
                   fontSize: '0.84rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
                 }}
@@ -414,7 +414,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 disabled={!canConfirm}
                 style={{
                   flex: 1, padding: '14px',
-                  background: canConfirm ? '#A8D4E6' : 'rgba(255,255,255,0.05)',
+                  background: canConfirm ? 'var(--teal)' : 'var(--wa-05)',
                   border: 'none', borderRadius: 'var(--r-md)',
                   color: canConfirm ? '#000' : 'var(--text-disabled)',
                   fontSize: '0.9rem', fontWeight: 800,
@@ -439,8 +439,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 disabled={status === 'confirming'}
                 style={{
                   width: '100%', padding: '10px 12px', fontSize: '0.86rem', colorScheme: 'dark',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 'var(--r-md)', color: '#fff', fontFamily: 'var(--font)',
+                  background: 'var(--wa-04)', border: '1px solid var(--wa-12)',
+                  borderRadius: 'var(--r-md)', color: 'var(--text-primary)', fontFamily: 'var(--font)',
                 }}
               />
               <div style={{ fontSize: '0.66rem', color: dateError ? '#FFB347' : 'var(--text-muted)', marginTop: 5, lineHeight: 1.45 }}>
@@ -459,8 +459,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                   disabled={status === 'confirming'}
                   style={{
                     width: '100%', padding: '10px 12px', fontSize: '0.86rem',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 'var(--r-md)', color: '#fff', fontFamily: 'var(--font)',
+                    background: 'var(--wa-04)', border: '1px solid var(--wa-12)',
+                    borderRadius: 'var(--r-md)', color: 'var(--text-primary)', fontFamily: 'var(--font)',
                   }}
                 />
               </div>
@@ -474,8 +474,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                   disabled={status === 'confirming'}
                   style={{
                     width: '100%', padding: '10px 12px', fontSize: '0.86rem',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 'var(--r-md)', color: '#fff', fontFamily: 'var(--font)',
+                    background: 'var(--wa-04)', border: '1px solid var(--wa-12)',
+                    borderRadius: 'var(--r-md)', color: 'var(--text-primary)', fontFamily: 'var(--font)',
                   }}
                 />
               </div>
@@ -486,10 +486,10 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               background: 'rgba(168,212,230,0.05)', border: '1px solid rgba(168,212,230,0.15)',
               fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.55,
             }}>
-              Sentinel-1 revisits every ~6–12 days: expect <b style={{ color: '#A8D4E6' }}>
-              ~{passEstimate(+preDays || 7)} baseline</b> and <b style={{ color: '#A8D4E6' }}>
+              Sentinel-1 revisits every ~6–12 days: expect <b style={{ color: 'var(--teal)' }}>
+              ~{passEstimate(+preDays || 7)} baseline</b> and <b style={{ color: 'var(--teal)' }}>
               ~{passEstimate(+postDays || 14)} post-event</b> satellite passes in this window.
-              A very narrow baseline can leave no pre-event scene — widen it if analysis
+              A very narrow baseline can leave no pre-event scene. Widen it if analysis
               reports no imagery. Settings are saved with the portfolio for re-runs.
             </div>
 
@@ -505,7 +505,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 disabled={status === 'confirming'}
                 style={{
                   flex: '0 0 auto', padding: '14px 18px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+                  background: 'var(--wa-04)', border: '1px solid var(--border)',
                   borderRadius: 'var(--r-md)', color: 'var(--text-secondary)',
                   fontSize: '0.84rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
                 }}
@@ -517,7 +517,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 disabled={status === 'confirming'}
                 style={{
                   flex: '0 0 auto', padding: '14px 16px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+                  background: 'var(--wa-04)', border: '1px solid var(--border)',
                   borderRadius: 'var(--r-md)', color: 'var(--text-secondary)',
                   fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)',
                 }}
@@ -529,7 +529,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 disabled={!eventDate || !!dateError || status === 'confirming'}
                 style={{
                   flex: 1, padding: '14px',
-                  background: eventDate && !dateError ? 'linear-gradient(135deg, #DDF1FB, #8FC4E8)' : 'rgba(255,255,255,0.05)',
+                  background: eventDate && !dateError ? 'linear-gradient(135deg, #DDF1FB, #8FC4E8)' : 'var(--wa-05)',
                   border: 'none', borderRadius: 'var(--r-md)',
                   color: eventDate && !dateError ? '#000' : 'var(--text-disabled)',
                   fontSize: '0.9rem', fontWeight: 800,
@@ -558,8 +558,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
                 Portfolio Ready
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <span style={{ color: '#fff', fontWeight: 700 }}>{result.geocoded_count}</span> of{' '}
-                <span style={{ color: '#fff', fontWeight: 700 }}>{result.total_count}</span> addresses geocoded
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{result.geocoded_count}</span> of{' '}
+                <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{result.total_count}</span> addresses geocoded
               </div>
             </div>
 
@@ -573,8 +573,8 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               color:        'var(--text-secondary)',
               lineHeight:   1.6,
             }}>
-              <strong style={{ color: '#fff' }}>Portfolio ID:</strong> {result.portfolio_id}<br />
-              <strong style={{ color: '#fff' }}>Center:</strong>{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>Portfolio ID:</strong> {result.portfolio_id}<br />
+              <strong style={{ color: 'var(--text-primary)' }}>Center:</strong>{' '}
               {result.center?.lat?.toFixed(4)}, {result.center?.lon?.toFixed(4)}
             </div>
 
@@ -582,7 +582,7 @@ export default function UploadModal({ events, onClose, onSuccess }) {
               onClick={handleSuccess}
               style={{
                 width: '100%', padding: '14px',
-                background: '#A8D4E6', border: 'none',
+                background: 'var(--teal)', border: 'none',
                 borderRadius: 'var(--r-md)',
                 color: '#000', fontSize: '0.9rem', fontWeight: 800,
                 cursor: 'pointer', fontFamily: 'var(--font)',

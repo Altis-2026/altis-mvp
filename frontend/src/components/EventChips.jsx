@@ -41,12 +41,12 @@ export default function EventChips({ events, selectedEvent, onSelect, loading })
               padding:       '12px 20px',
               background:    active
                 ? 'rgba(168,212,230,0.12)'
-                : 'rgba(6,8,14,0.82)',
+                : 'var(--panel)',
               border:        `1px solid ${active
                 ? 'rgba(168,212,230,0.35)'
-                : 'rgba(255,255,255,0.07)'}`,
+                : 'var(--wa-07)'}`,
               borderRadius:  'var(--r-lg)',
-              color:         active ? '#A8D4E6' : 'var(--text-secondary)',
+              color:         active ? 'var(--teal)' : 'var(--text-secondary)',
               cursor:        loading ? 'not-allowed' : 'pointer',
               fontFamily:    'var(--font)',
               backdropFilter: 'blur(16px)',
@@ -58,19 +58,19 @@ export default function EventChips({ events, selectedEvent, onSelect, loading })
               if (!active && !loading) {
                 e.currentTarget.style.background = 'rgba(168,212,230,0.07)';
                 e.currentTarget.style.borderColor = 'rgba(168,212,230,0.2)';
-                e.currentTarget.style.color = '#A8D4E6';
+                e.currentTarget.style.color = 'var(--teal)';
               }
             }}
             onMouseLeave={e => {
               if (!active) {
-                e.currentTarget.style.background = 'rgba(6,8,14,0.82)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
+                e.currentTarget.style.background = 'var(--panel)';
+                e.currentTarget.style.borderColor = 'var(--wa-07)';
                 e.currentTarget.style.color = 'var(--text-secondary)';
               }
             }}
           >
             {/* Icon */}
-            <span style={{ color: active ? '#A8D4E6' : '#3A5060' }}>
+            <span style={{ color: active ? 'var(--teal)' : '#3A5060' }}>
               {ICONS[evt.id]}
             </span>
 
@@ -90,7 +90,7 @@ export default function EventChips({ events, selectedEvent, onSelect, loading })
                 width:        6,
                 height:       6,
                 borderRadius: '50%',
-                background:   '#A8D4E6',
+                background:   'var(--teal)',
                 marginLeft:   4,
                 flexShrink:   0,
               }} />

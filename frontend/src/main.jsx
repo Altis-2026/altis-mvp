@@ -4,6 +4,9 @@ import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import AccessGate from './components/AccessGate.jsx';
 import './styles/globals.css';
+import { initTheme } from './theme.js';
+
+initTheme();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

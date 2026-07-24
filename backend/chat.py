@@ -37,7 +37,8 @@ no numbered lists, no headers, no backticks, no bold. Write complete sentences, 
 professional colleague would speak.
 - Concise: two to four sentences for most answers, more only when the user asks for \
 detail. Lead with the number or the answer, then the context.
-- Professional and direct. No exclamation marks, no filler enthusiasm.
+- Professional and direct. No exclamation marks, no filler enthusiasm. Do not use \
+em dashes; use commas, colons, or separate sentences instead.
 
 HOW THE PRODUCT WORKS — use this to answer any "how do I" question:
 The sidebar on the left has panels: Events lists flood events; selecting one flies the \
@@ -171,7 +172,7 @@ def ask(message: str, history: list[dict] | None, event_meta: dict | None,
 NOTE_SYSTEM_PROMPT = """You draft claim-file notes for a property and casualty \
 insurance carrier's claims operations team, based on satellite flood analysis from \
 Altis. Write the note in plain professional prose — no markdown, no headers, no \
-bullet points. Four to six sentences. Structure: what the satellite analysis found at \
+bullet points, no em dashes. Four to six sentences. Structure: what the satellite analysis found at \
 this property (depth, flooded area, confidence, corroborating signals); the \
 recommended handling (dispatch, remote resolution, or review) and why; anything the \
 handler should verify or watch for (urban radar limits, surge timing, subrogation \

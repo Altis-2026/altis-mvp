@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { api } from '../services/api.js';
 import { validateEventDate, clampDays } from '../lib/validation.js';
 
-const RISK_COLORS = { 1: '#4CAF82', 2: '#A8D4E6', 3: '#FFD97A', 4: '#FFB347', 5: '#FF4444' };
+const RISK_COLORS = { 1: '#4CAF82', 2: 'var(--teal)', 3: '#FFD97A', 4: '#FFB347', 5: '#FF4444' };
 
 /* Honest staged status shown while the real pipeline runs (typical order and
    duration; not a fake percent bar). */
@@ -24,7 +24,7 @@ function Chip({ label, active, color, onClick }) {
     <button onClick={onClick} style={{
       padding: '4px 9px', borderRadius: 'var(--r-sm)', fontSize: '0.66rem', fontWeight: 700,
       background: active ? `${color}22` : 'transparent',
-      border: `1px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
+      border: `1px solid ${active ? color : 'var(--wa-10)'}`,
       color: active ? color : 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font)',
       whiteSpace: 'nowrap',
     }}>
@@ -49,7 +49,7 @@ function ExpStat({ label, value, wide }) {
   return (
     <div style={wide ? { gridColumn: '1 / -1' } : undefined}>
       <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginBottom: 1 }}>{label}</div>
-      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </div>
     </div>
@@ -78,7 +78,7 @@ export default function AnalysisPanel({
     try {
       setRiskData(await api.getRiskScore(portfolioId));
     } catch (e) {
-      setRiskError('Risk scan failed — is live analysis (GEE) enabled?');
+      setRiskError('Risk scan failed. Is live analysis (GEE) enabled?');
     } finally {
       setRiskLoading(false);
     }
@@ -173,16 +173,16 @@ export default function AnalysisPanel({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '0 16px 12px' }}>
-        <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff', marginBottom: 10 }}>Analysis</div>
+        <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>Analysis</div>
 
         {/* Source toggle */}
         {hasEvent && hasPortfolio && (
-          <div style={{ display: 'flex', gap: 4, marginBottom: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--r-sm)', padding: 3 }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 10, background: 'var(--wa-03)', borderRadius: 'var(--r-sm)', padding: 3 }}>
             {['event', 'portfolio'].map(s => (
               <button key={s} onClick={() => setSource(s)} style={{
                 flex: 1, padding: '6px 0', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700,
                 background: source === s ? 'rgba(168,212,230,0.12)' : 'transparent',
-                border: 'none', color: source === s ? '#A8D4E6' : 'var(--text-muted)',
+                border: 'none', color: source === s ? 'var(--teal)' : 'var(--text-muted)',
                 cursor: 'pointer', fontFamily: 'var(--font)', textTransform: 'capitalize',
               }}>
                 {s}
@@ -194,7 +194,7 @@ export default function AnalysisPanel({
         {!hasEvent && !hasPortfolio && (
           <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
             Upload your policy portfolio to see flood exposure across your book
-            of business — or select an event to explore its footprint. Unlike
+            of business, or select an event to explore its footprint. Unlike
             static hazard scores, Altis delivers real-time satellite ground
             truth within 48 hours of a flood event.
           </div>
@@ -209,7 +209,7 @@ export default function AnalysisPanel({
           }}>
             <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: '#FF9B9B', textTransform: 'uppercase', marginBottom: 7 }}>
               {zoneSummary.zone_source === 'event'
-                ? 'Zone Check — Selected Event Footprint'
+                ? 'Zone Check: Selected Event Footprint'
                 : 'Portfolio Footprint (select an event for a zone check)'}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 10px' }}>
@@ -225,14 +225,14 @@ export default function AnalysisPanel({
                 {Object.entries(zoneSummary.by_region).slice(0, 4).map(([region, n]) => (
                   <div key={region} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', color: 'var(--text-secondary)', padding: '2px 0' }}>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{region}</span>
-                    <span style={{ color: '#ddd', fontWeight: 700 }}>{n}</span>
+                    <span style={{ color: 'var(--text-bright)', fontWeight: 700 }}>{n}</span>
                   </div>
                 ))}
               </div>
             )}
             {zoneSummary.zone_source === 'event' && zoneSummary.out_zone > 0 && (
               <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
-                {zoneSummary.out_zone} properties sit outside the event footprint —
+                {zoneSummary.out_zone} properties sit outside the event footprint;
                 run "in-zone only" below to skip them and save compute time.
               </div>
             )}
@@ -246,8 +246,8 @@ export default function AnalysisPanel({
             background: 'linear-gradient(135deg, rgba(168,212,230,0.06), rgba(212,176,104,0.06))',
             border: '1px solid rgba(168,212,230,0.18)', borderRadius: 'var(--r-md)',
           }}>
-            <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: '#A8D4E6', textTransform: 'uppercase', marginBottom: 7 }}>
-              Portfolio Exposure — This Event
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 7 }}>
+              Portfolio Exposure: This Event
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 10px' }}>
               <ExpStat label="Policies in flood zone"
@@ -271,22 +271,22 @@ export default function AnalysisPanel({
         {source === 'portfolio' && hasPortfolio && (
           <div style={{
             marginBottom: 10, padding: '10px 12px',
-            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
+            background: 'var(--wa-02)', border: '1px solid var(--wa-07)',
             borderRadius: 'var(--r-md)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ddd' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-bright)' }}>
                   Pre-event risk scan
                 </div>
                 <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                  Static 1–5 flood risk — no storm date needed
+                  Static 1–5 flood risk, no storm date needed
                 </div>
               </div>
               <button onClick={runRiskScan} disabled={riskLoading || !geeLive} style={{
                 padding: '6px 12px', whiteSpace: 'nowrap', borderRadius: 'var(--r-sm)',
                 background: 'rgba(168,212,230,0.1)', border: '1px solid rgba(168,212,230,0.25)',
-                color: geeLive ? '#A8D4E6' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.68rem',
+                color: geeLive ? 'var(--teal)' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.68rem',
                 cursor: riskLoading ? 'wait' : 'pointer', fontFamily: 'var(--font)',
               }}>
                 {riskLoading ? 'Scanning…' : riskData ? 'Re-scan' : 'Scan'}
@@ -323,7 +323,7 @@ export default function AnalysisPanel({
                       }}>
                         {r.risk_score}
                       </span>
-                      <span style={{ fontSize: '0.66rem', color: '#ccc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span style={{ fontSize: '0.66rem', color: 'var(--text-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {(r.address || r.property_id).split(',')[0]}
                       </span>
                     </div>
@@ -344,8 +344,8 @@ export default function AnalysisPanel({
               onChange={e => setSearch(e.target.value)}
               style={{
                 width: '100%', padding: '7px 10px', fontSize: '0.76rem', marginBottom: 10,
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
+                background: 'var(--wa-03)', border: '1px solid var(--wa-08)',
+                borderRadius: 'var(--r-sm)', color: 'var(--text-primary)', fontFamily: 'var(--font)',
               }}
             />
 
@@ -371,10 +371,10 @@ export default function AnalysisPanel({
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input type="number" placeholder="Min depth ft" value={minDepth}
                            onChange={e => setMinDepth(e.target.value)}
-                           style={{ flex: 1, padding: '5px 8px', fontSize: '0.7rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 'var(--r-sm)', color: '#fff' }} />
+                           style={{ flex: 1, padding: '5px 8px', fontSize: '0.7rem', background: 'var(--wa-03)', border: '1px solid var(--wa-08)', borderRadius: 'var(--r-sm)', color: 'var(--text-primary)' }} />
                     <input type="number" placeholder="Max depth ft" value={maxDepth}
                            onChange={e => setMaxDepth(e.target.value)}
-                           style={{ flex: 1, padding: '5px 8px', fontSize: '0.7rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 'var(--r-sm)', color: '#fff' }} />
+                           style={{ flex: 1, padding: '5px 8px', fontSize: '0.7rem', background: 'var(--wa-03)', border: '1px solid var(--wa-08)', borderRadius: 'var(--r-sm)', color: 'var(--text-primary)' }} />
                   </div>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
@@ -389,12 +389,12 @@ export default function AnalysisPanel({
                 borderRadius: 'var(--r-md)', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5,
               }}>
                 <b style={{ color: '#FFB347' }}>Next step:</b> run the flood analysis below.
-                Uploading only maps your portfolio — analysis is what scores it.
+                Uploading only maps your portfolio. Analysis is what scores it.
                 {eventLabel && (
                   <button onClick={onAnalyzePortfolio} disabled={analyzing || liveAnalyzing} style={{
                     display: 'block', width: '100%', marginTop: 8, padding: '8px 0',
                     background: 'rgba(168,212,230,0.12)', border: '1px solid rgba(168,212,230,0.3)',
-                    borderRadius: 'var(--r-sm)', color: '#A8D4E6', fontWeight: 700, fontSize: '0.72rem',
+                    borderRadius: 'var(--r-sm)', color: 'var(--teal)', fontWeight: 700, fontSize: '0.72rem',
                     cursor: analyzing ? 'wait' : 'pointer', fontFamily: 'var(--font)',
                   }}>
                     {analyzing ? 'Analyzing…' : `Match against ${eventLabel}`}
@@ -402,9 +402,9 @@ export default function AnalysisPanel({
                 )}
 
                 {/* ── Live, global satellite analysis ───────────────────── */}
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--wa-06)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#A8D4E6' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--teal)' }}>
                       Live satellite analysis
                     </span>
                     <span style={{
@@ -412,14 +412,14 @@ export default function AnalysisPanel({
                       borderRadius: 999, textTransform: 'uppercase',
                       background: geeLive ? 'rgba(76,175,130,0.15)' : 'rgba(107,143,163,0.15)',
                       color: geeLive ? 'var(--approve)' : 'var(--text-muted)',
-                      border: `1px solid ${geeLive ? 'rgba(76,175,130,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                      border: `1px solid ${geeLive ? 'rgba(76,175,130,0.3)' : 'var(--wa-08)'}`,
                     }}>
                       {geeLive ? 'Global' : 'Offline'}
                     </span>
                   </div>
                   <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: 7, lineHeight: 1.45 }}>
                     Run real Sentinel-1 detection for this portfolio anywhere on Earth. Enter the
-                    flood/landfall date — we composite the satellite imagery around it.
+                    flood/landfall date. We composite the satellite imagery around it.
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <input
@@ -427,8 +427,8 @@ export default function AnalysisPanel({
                       disabled={!geeLive || liveAnalyzing}
                       style={{
                         flex: 1.6, padding: '6px 8px', fontSize: '0.72rem', colorScheme: 'dark',
-                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
+                        background: 'var(--wa-03)', border: '1px solid var(--wa-08)',
+                        borderRadius: 'var(--r-sm)', color: 'var(--text-primary)', fontFamily: 'var(--font)',
                       }}
                     />
                     <input
@@ -437,8 +437,8 @@ export default function AnalysisPanel({
                       disabled={!geeLive || liveAnalyzing}
                       style={{
                         flex: 0.7, padding: '6px 6px', fontSize: '0.72rem',
-                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
+                        background: 'var(--wa-03)', border: '1px solid var(--wa-08)',
+                        borderRadius: 'var(--r-sm)', color: 'var(--text-primary)', fontFamily: 'var(--font)',
                       }}
                     />
                     <input
@@ -447,8 +447,8 @@ export default function AnalysisPanel({
                       disabled={!geeLive || liveAnalyzing}
                       style={{
                         flex: 0.7, padding: '6px 6px', fontSize: '0.72rem',
-                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
+                        background: 'var(--wa-03)', border: '1px solid var(--wa-08)',
+                        borderRadius: 'var(--r-sm)', color: 'var(--text-primary)', fontFamily: 'var(--font)',
                       }}
                     />
                   </div>
@@ -485,9 +485,9 @@ export default function AnalysisPanel({
                         disabled={!geeLive || liveAnalyzing || !!dateError}
                         style={{
                           flex: 1.4, padding: '7px 8px',
-                          background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'rgba(255,255,255,0.04)',
+                          background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'var(--wa-04)',
                           border: '1px solid rgba(168,212,230,0.3)', borderRadius: 'var(--r-sm)',
-                          color: geeLive ? '#A8D4E6' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.68rem',
+                          color: geeLive ? 'var(--teal)' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.68rem',
                           cursor: (!geeLive || liveAnalyzing) ? 'default' : 'pointer', fontFamily: 'var(--font)',
                         }}>
                         {liveAnalyzing ? 'Analyzing…' : `Run in-zone only (${zoneSummary.in_zone})`}
@@ -497,8 +497,8 @@ export default function AnalysisPanel({
                         disabled={!geeLive || liveAnalyzing || !!dateError}
                         style={{
                           flex: 1, padding: '7px 8px',
-                          background: 'rgba(255,255,255,0.04)',
-                          border: '1px solid rgba(255,255,255,0.12)', borderRadius: 'var(--r-sm)',
+                          background: 'var(--wa-04)',
+                          border: '1px solid var(--wa-12)', borderRadius: 'var(--r-sm)',
                           color: geeLive ? 'var(--text-secondary)' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.68rem',
                           cursor: (!geeLive || liveAnalyzing) ? 'default' : 'pointer', fontFamily: 'var(--font)',
                         }}>
@@ -511,9 +511,9 @@ export default function AnalysisPanel({
                       disabled={!geeLive || liveAnalyzing || !!dateError}
                       style={{
                         width: '100%', padding: '7px 12px',
-                        background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'rgba(255,255,255,0.04)',
+                        background: geeLive ? 'linear-gradient(135deg, rgba(168,212,230,0.18), rgba(212,176,104,0.18))' : 'var(--wa-04)',
                         border: '1px solid rgba(168,212,230,0.3)', borderRadius: 'var(--r-sm)',
-                        color: geeLive ? '#A8D4E6' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.72rem',
+                        color: geeLive ? 'var(--teal)' : 'var(--text-muted)', fontWeight: 700, fontSize: '0.72rem',
                         cursor: (!geeLive || liveAnalyzing) ? 'default' : 'pointer', fontFamily: 'var(--font)',
                       }}>
                       {liveAnalyzing ? 'Analyzing…' : 'Run Full Analysis'}
@@ -523,7 +523,7 @@ export default function AnalysisPanel({
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                       <span style={{
                         width: 11, height: 11, flexShrink: 0, borderRadius: '50%',
-                        border: '2px solid rgba(168,212,230,0.2)', borderTopColor: '#A8D4E6',
+                        border: '2px solid rgba(168,212,230,0.2)', borderTopColor: 'var(--teal)',
                         display: 'inline-block', animation: 'spin 0.8s linear infinite',
                       }} />
                       <span className="anim-fade-in" key={stageIdx}
@@ -537,7 +537,7 @@ export default function AnalysisPanel({
             )}
 
             <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
-              {filtered.length} of {dataset.length} {datasetName ? `— ${datasetName}` : ''}
+              {filtered.length} of {dataset.length} {datasetName ? `in ${datasetName}` : ''}
               {filtered.length > MAX_ROWS && ` (showing first ${MAX_ROWS})`}
             </div>
           </>
@@ -557,11 +557,11 @@ export default function AnalysisPanel({
                 borderRadius: 'var(--r-sm)', cursor: 'pointer', marginBottom: 2,
                 transition: 'background 0.12s ease',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--wa-04)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.74rem', color: '#ddd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {p.address?.split(',')[0] || p.property_id}
                 </div>
                 {hasTriage ? (
@@ -586,8 +586,8 @@ export default function AnalysisPanel({
                   title={inCompare ? 'In compare tray' : 'Add to SAR compare'}
                   style={{
                     flexShrink: 0, width: 22, height: 22, borderRadius: 5,
-                    background: inCompare ? 'rgba(168,212,230,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: 'none', color: inCompare ? '#A8D4E6' : 'var(--text-muted)',
+                    background: inCompare ? 'rgba(168,212,230,0.15)' : 'var(--wa-04)',
+                    border: 'none', color: inCompare ? 'var(--teal)' : 'var(--text-muted)',
                     cursor: (inCompare || compareFull) ? 'default' : 'pointer', fontSize: '0.8rem',
                   }}
                 >

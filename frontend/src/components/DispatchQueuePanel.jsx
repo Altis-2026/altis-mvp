@@ -48,7 +48,7 @@ export default function DispatchQueuePanel({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '0 18px 12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>Dispatch Queue</div>
+          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>Dispatch Queue</div>
           {queue.length > 0 && (
             <button onClick={() => onOpenGrid?.(source)} style={linkBtn}>Open grid →</button>
           )}
@@ -58,12 +58,12 @@ export default function DispatchQueuePanel({
         </div>
 
         {hasEvent && hasPortfolio && (
-          <div style={{ display: 'flex', gap: 4, marginTop: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--r-sm)', padding: 3 }}>
+          <div style={{ display: 'flex', gap: 4, marginTop: 10, background: 'var(--wa-03)', borderRadius: 'var(--r-sm)', padding: 3 }}>
             {['event', 'portfolio'].map(s => (
               <button key={s} onClick={() => setSource(s)} style={{
                 flex: 1, padding: '6px 0', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700,
                 background: source === s ? 'rgba(168,212,230,0.12)' : 'transparent',
-                border: 'none', color: source === s ? '#A8D4E6' : 'var(--text-muted)',
+                border: 'none', color: source === s ? 'var(--teal)' : 'var(--text-muted)',
                 cursor: 'pointer', fontFamily: 'var(--font)', textTransform: 'capitalize',
               }}>{s}</button>
             ))}
@@ -84,7 +84,7 @@ export default function DispatchQueuePanel({
 
         {!loading && queue.length > 0 && (
           <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', margin: '0 6px 8px' }}>
-            {queue.length} properties prioritized {label ? `— ${label}` : ''}
+            {queue.length} properties prioritized {label ? `for ${label}` : ''}
           </div>
         )}
 
@@ -97,21 +97,21 @@ export default function DispatchQueuePanel({
               display: 'block', width: '100%', textAlign: 'left', marginBottom: 6,
               padding: '11px 12px', borderRadius: 'var(--r-md)', cursor: 'pointer',
               fontFamily: 'var(--font)',
-              background: top ? 'rgba(255,68,68,0.06)' : 'rgba(255,255,255,0.02)',
-              border: `1px solid ${top ? 'rgba(255,68,68,0.3)' : 'rgba(255,255,255,0.06)'}`,
+              background: top ? 'rgba(255,68,68,0.06)' : 'var(--wa-02)',
+              border: `1px solid ${top ? 'rgba(255,68,68,0.3)' : 'var(--wa-06)'}`,
             }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-              onMouseLeave={e => e.currentTarget.style.background = top ? 'rgba(255,68,68,0.06)' : 'rgba(255,255,255,0.02)'}>
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--wa-05)'}
+              onMouseLeave={e => e.currentTarget.style.background = top ? 'rgba(255,68,68,0.06)' : 'var(--wa-02)'}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                 <span style={{
                   flexShrink: 0, width: 22, height: 22, borderRadius: 6,
-                  background: top ? '#FF4444' : 'rgba(255,255,255,0.06)',
+                  background: top ? '#FF4444' : 'var(--wa-06)',
                   color: top ? '#000' : 'var(--text-secondary)',
                   fontSize: '0.7rem', fontWeight: 800,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>{p.priority_rank}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.76rem', color: '#eee', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {p.address?.split(',')[0] || p.property_id}
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 3 }}>
@@ -127,7 +127,7 @@ export default function DispatchQueuePanel({
                   {Math.round(p.priority_score)}
                 </span>
               </div>
-              <div style={{ height: 3, borderRadius: 2, marginTop: 8, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+              <div style={{ height: 3, borderRadius: 2, marginTop: 8, background: 'var(--wa-05)', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${pct}%`, background: color, opacity: 0.85 }} />
               </div>
             </button>

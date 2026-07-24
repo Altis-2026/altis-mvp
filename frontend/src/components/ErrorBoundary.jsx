@@ -27,15 +27,15 @@ export default class ErrorBoundary extends Component {
       }}>
         <div style={{
           maxWidth: 420, padding: '28px 32px', textAlign: 'center',
-          background: 'rgba(6,8,16,0.97)', border: '1px solid rgba(168,212,230,0.2)',
+          background: 'var(--panel-solid)', border: '1px solid rgba(168,212,230,0.2)',
           borderRadius: 16,
         }}>
           <div style={{ fontSize: '2rem', marginBottom: 12 }}>🛰</div>
-          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: 8 }}>
+          <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
             Something hiccuped in the display
           </div>
           <p style={{ fontSize: '0.8rem', color: '#8B9AA3', lineHeight: 1.6, marginBottom: 18 }}>
-            Your data and analysis results are safe on the server — this was a
+            Your data and analysis results are safe on the server. This was a
             display issue only. Reload to pick up right where you left off.
           </p>
           <button

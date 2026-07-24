@@ -1,5 +1,7 @@
+import { useIsMobile } from '../hooks/useIsMobile.js';
 import { useState, useMemo } from 'react';
 import { downloadCSV } from '../utils/csv.js';
+import { exportGuidewire, exportDuckCreek } from '../utils/claimsExport.js';
 
 /* DataGrid — full-screen claims table where a claims manager lives as much as
    the globe. Sortable columns, text + triage filters, row selection with
@@ -39,7 +41,8 @@ function fmt(value, type) {
   return String(value);
 }
 
-export default function DataGrid({ title, rows = [], kind = 'event', onClose, onRowClick }) {
+export default function DataGrid({ title, rows = [], kind = 'event', onClose, onRowClick, eventLabel, eventDate }) {
+  const isMobile = useIsMobile();
   const columns = kind === 'portfolio' ? PORTFOLIO_COLUMNS : EVENT_COLUMNS;
   const hasTriage = rows.length > 0 && rows[0].impact_class !== undefined;
 
@@ -93,12 +96,16 @@ export default function DataGrid({ title, rows = [], kind = 'event', onClose, on
     setSelected(next);
   };
 
+  const [exportFormat, setExportFormat] = useState('altis');
+
   const exportRows = (which) => {
-    const cols = columns.map(c => c.key);
     const data = which === 'selected'
       ? filtered.filter(p => selected.has(p.property_id))
       : filtered;
-    downloadCSV(`altis_${kind}_${which}_${data.length}`, data, cols);
+    const opts = { eventLabel, eventDate };
+    if (exportFormat === 'guidewire') return exportGuidewire(data, opts);
+    if (exportFormat === 'duckcreek') return exportDuckCreek(data, opts);
+    downloadCSV(`altis_${kind}_${which}_${data.length}`, data, columns.map(c => c.key));
   };
 
   return (
@@ -114,20 +121,20 @@ export default function DataGrid({ title, rows = [], kind = 'event', onClose, on
         className="anim-slide-in-up"
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: 1180, height: '100%', maxHeight: '90vh',
-          background: 'rgba(6,8,16,0.98)', border: '1px solid rgba(255,255,255,0.08)',
+          width: '100%', maxWidth: isMobile ? 'none' : 1180, height: '100%', maxHeight: isMobile ? '100dvh' : '90vh',
+          background: 'var(--panel-solid)', border: '1px solid var(--wa-08)',
           borderRadius: 'var(--r-xl)', display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
         }}
       >
         {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--wa-06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.14em', color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 4 }}>
                 Claims Data Grid
               </div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
                 {title || 'Properties'}
               </h2>
             </div>
@@ -143,15 +150,15 @@ export default function DataGrid({ title, rows = [], kind = 'event', onClose, on
               placeholder="Search address, ID, policy…"
               style={{
                 flex: '1 1 240px', minWidth: 200, padding: '8px 12px', fontSize: '0.78rem',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 'var(--r-sm)', color: '#fff', fontFamily: 'var(--font)',
+                background: 'var(--wa-04)', border: '1px solid var(--wa-08)',
+                borderRadius: 'var(--r-sm)', color: 'var(--text-primary)', fontFamily: 'var(--font)',
               }}
             />
             {hasTriage && TRIAGE_CLASSES.map(c => (
               <button key={c} onClick={() => toggleTriage(c)} style={{
                 padding: '6px 10px', borderRadius: 'var(--r-sm)', fontSize: '0.66rem', fontWeight: 700,
                 background: triage.has(c) ? `${TRIAGE_COLORS[c]}22` : 'transparent',
-                border: `1px solid ${triage.has(c) ? TRIAGE_COLORS[c] : 'rgba(255,255,255,0.1)'}`,
+                border: `1px solid ${triage.has(c) ? TRIAGE_COLORS[c] : 'var(--wa-10)'}`,
                 color: triage.has(c) ? TRIAGE_COLORS[c] : 'var(--text-muted)',
                 cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap',
               }}>{c}</button>
@@ -161,10 +168,25 @@ export default function DataGrid({ title, rows = [], kind = 'event', onClose, on
           {/* Counts + bulk actions */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, gap: 12, flexWrap: 'wrap' }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-              <strong style={{ color: '#fff' }}>{filtered.length.toLocaleString()}</strong> of {rows.length.toLocaleString()} shown
+              <strong style={{ color: 'var(--text-primary)' }}>{filtered.length.toLocaleString()}</strong> of {rows.length.toLocaleString()} shown
               {selected.size > 0 && <span style={{ color: 'var(--teal)' }}> · {selected.size} selected</span>}
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select
+                value={exportFormat}
+                onChange={e => setExportFormat(e.target.value)}
+                title="Export layout. Guidewire and Duck Creek files are shaped for direct claim-intake import."
+                style={{
+                  padding: '6px 8px', fontSize: '0.7rem', fontWeight: 600,
+                  background: 'var(--wa-04)', color: 'var(--text-secondary)',
+                  border: '1px solid var(--wa-10)', borderRadius: 'var(--r-sm)',
+                  fontFamily: 'var(--font)', cursor: 'pointer',
+                }}
+              >
+                <option value="altis">Altis CSV</option>
+                <option value="guidewire">Guidewire ClaimCenter</option>
+                <option value="duckcreek">Duck Creek Claims</option>
+              </select>
               <button onClick={() => exportRows('selected')} disabled={selected.size === 0} style={gridBtn(selected.size === 0)}>
                 ↓ Export selected
               </button>
@@ -203,7 +225,7 @@ export default function DataGrid({ title, rows = [], kind = 'event', onClose, on
                 return (
                   <tr key={p.property_id || i}
                       style={{ background: isSel ? 'rgba(168,212,230,0.07)' : 'transparent', cursor: 'pointer' }}
-                      onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+                      onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'var(--wa-03)'; }}
                       onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = 'transparent'; }}>
                     <td style={{ ...tdStyle, textAlign: 'center' }} onClick={e => { e.stopPropagation(); toggleRow(p.property_id); }}>
                       <input type="checkbox" checked={isSel} readOnly style={{ cursor: 'pointer' }} />
@@ -212,7 +234,7 @@ export default function DataGrid({ title, rows = [], kind = 'event', onClose, on
                       <td key={c.key} style={{
                         ...tdStyle,
                         textAlign: (c.type === 'num' || c.type === 'money') ? 'right' : 'left',
-                        color: c.key === 'adjuster_note' ? 'var(--text-muted)' : '#ccc',
+                        color: c.key === 'adjuster_note' ? 'var(--text-muted)' : 'var(--text-body)',
                         maxWidth: c.w, overflow: 'hidden', textOverflow: 'ellipsis',
                       }}
                         onClick={() => onRowClick?.(p)}>
@@ -240,9 +262,9 @@ export default function DataGrid({ title, rows = [], kind = 'event', onClose, on
 const thStyle = {
   textAlign: 'left', padding: '10px 12px', fontSize: '0.64rem', fontWeight: 700,
   letterSpacing: '0.04em', color: 'var(--text-secondary)', textTransform: 'uppercase',
-  borderBottom: '1px solid rgba(255,255,255,0.1)',
+  borderBottom: '1px solid var(--wa-10)',
 };
-const tdStyle = { padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', fontVariantNumeric: 'tabular-nums' };
+const tdStyle = { padding: '8px 12px', borderBottom: '1px solid var(--wa-04)', fontVariantNumeric: 'tabular-nums' };
 const closeBtn = {
   background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
   fontSize: '1.2rem', lineHeight: 1, padding: '0 0 0 16px', transition: 'color 0.15s',
@@ -251,9 +273,9 @@ function gridBtn(disabled, ghost) {
   return {
     padding: '7px 12px', fontSize: '0.7rem', fontWeight: 700, fontFamily: 'var(--font)',
     borderRadius: 'var(--r-sm)', whiteSpace: 'nowrap',
-    background: ghost ? 'transparent' : disabled ? 'rgba(255,255,255,0.03)' : 'rgba(168,212,230,0.12)',
-    border: `1px solid ${ghost ? 'rgba(255,255,255,0.12)' : disabled ? 'rgba(255,255,255,0.06)' : 'rgba(168,212,230,0.3)'}`,
-    color: ghost ? 'var(--text-secondary)' : disabled ? 'var(--text-disabled)' : '#A8D4E6',
+    background: ghost ? 'transparent' : disabled ? 'var(--wa-03)' : 'rgba(168,212,230,0.12)',
+    border: `1px solid ${ghost ? 'var(--wa-12)' : disabled ? 'var(--wa-06)' : 'rgba(168,212,230,0.3)'}`,
+    color: ghost ? 'var(--text-secondary)' : disabled ? 'var(--text-disabled)' : 'var(--teal)',
     cursor: disabled ? 'not-allowed' : 'pointer',
   };
 }

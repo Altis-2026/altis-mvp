@@ -172,7 +172,7 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
                 padding: '8px 12px', borderRadius: 'var(--r-md)',
                 whiteSpace: 'pre-wrap',
                 color: m.role === 'user' ? 'var(--bg)' : 'var(--text-primary)',
-                background: m.role === 'user' ? 'var(--teal)' : 'rgba(255,255,255,0.04)',
+                background: m.role === 'user' ? 'var(--teal)' : 'var(--wa-04)',
                 border: m.role === 'user' ? 'none' : '1px solid var(--border)',
               }}>
                 {m.content}
@@ -206,8 +206,8 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
           {suggestions.map(s => (
             <button key={s} onClick={() => send(s)} style={{
               padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
-              background: 'rgba(4,6,14,0.8)', border: '1px solid rgba(168,212,230,0.2)',
-              color: '#A8D4E6', fontSize: '0.68rem', fontWeight: 600,
+              background: 'var(--panel)', border: '1px solid rgba(168,212,230,0.2)',
+              color: 'var(--teal)', fontSize: '0.68rem', fontWeight: 600,
               fontFamily: 'var(--font)', backdropFilter: 'blur(10px)',
             }}>
               {s}
@@ -238,7 +238,7 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
               : selectedProperty ? `Ask about ${selectedProperty.address || selectedProperty.property_id}…`
               : portfolioId ? 'Ask about your book, this event, or how to use Altis…'
               : eventMeta ? `Ask about ${eventMeta.label}, or how to use Altis…`
-              : 'Ask Altis anything — your book, an event, or how to use the product…'
+              : 'Ask Altis anything: your book, an event, or how to use the product…'
           }
           style={{
             flex: 1, background: 'transparent', border: 'none', outline: 'none',
@@ -259,7 +259,7 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
             style={roundBtn(speakBack ? 'rgba(168,212,230,0.16)' : 'transparent')}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                 stroke={speakBack ? '#A8D4E6' : 'rgba(255,255,255,0.35)'} strokeWidth="1.8"
+                 stroke={speakBack ? 'var(--teal)' : 'var(--wa-20)'} strokeWidth="1.8"
                  strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 5L6 9H2v6h4l5 4V5z"/>
               {speakBack
@@ -282,7 +282,7 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
             }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                 stroke={listening ? '#FF6B6B' : '#A8D4E6'} strokeWidth="1.8"
+                 stroke={listening ? '#FF6B6B' : 'var(--teal)'} strokeWidth="1.8"
                  strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="2" width="6" height="12" rx="3"/>
               <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/>
@@ -296,7 +296,7 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
           aria-label="Send"
           style={{
             width: 34, height: 34, borderRadius: '50%', border: 'none', flexShrink: 0,
-            background: input.trim() ? 'linear-gradient(135deg, var(--teal), #D4B068)' : 'rgba(255,255,255,0.06)',
+            background: input.trim() ? 'linear-gradient(135deg, var(--teal), #D4B068)' : 'var(--wa-06)',
             color: 'var(--bg)', cursor: input.trim() ? 'pointer' : 'default',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             opacity: sending ? 0.6 : 1, transition: 'background 0.15s, opacity 0.15s',
