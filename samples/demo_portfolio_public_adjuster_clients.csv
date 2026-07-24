@@ -1,0 +1,62 @@
+Claim Number,Insured Name,Loss Address,City,State,Latitude,Longitude,Dwelling Coverage,Carrier
+PA-CLM-0001,Lismore Sawmill Co,"Lot 6, Wyrallah Rd",South Lismore,NSW,-28.8475,153.2875,860000,QBE Insurance
+PA-CLM-0002,Woodburn Rural Supplies,"Lot 12, Bagotville Rd",Woodburn,NSW,-29.01625,153.3625,310000,Suncorp
+PA-CLM-0003,Coraki District Co-op,"Lot 3, Coraki Bridge Rd",Coraki,NSW,-29.01625,153.2875,540000,IAG
+PA-CLM-0004,Broadwater Cane Growers,"Lot 9, River St",Broadwater,NSW,-28.94875,153.3625,295000,QBE Insurance
+PA-CLM-0005,Woodburn Cold Stores,"Lot 21, Pacific Hwy",Woodburn,NSW,-28.9825,153.3625,475000,Allianz
+PA-CLM-0006,T. Nguyen Residence,"Lot 4, Coraki North Rd",Coraki,NSW,-29.01625,153.325,165000,Suncorp
+PA-CLM-0007,Bungawalbin Farmstead,"Lot 17, Bungawalbin Rd",Bungawalbin,NSW,-28.94875,153.2875,225000,IAG
+PA-CLM-0008,Coraki Caravan Park,"Lot 1, Richmond Tce",Coraki,NSW,-29.05,153.2875,390000,Allianz
+PA-CLM-0009,Broadwater Sugar Depot,"Lot 8, Mill Rd",Broadwater,NSW,-28.9825,153.4,610000,QBE Insurance
+PA-CLM-0010,J. Hartley Residence,"Lot 14, River Rd",Coraki,NSW,-29.05,153.325,140000,Suncorp
+PA-CLM-0011,Woodburn Marina,"Lot 2, Richmond River Esplanade",Woodburn,NSW,-29.05,153.3625,355000,IAG
+PA-CLM-0012,Coraki Dairy Farm,"Lot 26, Codrington Rd",Coraki,NSW,-29.05,153.25,420000,Allianz
+PA-CLM-0013,Bungawalbin Timber Yard,"Lot 5, Tuckombil Rd",Bungawalbin,NSW,-28.915,153.2875,265000,QBE Insurance
+PA-CLM-0014,N. Patel Residence,"Lot 19, Wilson St",Coraki,NSW,-29.01625,153.25,155000,Suncorp
+PA-CLM-0015,Lismore CBD Retail Strip,42 Molesworth St,Lismore,NSW,-28.81375,153.2875,980000,IAG
+PA-CLM-0016,Tuncester Highland Farm,"Lot 33, Tuncester Rd",Tuncester,NSW,-28.915,153.25,310000,Allianz
+PA-CLM-0017,Carmody Residence,20 River St,South Lismore,NSW,-28.848381,153.285754,260000,QBE Insurance
+PA-CLM-0018,Doyle Residence,113 Wilson St,South Lismore,NSW,-28.845451,153.286073,145000,Suncorp
+PA-CLM-0019,Tran Residence,33 Richmond Tce,South Lismore,NSW,-28.849546,153.287123,520000,QBE Insurance
+PA-CLM-0020,Iqbal Residence,13 Pacific Hwy,Woodburn,NSW,-29.015864,153.361983,260000,Allianz
+PA-CLM-0021,Kowalski Residence,145 Coraki North Rd,Woodburn,NSW,-29.018029,153.360589,145000,Suncorp
+PA-CLM-0022,Doyle Residence,146 Bagotville Rd,Woodburn,NSW,-29.016888,153.362739,410000,Suncorp
+PA-CLM-0023,Lefebvre Residence,121 Molesworth St,Coraki,NSW,-29.016268,153.287659,260000,IAG
+PA-CLM-0024,Iqbal Residence,22 River Rd,Coraki,NSW,-29.017508,153.285899,410000,Allianz
+PA-CLM-0025,Kowalski Residence,157 Coraki Bridge Rd,Coraki,NSW,-29.014374,153.288647,145000,Allianz
+PA-CLM-0026,Quintero Residence,109 Bagotville Rd,Broadwater,NSW,-28.950425,153.36171,520000,QBE Insurance
+PA-CLM-0027,Lefebvre Residence,89 Codrington Rd,Broadwater,NSW,-28.947427,153.362865,410000,Allianz
+PA-CLM-0028,Doyle Residence,71 Tuncester Rd,Broadwater,NSW,-28.948351,153.362281,520000,QBE Insurance
+PA-CLM-0029,Tran Residence,176 Molesworth St,Woodburn,NSW,-28.984697,153.363507,260000,Allianz
+PA-CLM-0030,Pham Residence,92 Coraki North Rd,Woodburn,NSW,-28.980565,153.361735,410000,QBE Insurance
+PA-CLM-0031,Kowalski Residence,35 Richmond Tce,Woodburn,NSW,-28.982532,153.361091,330000,Allianz
+PA-CLM-0032,Greenwood Residence,116 Tuckombil Rd,Coraki,NSW,-29.014166,153.324983,410000,IAG
+PA-CLM-0033,Singh Residence,73 Wilson St,Coraki,NSW,-29.014333,153.326596,260000,Allianz
+PA-CLM-0034,Greenwood Residence,40 Richmond Tce,Coraki,NSW,-29.013961,153.323255,520000,Suncorp
+PA-CLM-0035,Greenwood Residence,69 River Rd,Bungawalbin,NSW,-28.95119,153.289155,145000,Suncorp
+PA-CLM-0036,Tran Residence,83 Pacific Hwy,Bungawalbin,NSW,-28.949155,153.286846,520000,QBE Insurance
+PA-CLM-0037,Singh Residence,102 Tuckombil Rd,Bungawalbin,NSW,-28.948967,153.289355,330000,Allianz
+PA-CLM-0038,Carmody Residence,50 Coraki Bridge Rd,Coraki,NSW,-29.051982,153.288171,210000,Allianz
+PA-CLM-0039,Carmody Residence,28 Wyrallah Rd,Coraki,NSW,-29.051688,153.2867,410000,Suncorp
+PA-CLM-0040,Underhill Residence,8 Coraki Bridge Rd,Coraki,NSW,-29.049817,153.289745,210000,Allianz
+PA-CLM-0041,Mancini Residence,156 Codrington Rd,Broadwater,NSW,-28.984257,153.398761,330000,QBE Insurance
+PA-CLM-0042,Pham Residence,124 Tuncester Rd,Broadwater,NSW,-28.984423,153.39994,260000,QBE Insurance
+PA-CLM-0043,Jorgensen Residence,124 Coraki North Rd,Broadwater,NSW,-28.984279,153.401248,410000,QBE Insurance
+PA-CLM-0044,Mancini Residence,39 Wyrallah Rd,Coraki,NSW,-29.051474,153.32726,410000,IAG
+PA-CLM-0045,Jorgensen Residence,134 Codrington Rd,Coraki,NSW,-29.047607,153.326817,210000,IAG
+PA-CLM-0046,Reyes Residence,86 Richmond Tce,Coraki,NSW,-29.04864,153.325163,410000,Suncorp
+PA-CLM-0047,Iqbal Residence,53 Tuncester Rd,Woodburn,NSW,-29.04847,153.364092,260000,QBE Insurance
+PA-CLM-0048,Quintero Residence,68 Bungawalbin Rd,Woodburn,NSW,-29.047552,153.363951,520000,IAG
+PA-CLM-0049,Mancini Residence,95 Coraki Bridge Rd,Woodburn,NSW,-29.050264,153.364685,210000,QBE Insurance
+PA-CLM-0050,Hutchins Residence,125 Wyrallah Rd,Coraki,NSW,-29.051366,153.248484,330000,IAG
+PA-CLM-0051,Esposito Residence,101 Bungawalbin Rd,Coraki,NSW,-29.048502,153.247924,330000,Suncorp
+PA-CLM-0052,Doyle Residence,103 Molesworth St,Coraki,NSW,-29.05033,153.250679,330000,QBE Insurance
+PA-CLM-0053,Farrugia Residence,9 Pacific Hwy,Bungawalbin,NSW,-28.913876,153.28585,410000,Allianz
+PA-CLM-0054,Underhill Residence,123 Codrington Rd,Bungawalbin,NSW,-28.913467,153.285731,210000,Suncorp
+PA-CLM-0055,Esposito Residence,136 Pacific Hwy,Bungawalbin,NSW,-28.917393,153.288997,330000,Suncorp
+PA-CLM-0056,Jorgensen Residence,56 River Rd,Coraki,NSW,-29.014619,153.248555,410000,Suncorp
+PA-CLM-0057,Singh Residence,109 Pacific Hwy,Coraki,NSW,-29.014932,153.24913,145000,IAG
+PA-CLM-0058,Reyes Residence,109 Pacific Hwy,Coraki,NSW,-29.014261,153.250812,410000,Suncorp
+PA-CLM-0059,Pham Residence,48 Wyrallah Rd,Lismore,NSW,-28.813632,153.285094,210000,Suncorp
+PA-CLM-0060,Esposito Residence,144 Bagotville Rd,Lismore,NSW,-28.815542,153.288096,260000,Allianz
+PA-CLM-0061,Singh Residence,16 Richmond Tce,Lismore,NSW,-28.812329,153.285531,210000,IAG

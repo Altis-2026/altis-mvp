@@ -4,7 +4,7 @@ export default function EventsPanel({ events, selectedEvent, onSelect, loading }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '0 20px 14px' }}>
-        <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>Events</div>
+        <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>Events</div>
         <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
           {events.length} processed disaster{events.length !== 1 ? 's' : ''}
         </div>
@@ -32,15 +32,15 @@ export default function EventsPanel({ events, selectedEvent, onSelect, loading }
                 cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
                 opacity: loading && !active ? 0.55 : 1, transition: 'background 0.15s ease',
               }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--wa-04)'; }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               <span style={{
                 width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                background: active ? '#A8D4E6' : 'rgba(255,255,255,0.15)',
+                background: active ? 'var(--teal)' : 'var(--wa-15)',
               }} />
               <span>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: active ? '#A8D4E6' : '#fff' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: active ? 'var(--teal)' : '#fff' }}>
                   {evt.label}
                 </div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>
@@ -53,7 +53,7 @@ export default function EventsPanel({ events, selectedEvent, onSelect, loading }
       </div>
 
       <div style={{
-        padding: '14px 20px', borderTop: '1px solid rgba(255,255,255,0.05)',
+        padding: '14px 20px', borderTop: '1px solid var(--wa-05)',
         fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5,
       }}>
         To add a new disaster: add its bounding box to <code style={{ color: 'var(--text-secondary)' }}>pipeline/config.py</code>,

@@ -1,0 +1,83 @@
+{
+  "event_id": "harvey",
+  "pipeline_version": "1.0.0",
+  "stages": {
+    "flood_detection": {
+      "dem_resolution_m": 1,
+      "sar_orbit_pass": "DESCENDING",
+      "pre_event_scene_count": 3,
+      "post_event_scene_count": 2,
+      "pre_event_window": [
+        "2017-08-01",
+        "2017-08-24"
+      ],
+      "post_event_window": [
+        "2017-08-27",
+        "2017-09-10"
+      ],
+      "wse_radius_m": 300,
+      "threshold_method": "Otsu adaptive + range guard",
+      "otsu_water_db_range": [
+        -22.0,
+        -12.0
+      ],
+      "otsu_fallback_db": -16.0,
+      "speckle_filter_radius_m": 50,
+      "wse_estimator": "p90 neighborhood percentile",
+      "max_plausible_depth_ft": 20.0,
+      "slope_mask_max_degrees": 5,
+      "permanent_water_dataset": "JRC/GSW1_4/GlobalSurfaceWater (seasonality >= 8mo)",
+      "building_mask_dataset": "GOOGLE/Research/open-buildings/v3",
+      "urban_density_dataset": "JRC/GHSL/P2023A/GHS_BUILT_S/2020",
+      "flooded_property_count": 0,
+      "urban_property_count": 926,
+      "optical_dataset": "COPERNICUS/S2_SR_HARMONIZED (MNDWI, SCL cloud mask)",
+      "optical_max_cloud_pct": 40,
+      "optical_scene_count": 6,
+      "optical_available_property_count": 1000,
+      "sar_optical_contradiction_count": 0,
+      "depth_uncertainty": {
+        "dem_vertical_rmse_m": 0.3,
+        "interval": "\u00b11\u03c3 (~68%): quadrature of DEM vertical accuracy + measured WSE spread"
+      },
+      "generated_at": "2026-07-01T23:44:18.710164+00:00"
+    },
+    "triage": {
+      "pipeline_version": "1.0.0",
+      "triage_thresholds": {
+        "dispatch_depth_ft": 3.0,
+        "dispatch_low_depth_ft": 1.0,
+        "dispatch_pct": 0.5,
+        "remote_deny_depth_ft": 0.3,
+        "remote_deny_pct": 0.05,
+        "remote_deny_conf": 80,
+        "remote_approve_min_depth": 0.5,
+        "remote_approve_max_depth": 3.0,
+        "remote_approve_min_pct": 0.2,
+        "remote_approve_conf": 78
+      },
+      "category_counts": {
+        "Dispatch": 0,
+        "Remote-Approve": 0,
+        "Remote-Deny": 842,
+        "Review": 158
+      },
+      "estimated_savings_usd": 631500,
+      "remote_resolution_count": 842,
+      "cost_per_inspection_usd": 750,
+      "optical_cross_check": {
+        "max_cloud_pct": 40,
+        "water_mndwi_min": 0.0,
+        "min_valid_fraction": 0.5,
+        "sar_flood_pct": 0.1,
+        "water_confirm_pct": 0.1,
+        "water_contradict_pct": 0.05,
+        "confirm_bonus": 10,
+        "confirm_dry_bonus": 6,
+        "contradict_penalty": -12
+      },
+      "optical_available_count": 1000,
+      "generated_at": "2026-07-01T23:48:17.441685+00:00"
+    }
+  }
+}

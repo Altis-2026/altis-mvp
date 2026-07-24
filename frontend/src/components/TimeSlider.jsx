@@ -1,13 +1,15 @@
 /* TimeSlider.jsx — Pre/post satellite imagery toggle (bottom left) */
+import { useIsMobile } from '../hooks/useIsMobile.js';
 
 export default function TimeSlider({ timeMode, onTimeChange, hasTile }) {
+  const isMobile = useIsMobile();
   return (
     <div
       className="anim-fade-in"
       style={{
         position:   'fixed',
-        bottom:     32,
-        left:       72,
+        bottom:     isMobile ? 92 : 32,
+        left:       isMobile ? 64 : 72,
         zIndex:     'var(--z-ui)',
         display:    'flex',
         flexDirection: 'column',
@@ -29,8 +31,8 @@ export default function TimeSlider({ timeMode, onTimeChange, hasTile }) {
       {/* Toggle */}
       <div style={{
         display:       'flex',
-        background:    'rgba(4,6,12,0.88)',
-        border:        '1px solid rgba(255,255,255,0.07)',
+        background:    'var(--panel)',
+        border:        '1px solid var(--wa-07)',
         borderRadius:  'var(--r-md)',
         backdropFilter: 'blur(16px)',
         padding:       3,
@@ -50,7 +52,7 @@ export default function TimeSlider({ timeMode, onTimeChange, hasTile }) {
                 background:    active ? 'rgba(168,212,230,0.12)' : 'transparent',
                 border:        `1px solid ${active ? 'rgba(168,212,230,0.3)' : 'transparent'}`,
                 borderRadius:  'var(--r-sm)',
-                color:         active ? '#A8D4E6' : 'var(--text-muted)',
+                color:         active ? 'var(--teal)' : 'var(--text-muted)',
                 fontSize:      '0.76rem',
                 fontWeight:    active ? 700 : 500,
                 letterSpacing: '0.04em',
@@ -69,7 +71,7 @@ export default function TimeSlider({ timeMode, onTimeChange, hasTile }) {
                 borderRadius: '50%',
                 background:   active
                   ? (value === 'post' ? '#4CAF82' : '#6B8FA3')
-                  : 'rgba(255,255,255,0.15)',
+                  : 'var(--wa-15)',
                 transition:   'background 0.18s ease',
               }} />
               {label}
@@ -81,7 +83,7 @@ export default function TimeSlider({ timeMode, onTimeChange, hasTile }) {
       {/* Overlay status */}
       <div style={{
         fontSize:   '0.62rem',
-        color:      hasTile ? 'rgba(76,175,130,0.7)' : 'rgba(255,255,255,0.18)',
+        color:      hasTile ? 'rgba(76,175,130,0.7)' : 'var(--wa-15)',
         paddingLeft: 2,
       }}>
         {hasTile

@@ -10,7 +10,7 @@ export default function SarComparePanel({ compareList = [], onRemove, onClear })
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '0 16px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>SAR compare</div>
+          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>SAR compare</div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
             {compareList.length} of 4 properties
           </div>
@@ -29,19 +29,19 @@ export default function SarComparePanel({ compareList = [], onRemove, onClear })
         {compareList.length === 0 && (
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
             Click <strong style={{ color: 'var(--text-secondary)', fontWeight: 700 }}>+ Add to SAR compare</strong> on
-            any property — in the drawer or the Analysis table — to line up to 4
+            any property, in the drawer or the Analysis table, to line up to 4
             before/after pairs side by side here.
           </div>
         )}
 
         {compareList.map(p => (
           <div key={p.property_id} style={{
-            border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--r-md)',
-            padding: 12, marginBottom: 12, background: 'rgba(255,255,255,0.02)',
+            border: '1px solid var(--wa-07)', borderRadius: 'var(--r-md)',
+            padding: 12, marginBottom: 12, background: 'var(--wa-02)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#ddd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-bright)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {p.address?.split(',')[0] || p.property_id}
                 </div>
                 {p.impact_class && (

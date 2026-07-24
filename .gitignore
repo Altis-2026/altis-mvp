@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+.env
+.env.local
+secrets/
+*-sa-key.json
+*-service-account*.json
+altis.db
+cache/
+node_modules/
+dist/
+*.log
+monitor/events.log
+monitor/state.json

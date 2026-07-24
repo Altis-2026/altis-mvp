@@ -29,9 +29,18 @@ def get_flood_tile_url(event_id: str) -> Optional[str]:
     """
     try:
         import ee
-        from pipeline.config import GEE_PROJECT, HARVEY, IAN
+        from pipeline.config import HARVEY, IAN
+        from backend.live_pipeline import init_ee, gee_available, LiveAnalysisError
 
-        ee.Initialize(project=GEE_PROJECT)
+        # Same service-account auth as live analysis (file path locally, raw
+        # JSON env var in a container) rather than requiring an interactive
+        # `earthengine authenticate` session the deployed server can't run.
+        if not gee_available():
+            return None
+        try:
+            init_ee()
+        except LiveAnalysisError:
+            return None
 
         event_map = {'harvey': HARVEY, 'ian': IAN}
         cfg = event_map.get(event_id)
@@ -72,94 +81,187 @@ def get_flood_tile_url(event_id: str) -> Optional[str]:
 
 # ── SAR thumbnail generation ──────────────────────────────────────────────────
 
-def generate_synthetic_thumbnail(property_id: str, depth_ft: float,
-                                  is_post: bool) -> str:
-    """
-    Generate a synthetic SAR-like thumbnail using PIL.
-    Returns a base64-encoded PNG data URL.
+def _value_noise(rng: np.random.RandomState, H: int, W: int, octaves=(8, 16, 32, 64)) -> np.ndarray:
+    """Cheap multi-octave value noise (no external deps): generate coarse random
+    grids and upsample with bicubic interpolation at increasing frequency, summed
+    with decreasing amplitude. Produces smooth, natural-looking terrain texture
+    instead of flat per-pixel static."""
+    from PIL import Image as _Image
+    out = np.zeros((H, W), dtype=np.float32)
+    amp_total = 0.0
+    for i, n in enumerate(octaves):
+        amp = 1.0 / (2 ** i)
+        grid = rng.rand(max(2, n // 4), max(2, n // 4)).astype(np.float32)
+        layer = np.asarray(
+            _Image.fromarray((grid * 255).astype(np.uint8)).resize((W, H), _Image.BICUBIC),
+            dtype=np.float32,
+        ) / 255.0
+        out += layer * amp
+        amp_total += amp
+    return out / amp_total
 
-    This is the fallback when GEE thumbnails aren't cached.
-    Renders in the Altis blue-gray color scheme:
-    - Water: near-black
-    - Flooded areas: mid-teal
-    - Buildings/land: bright gray-white
+
+def generate_synthetic_thumbnail(property_id: str, depth_ft: float,
+                                  is_post: bool, view: str = 'sar') -> str:
+    """
+    Generate a synthetic thumbnail using PIL. Returns a base64 PNG data URL.
+    Fallback when real GEE imagery isn't cached.
+
+    Two distinct, physically-motivated renderings, built from smooth multi-octave
+    terrain noise (not flat per-pixel static) plus a parcel layout — a street
+    grid, building footprints with drop shadows, and a tree-line/yard texture —
+    so the scene reads as an aerial tile rather than abstract noise:
+    - view='sar'     : Sentinel-1 radar. Speckled grayscale; standing water is
+                       specular and reads NEAR-BLACK. Flooding => dark pools.
+    - view='optical' : Sentinel-2 true-color/MNDWI-style. Vegetated land reads
+                       green, roads/roofs read warm gray; water has high MNDWI
+                       and reads BRIGHT CYAN. Flooding => bright pools.
+                       (Deliberately the inverse of SAR so the two sensors are
+                       visibly different, as they are in reality.)
     """
     try:
-        from PIL import Image
+        from PIL import Image, ImageFilter, ImageDraw
     except ImportError:
         return ""
 
-    seed = int(hashlib.md5(f"{property_id}{'post' if is_post else 'pre'}".encode())
-               .hexdigest()[:8], 16) % 100_000
+    optical = (view == 'optical')
+    seed = int(hashlib.md5(
+        f"{property_id}{'post' if is_post else 'pre'}{view}".encode()
+    ).hexdigest()[:8], 16) % 100_000
     rng  = np.random.RandomState(seed)
     H, W = 200, 300
 
-    # SAR speckle texture
-    base = rng.exponential(scale=0.32, size=(H, W)).astype(np.float32)
+    # Smooth terrain base (ground/vegetation albedo variation), then speckle
+    # is layered on top only for SAR — optical stays smooth like a real
+    # pan-sharpened composite.
+    terrain = _value_noise(rng, H, W)
 
-    # Building-like bright returns
-    for _ in range(rng.randint(5, 12)):
-        bx = rng.randint(5, W - 20)
-        by = rng.randint(5, H - 18)
-        bw = rng.randint(8, 22)
-        bh = rng.randint(6, 14)
-        base[by:by+bh, bx:bx+bw] += rng.uniform(0.35, 1.0)
+    # Parcel layout drawn once, shared geometry between pre/post and sensors
+    # (seeded without 'post'/'view' so the neighborhood layout doesn't change
+    # between frames — only the flood state does).
+    layout_seed = int(hashlib.md5(f"{property_id}-layout".encode()).hexdigest()[:8], 16) % 100_000
+    lrng = np.random.RandomState(layout_seed)
 
-    # Road-like linear return
-    ry = rng.randint(H // 3, 2 * H // 3)
-    base[ry:ry+2, :] *= rng.uniform(0.25, 0.40)
+    buildings = []  # (x, y, w, h)
+    n_buildings = lrng.randint(6, 11)
+    for _ in range(n_buildings):
+        bw, bh = lrng.randint(16, 34), lrng.randint(14, 26)
+        bx, by = lrng.randint(8, W - bw - 8), lrng.randint(8, H - bh - 8)
+        buildings.append((bx, by, bw, bh))
 
-    # Add flood signature on post-event image
+    road_y = lrng.randint(int(H * 0.40), int(H * 0.62))
+    road_x = lrng.randint(int(W * 0.55), int(W * 0.80))
+
+    if optical:
+        base = (terrain * 0.5 + rng.normal(0.5, 0.04, size=(H, W))).astype(np.float32)
+    else:
+        # SAR speckle multiplies the terrain signal (true radar speckle is
+        # multiplicative gamma noise, not additive).
+        speckle = rng.gamma(shape=4.0, scale=0.25, size=(H, W)).astype(np.float32)
+        base = (terrain * 0.6 + 0.4) * speckle
+
+    rgb_extra = np.zeros((H, W, 3), dtype=np.float32)  # building/road tint, optical-only
+
+    # Roads — light gray asphalt strip, slight width variance
+    base[road_y - 3:road_y + 3, :] *= 0.55
+    base[:, road_x - 3:road_x + 3] *= 0.60
+    if optical:
+        rgb_extra[road_y - 3:road_y + 3, :, :] += 8
+        rgb_extra[:, road_x - 3:road_x + 3, :] += 8
+
+    # Buildings — bright radar return / warm rooftop color, with a soft
+    # drop-shadow on the SW side for a pseudo-3D aerial look.
+    for (bx, by, bw, bh) in buildings:
+        sx0, sy0 = min(bx + 3, W - 1), min(by + 3, H - 1)
+        sx1, sy1 = min(bx + bw + 5, W), min(by + bh + 5, H)
+        base[sy0:sy1, sx0:sx1] *= 0.65
+        base[by:by+bh, bx:bx+bw] = base[by:by+bh, bx:bx+bw] * 0.3 + rng.uniform(0.7, 1.3)
+        if optical:
+            rgb_extra[by:by+bh, bx:bx+bw, 0] += 40
+            rgb_extra[by:by+bh, bx:bx+bw, 1] += 28
+            rgb_extra[by:by+bh, bx:bx+bw, 2] += 22
+
+    # Flood mask on post-event image — irregular, noise-carved water edge
+    # rather than a clean ellipse, clipped near the parcel's low ground.
+    flood_mask = np.zeros((H, W), dtype=bool)
     if is_post and depth_ft > 0.2:
-        inten = min(depth_ft / 7.0, 1.0)
-        cx    = rng.randint(W // 4, 3 * W // 4)
-        cy    = rng.randint(H // 2, H - 15)
-        rx    = int(38 + W * 0.17 * inten)
-        ry2   = int(28 + H * 0.17 * inten)
-        Y, X  = np.ogrid[:H, :W]
-        m1    = ((X - cx)**2 / rx**2 + (Y - cy)**2 / ry2**2) <= 1.0
-        base[m1] = rng.uniform(0.01, 0.06, m1.sum())
-
+        inten   = min(depth_ft / 7.0, 1.0)
+        Y, X    = np.ogrid[:H, :W]
+        cx      = lrng.randint(W // 4, 3 * W // 4)
+        cy      = lrng.randint(H // 2, H - 15)
+        rx      = int(40 + W * 0.18 * inten)
+        ry2     = int(30 + H * 0.18 * inten)
+        ellipse = ((X - cx)**2 / rx**2 + (Y - cy)**2 / ry2**2) <= 1.0
+        edge_noise = _value_noise(np.random.RandomState(seed + 7), H, W, octaves=(16, 32, 64))
+        flood_mask |= ellipse & (edge_noise > 0.32)
         if depth_ft > 1.5:
-            cx2, cy2 = rng.randint(15, W - 25), rng.randint(H // 3, H - 15)
-            r2  = int(18 + 22 * inten)
-            m2  = (X - cx2)**2 + (Y - cy2)**2 <= r2**2
-            base[m2] = rng.uniform(0.01, 0.05, m2.sum())
+            cx2, cy2 = lrng.randint(15, W - 25), lrng.randint(H // 3, H - 15)
+            r2 = int(20 + 24 * inten)
+            pool2 = (X - cx2)**2 + (Y - cy2)**2 <= r2**2
+            flood_mask |= pool2 & (edge_noise > 0.30)
+        # Streets/yards flood first, then erode raised building footprints —
+        # a flooded scene still shows roofs poking above shallow water.
+        for (bx, by, bw, bh) in buildings:
+            if depth_ft < 3.0:
+                flood_mask[by:by+bh, bx:bx+bw] = False
 
-    # Normalize
-    p97 = np.percentile(base, 97) + 1e-8
-    arr = np.clip(base / p97, 0, 1)
+    if not optical:
+        base[flood_mask] = rng.uniform(0.02, 0.08, flood_mask.sum())
 
-    # Altis blue-gray palette
-    rgb          = np.zeros((H, W, 3), dtype=np.uint8)
-    rgb[:, :, 0] = (arr * 155).astype(np.uint8)
-    rgb[:, :, 1] = (arr * 178).astype(np.uint8)
-    rgb[:, :, 2] = (arr * 205).astype(np.uint8)
+    arr_img = Image.fromarray((np.clip(base / (np.percentile(base, 98) + 1e-8), 0, 1) * 255).astype(np.uint8))
+    if optical:
+        arr_img = arr_img.filter(ImageFilter.GaussianBlur(radius=0.6))
+    arr = np.asarray(arr_img, dtype=np.float32) / 255.0
 
-    img    = Image.fromarray(rgb)
+    rgb = np.zeros((H, W, 3), dtype=np.float32)
+    if optical:
+        # Natural aerial palette: green vegetation, warm-gray hardscape.
+        rgb[:, :, 0] = arr * 95  + rgb_extra[:, :, 0]
+        rgb[:, :, 1] = arr * 138 + rgb_extra[:, :, 1]
+        rgb[:, :, 2] = arr * 80  + rgb_extra[:, :, 2]
+        if flood_mask.any():
+            shade = arr[flood_mask]
+            rgb[flood_mask, 0] = 35 + shade * 20
+            rgb[flood_mask, 1] = 130 + shade * 70
+            rgb[flood_mask, 2] = 195 + shade * 55
+    else:
+        # Altis blue-gray SAR palette (dark = low backscatter = water/shadow)
+        rgb[:, :, 0] = arr * 150
+        rgb[:, :, 1] = arr * 172
+        rgb[:, :, 2] = arr * 198
+
+    rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+    img = Image.fromarray(rgb)
+    if not optical:
+        img = img.filter(ImageFilter.GaussianBlur(radius=0.4))  # softens speckle just enough to avoid pure pixel noise
+
     buffer = io.BytesIO()
     img.save(buffer, format='PNG')
     b64 = base64.b64encode(buffer.getvalue()).decode()
     return f"data:image/png;base64,{b64}"
 
 
-def get_sar_thumbnails(property_id: str, depth_ft: float) -> dict:
+def get_sar_thumbnails(property_id: str, depth_ft: float, view: str = 'sar') -> dict:
     """
-    Return pre/post SAR thumbnail data URLs for a property.
-    Checks GEE cache first, falls back to synthetic generation.
+    Return pre/post thumbnail data URLs for a property and sensor view
+    ('sar' or 'optical'). Checks GEE cache first, falls back to synthetic.
     """
     from backend.database import get_cached_thumbnail
 
-    pre_url  = get_cached_thumbnail(property_id, is_post=False)
-    post_url = get_cached_thumbnail(property_id, is_post=True)
+    # Only real SAR tiles are cached; optical always uses the synthetic path.
+    pre_url = post_url = None
+    if view == 'sar':
+        pre_url  = get_cached_thumbnail(property_id, is_post=False)
+        post_url = get_cached_thumbnail(property_id, is_post=True)
 
     if not pre_url:
-        pre_url  = generate_synthetic_thumbnail(property_id, depth_ft, is_post=False)
+        pre_url  = generate_synthetic_thumbnail(property_id, depth_ft, is_post=False, view=view)
     if not post_url:
-        post_url = generate_synthetic_thumbnail(property_id, depth_ft, is_post=True)
+        post_url = generate_synthetic_thumbnail(property_id, depth_ft, is_post=True, view=view)
 
     return {
         'property_id': property_id,
+        'view':        view,
         'pre_url':     pre_url,
         'post_url':    post_url,
         'is_real_sar': False,   # Will be True when GEE thumbnails are cached

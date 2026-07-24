@@ -15,14 +15,14 @@ export default function PortfoliosPanel({ portfolios, activePortfolioId, onSelec
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '0 20px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>Portfolios</div>
+          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>Portfolios</div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
             {portfolios.length} saved
           </div>
         </div>
         <button onClick={onUploadClick} style={{
           background: 'rgba(168,212,230,0.1)', border: '1px solid rgba(168,212,230,0.25)',
-          borderRadius: 'var(--r-sm)', color: '#A8D4E6', fontSize: '0.68rem', fontWeight: 700,
+          borderRadius: 'var(--r-sm)', color: 'var(--teal)', fontSize: '0.68rem', fontWeight: 700,
           padding: '6px 10px', cursor: 'pointer', fontFamily: 'var(--font)',
         }}>
           + New
@@ -50,11 +50,11 @@ export default function PortfoliosPanel({ portfolios, activePortfolioId, onSelec
                 cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
                 transition: 'background 0.15s ease',
               }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--wa-04)'; }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: active ? '#A8D4E6' : '#fff' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: active ? 'var(--teal)' : '#fff' }}>
                   {p.id}
                 </span>
                 <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>
