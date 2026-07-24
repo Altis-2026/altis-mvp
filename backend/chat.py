@@ -152,7 +152,7 @@ def ask(message: str, history: list[dict] | None, event_meta: dict | None,
         portfolio_summary: dict | None = None) -> str:
     if not OPENROUTER_API_KEY:
         raise ChatError(
-            "Chat isn't configured — OPENROUTER_API_KEY is missing from the backend "
+            "Chat isn't configured. OPENROUTER_API_KEY is missing from the backend "
             "environment. Set it in your .env and restart the server."
         )
 

@@ -435,6 +435,7 @@ export default function App() {
           eventStats={stats}
           selectedProperty={selectedProperty}
           portfolioId={portfolioAnalyzed ? portfolioId : null}
+          panelOpen={!!activePanel}
         />
       )}
 
