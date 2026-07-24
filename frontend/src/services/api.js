@@ -167,6 +167,19 @@ export const api = {
     body: JSON.stringify(payload),
   }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
 
-  /* Health — also used by AccessGate to detect whether the demo gate is on */
+  /* One-click adjuster note draft (LLM w/ deterministic fallback) */
+  draftNote: (property, eventLabel) => authFetch('/property/draft-note', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ property, event_label: eventLabel || null }),
+  }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+
+  /* Health — open even when the demo gate is on (hosting healthchecks) */
   health: () => get('/health'),
+
+  /* Gate probe — 401 when the demo gate is on and no valid code is stored.
+     AccessGate must use this, NOT health(): health is deliberately
+     unauthenticated so platform healthchecks pass, which makes it blind to
+     the gate. */
+  authCheck: () => get('/auth-check'),
 };

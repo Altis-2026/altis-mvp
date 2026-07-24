@@ -43,6 +43,7 @@ export default function Globe({
   const pinsReady    = useRef(false);
   const [showFema,  setShowFema]  = useState(false);
   const [showTrack, setShowTrack] = useState(true);
+  const [showHeat,  setShowHeat]  = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.5);
 
   /* ── Initialize map ─────────────────────────────────────────── */
@@ -86,6 +87,32 @@ export default function Globe({
         cluster:       true,
         clusterMaxZoom: 11,
         clusterRadius:  48,
+      });
+
+      /* ── Exposure heat layer — dollar-weighted concentration view for the
+         exec/underwriting audience. Unclustered twin source (heatmaps can't
+         read a clustered one); added first so every pin layer stacks above
+         it — pins always stay visible. Off until toggled. */
+      map.addSource('exposure-heat', { type: 'geojson', data: emptyFC() });
+      map.addLayer({
+        id:     'exposure-heatmap',
+        type:   'heatmap',
+        source: 'exposure-heat',
+        layout: { visibility: 'none' },
+        maxzoom: 15,
+        paint: {
+          'heatmap-weight':    ['get', 'heat_w'],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 4, 0.7, 10, 1.4],
+          'heatmap-radius':    ['interpolate', ['linear'], ['zoom'], 4, 18, 9, 42, 13, 64],
+          'heatmap-opacity':   ['interpolate', ['linear'], ['zoom'], 4, 0.62, 13, 0.45, 15, 0],
+          'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
+            0,    'rgba(0,0,0,0)',
+            0.15, 'rgba(107,143,163,0.35)',
+            0.4,  'rgba(168,212,230,0.55)',
+            0.65, 'rgba(212,176,104,0.75)',
+            0.85, 'rgba(255,120,60,0.85)',
+            1,    'rgba(255,68,68,0.95)'],
+        }
       });
 
       /* Cluster halos */
@@ -536,6 +563,39 @@ export default function Globe({
     });
   }, [zoneBbox]);
 
+  /* ── Exposure heat data + visibility ─────────────────────────── */
+  useEffect(() => {
+    if (!pinsReady.current || !mapRef.current) return;
+    const map = mapRef.current;
+    const src = map.getSource('exposure-heat');
+    if (!src) return;
+
+    // Whatever book is on screen, weighted by what a carrier cares about:
+    // estimated loss where analyzed, coverage exposure otherwise, flood
+    // depth as the last resort. Normalized 0.15–1 so a single giant policy
+    // doesn't wash out the rest of the map.
+    const all = [...properties, ...portfolioProperties]
+      .filter(p => p.latitude && p.longitude);
+    const val = p => +p.severity_mid_usd || +p.coverage_amount
+                  || (+p.max_depth_ft || 0) * 50000 || 0;
+    const max = Math.max(1, ...all.map(val));
+    src.setData({
+      type: 'FeatureCollection',
+      features: all.map(p => ({
+        type:       'Feature',
+        geometry:   { type: 'Point', coordinates: [+p.longitude, +p.latitude] },
+        properties: { heat_w: Math.max(0.15, val(p) / max) },
+      }))
+    });
+  }, [properties, portfolioProperties]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer('exposure-heatmap')) return;
+    map.setLayoutProperty('exposure-heatmap', 'visibility',
+                          showHeat ? 'visible' : 'none');
+  }, [showHeat]);
+
   /* ── Storm track overlay ─────────────────────────────────────── */
   useEffect(() => {
     const map = mapRef.current;
@@ -744,6 +804,12 @@ export default function Globe({
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {hasAnyPins && (
+            <button onClick={() => setShowHeat(v => !v)} style={toggleStyle(showHeat)}
+                    title="Dollar-weighted exposure concentration — estimated loss where analyzed, coverage otherwise. Pins stay on.">
+              ◉ Exposure heat
+            </button>
+          )}
           {stormTrack && (
             <button
               onClick={() => {

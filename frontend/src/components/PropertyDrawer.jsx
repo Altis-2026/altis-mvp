@@ -60,8 +60,14 @@ function Mrow({ label, tech, value }) {
   );
 }
 
-export default function PropertyDrawer({ property, eventId, liveEventDate, onClose, onAddToCompare, isInCompare, compareFull, onFeedbackSaved }) {
+export default function PropertyDrawer({ property, eventId, liveEventDate, onClose, onAddToCompare, isInCompare, compareFull, onFeedbackSaved, eventLabel, durationSlices }) {
   const [sarView, setSarView] = useState('sar'); // 'sar' | 'optical'
+
+  /* One-click drafted claim-file note */
+  const [draft, setDraft]           = useState(null);   // { note, source }
+  const [drafting, setDrafting]     = useState(false);
+  const [draftErr, setDraftErr]     = useState('');
+  const [copied, setCopied]         = useState(false);
 
   /* Adjuster feedback (human-in-the-loop ground truth) */
   const [verdict, setVerdict]       = useState(null);   // 'up' | 'down' | null
@@ -74,7 +80,30 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   useEffect(() => {
     setVerdict(null); setCorrected(''); setNote('');
     setFbStatus('idle'); setFbError('');
+    setDraft(null); setDrafting(false); setDraftErr(''); setCopied(false);
   }, [property?.property_id]);
+
+  const runDraftNote = async () => {
+    if (drafting) return;
+    setDrafting(true);
+    setDraftErr('');
+    try {
+      const res = await api.draftNote(property, eventLabel);
+      setDraft(res);
+    } catch (e) {
+      setDraftErr(e?.detail || 'Could not draft the note.');
+    } finally {
+      setDrafting(false);
+    }
+  };
+
+  const copyDraft = async () => {
+    try {
+      await navigator.clipboard.writeText(draft.note);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* clipboard unavailable — text stays selectable */ }
+  };
 
   if (!property) return null;
 
@@ -406,6 +435,63 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             </div>
           </div>
 
+          {/* Inundation timeline — per-slice flooded fraction across the post
+              window (live analyses persist flood_slices; slice date ranges
+              come from analysis meta). Shows the water arriving and receding
+              pass by pass — data competitors' static "after photo" can't show. */}
+          {(() => {
+            const slices = parseJsonField(property.flood_slices);
+            if (!Array.isArray(slices) || !slices.some(v => v != null)) return null;
+            const maxV = Math.max(0.05, ...slices.filter(v => v != null));
+            return (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{
+                  fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em',
+                  color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 10,
+                }}>
+                  Inundation Timeline
+                </div>
+                <div style={{
+                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 'var(--r-md)', padding: '14px 14px 10px',
+                }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 64 }}>
+                    {slices.map((v, i) => {
+                      const meta = durationSlices?.[i];
+                      const noPass = v == null;
+                      const h = noPass ? 4 : Math.max(4, Math.round((v / maxV) * 56));
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column',
+                                              alignItems: 'center', gap: 4 }}
+                             title={noPass
+                               ? `No satellite pass${meta ? ` (${meta.start} – ${meta.end})` : ''}`
+                               : `${(v * 100).toFixed(0)}% of parcel flooded${meta ? ` (${meta.start} – ${meta.end})` : ''}`}>
+                          <div style={{
+                            width: '100%', height: h, borderRadius: 3,
+                            background: noPass
+                              ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.06), rgba(255,255,255,0.06) 3px, transparent 3px, transparent 6px)'
+                              : 'linear-gradient(180deg, #A8D4E6, #4A7FA8)',
+                            opacity: noPass ? 1 : 0.55 + 0.45 * (v / maxV),
+                            transition: 'height 0.5s ease',
+                          }} />
+                          <span style={{ fontSize: '0.54rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                            {meta ? meta.start.slice(5) : `P${i + 1}`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.45 }}>
+                    Flooded fraction of this parcel per satellite pass window.
+                    {durDays != null && durDays > 0 && ` Water persisted ~${durDays} days.`}
+                    {durDays === 0 && ' Drained before the next pass.'}
+                    {' '}Hatched = no usable pass in that window.
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Estimated claim severity (reserving aid) */}
           {sevLow != null && sevHigh != null && (
             <div style={{
@@ -566,6 +652,63 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               </p>
             </div>
           )}
+
+          {/* One-click drafted claim-file note — turns the analysis into text
+              an adjuster can paste straight into their claims system. */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{
+              fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em',
+              color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 10,
+            }}>
+              Claim-File Note
+            </div>
+            {draft ? (
+              <div style={{
+                background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(168,212,230,0.18)',
+                borderRadius: 'var(--r-md)', padding: '14px',
+              }}>
+                <p style={{ fontSize: '0.78rem', color: '#ccc', lineHeight: 1.65, margin: '0 0 12px', userSelect: 'text' }}>
+                  {draft.note}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button onClick={copyDraft} style={{
+                    padding: '8px 16px', borderRadius: 'var(--r-md)', border: 'none',
+                    background: copied ? '#4CAF82' : 'linear-gradient(135deg, #DDF1FB, #8FC4E8)',
+                    color: '#000', fontSize: '0.74rem', fontWeight: 800,
+                    cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background 0.2s',
+                  }}>
+                    {copied ? '✓ Copied' : 'Copy to clipboard'}
+                  </button>
+                  <button onClick={runDraftNote} disabled={drafting} style={{
+                    padding: '8px 14px', borderRadius: 'var(--r-md)',
+                    background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                    color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 600,
+                    cursor: drafting ? 'wait' : 'pointer', fontFamily: 'var(--font)',
+                  }}>
+                    {drafting ? 'Redrafting…' : 'Redraft'}
+                  </button>
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-disabled)', marginLeft: 'auto' }}>
+                    {draft.source === 'llm' ? 'AI-drafted — review before use' : 'Template draft'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <button onClick={runDraftNote} disabled={drafting} style={{
+                  width: '100%', padding: '11px 0', borderRadius: 'var(--r-md)',
+                  background: 'rgba(168,212,230,0.08)', border: '1px solid rgba(168,212,230,0.25)',
+                  color: '#A8D4E6', fontSize: '0.78rem', fontWeight: 700,
+                  cursor: drafting ? 'wait' : 'pointer', fontFamily: 'var(--font)',
+                  letterSpacing: '0.02em', transition: 'background 0.15s',
+                }}>
+                  {drafting ? 'Drafting from satellite analysis…' : '✎ Draft claim-file note'}
+                </button>
+                {draftErr && (
+                  <div style={{ fontSize: '0.7rem', color: '#FF6B6B', marginTop: 8 }}>{draftErr}</div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Adjuster feedback — human-in-the-loop ground truth */}
           <div style={{ marginBottom: 24 }}>

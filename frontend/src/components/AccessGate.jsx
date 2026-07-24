@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { api, setDemoCode } from '../services/api.js';
+import { AltisLogo } from './Brand.jsx';
 
 /*
  * AccessGate — lightweight shared-password screen for a public demo/investor
  * link. Wraps the whole app in main.jsx. Does nothing (renders children
  * immediately) unless the backend has DEMO_PASSWORD configured — checked by
- * calling /api/health with whatever code (if any) is already stored; a 200
- * means either there's no gate at all, or a previously-entered code is still
- * good. Only a 401 triggers the prompt screen.
+ * calling /api/auth-check with whatever code (if any) is already stored; a
+ * 200 means either there's no gate at all, or a previously-entered code is
+ * still good. Only a 401 triggers the prompt screen. (/api/health can't be
+ * the probe: it's deliberately unauthenticated so hosting healthchecks pass.)
  */
 export default function AccessGate({ children }) {
   const [status, setStatus] = useState('checking'); // checking | locked | unlocked | offline
@@ -17,7 +19,7 @@ export default function AccessGate({ children }) {
 
   const probe = async () => {
     try {
-      await api.health();
+      await api.authCheck();
       setStatus('unlocked');
     } catch (err) {
       if (err?.status === 401) {
@@ -38,7 +40,7 @@ export default function AccessGate({ children }) {
     setError('');
     setDemoCode(code.trim());
     try {
-      await api.health();
+      await api.authCheck();
       setStatus('unlocked');
     } catch (err) {
       setDemoCode(null);
@@ -59,6 +61,9 @@ export default function AccessGate({ children }) {
       background: '#000004', fontFamily: "'Plus Jakarta Sans', sans-serif",
     }}>
       <div style={{ width: 'min(360px, 88vw)', textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+          <AltisLogo size={54} idSuffix="Gate" />
+        </div>
         <div style={{
           fontSize: '1.3rem', fontWeight: 800, letterSpacing: '0.14em', marginBottom: 6,
           background: 'linear-gradient(135deg, #DDF1FB, #8FC4E8)',

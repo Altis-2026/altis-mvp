@@ -401,6 +401,8 @@ export default function App() {
         property={selectedProperty}
         eventId={selectedEvent}
         liveEventDate={liveEventDate}
+        eventLabel={liveMeta?.label || selectedEventMeta?.label}
+        durationSlices={liveMeta?.duration_slices}
         onClose={() => setSelectedProperty(null)}
         onAddToCompare={addToCompare}
         isInCompare={selectedProperty ? compareIds.has(selectedProperty.property_id) : false}

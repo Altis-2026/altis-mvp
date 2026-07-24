@@ -977,6 +977,34 @@ def chat(body: dict = Body(...)):
                     return 0.0
 
             top = sorted(analyzed, key=lambda r: -_n(r.get('severity_high_usd')))[:5]
+
+            # Underwriting / trend aggregates — flood-zone mix, depth
+            # distribution, and a by-city rollup so the assistant can read
+            # book-level patterns without ever inventing a number.
+            zone_mix: dict = {}
+            for r in analyzed:
+                z = r.get('flood_zone')
+                z = z if z and z not in ('null', 'unavailable') else 'none/unknown'
+                zone_mix[z] = zone_mix.get(z, 0) + 1
+            depths = [_n(r.get('max_depth_ft')) for r in analyzed]
+            depth_buckets = {
+                'dry (<0.1 ft)':      sum(1 for d in depths if d < 0.1),
+                'minor (0.1-1 ft)':   sum(1 for d in depths if 0.1 <= d < 1),
+                'moderate (1-3 ft)':  sum(1 for d in depths if 1 <= d < 3),
+                'severe (3+ ft)':     sum(1 for d in depths if d >= 3),
+            }
+            by_city: dict = {}
+            for r in analyzed:
+                city = (r.get('city') or '').strip() or 'unknown'
+                b = by_city.setdefault(city, {'properties': 0, 'dispatch': 0,
+                                              'tiv': 0, 'est_loss_mid': 0})
+                b['properties'] += 1
+                b['dispatch'] += 1 if r.get('impact_class') == 'Dispatch' else 0
+                b['tiv'] += int(_n(r.get('coverage_amount')))
+                b['est_loss_mid'] += int(_n(r.get('severity_mid_usd')))
+            worst_cities = dict(sorted(by_city.items(),
+                                       key=lambda kv: -kv[1]['est_loss_mid'])[:6])
+
             portfolio_summary = {
                 'portfolio_id': pid,
                 'exposure': meta.get('exposure'),
@@ -985,6 +1013,9 @@ def chat(body: dict = Body(...)):
                 'class_counts': {c: sum(1 for r in analyzed if r['impact_class'] == c)
                                  for c in ('Dispatch', 'Review', 'Remote-Approve',
                                            'Remote-Deny', 'No Coverage')},
+                'flood_zone_mix': zone_mix,
+                'depth_distribution': depth_buckets,
+                'by_city_rollup': worst_cities,
                 'flags': {
                     'subrogation_candidates': sum(1 for r in analyzed if r.get('subrogation_flag')),
                     'surge_verification_suggested': sum(1 for r in analyzed if r.get('surge_check_flag')),
@@ -1014,7 +1045,33 @@ def chat(body: dict = Body(...)):
     return {"reply": reply}
 
 
+@app.post("/api/property/draft-note")
+def property_draft_note(body: dict = Body(...)):
+    """
+    One-click professional claim-file note for a property. The frontend sends
+    the property row it already has; LLM-drafted when OPENROUTER_API_KEY is
+    configured, deterministic template otherwise — the button always works.
+    """
+    from backend.chat import draft_adjuster_note
+
+    row = body.get("property")
+    if not isinstance(row, dict) or not row:
+        raise HTTPException(400, "property is required.")
+    return draft_adjuster_note(row, body.get("event_label") or None)
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/auth-check")
+def auth_check():
+    """
+    Gate probe for the frontend AccessGate. Unlike /api/health (which must
+    stay open so hosting platforms' healthchecks pass), this sits behind the
+    demo-password gate like every other route: 200 means "no gate configured,
+    or your stored code is valid"; 401 means "show the password screen."
+    """
+    return {"ok": True}
+
 
 @app.get("/api/health")
 def health():

@@ -383,6 +383,16 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'vh_available':      row['vh_available'],
             'vh_water_pct':      round(row['vh_water_pct'], 4),
             'duration_days':     duration_days,
+            # Per-slice flooded fraction across the post window (None where no
+            # scene covered the slice) — powers the drawer's inundation
+            # timeline. Slice date ranges live in meta['duration_slices'].
+            'flood_slices':      json.dumps([
+                (round(float(s[f'flood_s{i}']), 4)
+                 if s.get(f'flood_s{i}') is not None
+                 and not (isinstance(s.get(f'flood_s{i}'), float)
+                          and math.isnan(s.get(f'flood_s{i}')))
+                 else None)
+                for i in range(n_slices)]),
             'ndvi_delta':        round(ndvi_delta, 3) if ndvi_valid else None,
             'vegetation_loss':   int(ndvi_valid and ndvi_delta >= VEGETATION['loss_flag_delta']),
             'near_water_flag':   near_water,
