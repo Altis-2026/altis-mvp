@@ -33,7 +33,7 @@ from typing import Optional
 
 import pandas as pd
 from fastapi import (
-    FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Body, Depends, Header,
+    FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Body, Depends, Header, Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -79,9 +79,14 @@ from pipeline.config import EVENTS
 _demo_pass = os.getenv('DEMO_PASSWORD')
 
 
-def require_demo_auth(x_demo_password: str = Header(default=None)):
+def require_demo_auth(request: Request, x_demo_password: str = Header(default=None)):
     if not _demo_pass:
         return  # gate disabled — no DEMO_PASSWORD configured
+    if request.url.path == "/api/health":
+        return  # must stay reachable unauthenticated — hosting platforms
+        # (Railway, Render, Cloud Run, ...) probe this for liveness and
+        # never send our custom auth header, so gating it would make every
+        # deploy fail its healthcheck and get killed as "unhealthy."
     if not (x_demo_password and secrets.compare_digest(x_demo_password, _demo_pass)):
         raise HTTPException(401, "Access code required.")
 
