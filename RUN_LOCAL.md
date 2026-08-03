@@ -105,12 +105,39 @@ Open **http://localhost:5173**. The globe should render and slowly rotate.
 
 8. **Real FEMA validation + calibration** (needs internet, no key):
    ```bash
-   python validation/accuracy_check.py --event harvey
+   python validation/accuracy_check.py --event harvey --event ian
    ```
-   This writes `outputs/validation_harvey.md` and `outputs/calibration_harvey.json`,
-   which then populate the Reports reliability chart and the PDF's precision/recall
-   section. Any adjuster verdicts you submitted in step 2 are merged as
-   property-level ground truth.
+   Fetches real FEMA Individual Assistance records for each disaster, compares
+   them against Altis's output by zip code, fits a calibrated flood-probability
+   map on a zip-grouped hold-out, and writes:
+
+   - `outputs/validation_{event}.md` — correlation report, zip-level detail,
+     precision/recall by triage category, and the stated limitations
+   - `outputs/calibration_{event}.json` — the fitted calibrator plus held-out
+     Brier score and expected calibration error
+
+   **These files are what turn the confidence badge into a defensible number.**
+   Once they exist, Altis replays the fitted calibrator at inference time and
+   every analysed property gains a `flood_probability`: a calibrated P(flooded)
+   anchored to FEMA ground truth, shown in the property drawer, the claims
+   grid, and the Guidewire/Duck Creek exports. It is deliberately kept separate
+   from `confidence_score` (which is decision confidence, not a probability),
+   and it is simply absent until this step has been run — Altis never invents
+   the number.
+
+   Live analysis has no FEMA disaster of its own, so it borrows a fitted
+   event's calibrator and reports which one it used. Control the preference
+   order with `CALIBRATION_EVENT_ORDER` (default `harvey,ian`).
+
+   Lismore is intentionally unsupported here: FEMA is US-only, and there is no
+   equivalent open Australian per-zip assistance dataset to validate against.
+
+   To ship the result to production, commit the generated
+   `outputs/calibration_*.json` and redeploy — `outputs/` is copied into the
+   Docker image, so the deployed backend picks it up automatically.
+
+   Any adjuster verdicts submitted in step 2 are merged first and override the
+   coarse zip-level FEMA label, since a human verdict is per-house truth.
 
 9. **Live event detection** (needs internet, no key):
    ```bash

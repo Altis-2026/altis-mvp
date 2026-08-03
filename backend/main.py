@@ -48,6 +48,7 @@ from backend.database import (
     save_run, list_runs, update_run_status,
 )
 from backend.priority import rank_dispatch
+from backend.calibrated_confidence import attach_flood_probability
 from backend.geocoder import geocode_batch
 from backend.gee_service import get_flood_tile_url, get_sar_thumbnails
 from backend.ingestion import (
@@ -148,10 +149,15 @@ def get_properties(event_id: str):
             if isinstance(v, float) and (v != v):  # NaN check
                 p[k] = None
 
+    # Calibrated P(flooded) from this event's own FEMA-fitted calibrator when
+    # one exists. Absent (not zero, not guessed) until validation has run.
+    calib_prov = attach_flood_probability(properties, event_id)
+
     return {
         "event_id":   event_id,
         "properties": properties,
         "stats":      get_event_stats(df),
+        "calibration": calib_prov,
     }
 
 
@@ -456,6 +462,7 @@ async def analyze_portfolio(portfolio_id: str, event_id: str,
             }
         results.append(result)
 
+    attach_flood_probability(results, event_id)
     save_analysis_results(portfolio_id, event_id, results)
 
     return {
@@ -579,6 +586,16 @@ def analyze_portfolio_live_endpoint(portfolio_id: str, body: dict = Body(...)):
                                  f"(days before/after the event date).")
 
     results = out['results'] + excluded
+
+    # Calibrated P(flooded) per property, replayed from a calibrator fitted
+    # against real FEMA ground truth (validation/accuracy_check.py). Live runs
+    # have no disaster of their own, so this borrows a fitted event's
+    # calibration and records which one. Silently absent (never fabricated)
+    # until a calibration has actually been fitted.
+    calib_prov = attach_flood_probability(results, None)
+    if calib_prov:
+        out['meta']['calibration'] = calib_prov
+
     save_analysis_results(portfolio_id, 'live', results)
     save_analysis_meta(portfolio_id, 'live', out['meta'])
     if event_date:
@@ -601,6 +618,9 @@ def get_results(portfolio_id: str, event_id: str):
     results = get_analysis_results(portfolio_id, event_id)
     if not results:
         raise HTTPException(404, "No analysis results found. Run analyze first.")
+    # Live runs already persisted a calibrated probability; re-attaching is
+    # idempotent and backfills rows analysed before a calibration existed.
+    attach_flood_probability(results, None if event_id == 'live' else event_id)
     return {
         "portfolio_id": portfolio_id,
         "event_id":     event_id,
@@ -833,6 +853,7 @@ def get_dispatch_queue(event_id: str, classes: str = "Dispatch,Review"):
                 p[k] = None
 
     queue = rank_dispatch(records, classes=wanted)
+    attach_flood_probability(queue, event_id)
     return {
         "event_id":  event_id,
         "count":     len(queue),

@@ -130,6 +130,8 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   // value or a reason. Never a silent blank, never a placeholder zero.
   const num = (v) => (v == null || v === '' || Number.isNaN(+v) ? null : +v);
   const isLiveResult = property.rain_mm !== undefined;
+  // Calibrated P(flooded), present only once a calibration has been fitted.
+  const floodProb = num(property.flood_probability);
   const rainMm    = num(property.rain_mm);
   const durDays   = num(property.duration_days);
   const sevLow    = num(property.severity_low_usd);
@@ -274,11 +276,38 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <ConfidenceGauge value={conf} color={color} />
-              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
-                CONFIDENCE
+              <span
+                title="How sure the model is about this triage decision. A model-internal score, not a validated probability."
+                style={{ fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.08em', cursor: 'help' }}>
+                DECISION CONFIDENCE
               </span>
             </div>
           </div>
+          )}
+
+          {/* Calibrated probability that this property actually flooded.
+              Distinct from decision confidence above: this one is fitted
+              against real FEMA ground truth and is only shown once that
+              calibration exists. */}
+          {!notAnalyzed && floodProb != null && (
+            <div style={{
+              marginTop: 14, padding: '10px 12px', borderRadius: 'var(--r-md)',
+              background: 'rgba(76,175,130,0.06)', border: '1px solid rgba(76,175,130,0.22)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--approve)', textTransform: 'uppercase' }}>
+                  Validated flood probability
+                </span>
+                <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  {floodProb.toFixed(0)}%
+                </strong>
+              </div>
+              <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
+                Calibrated against FEMA Individual Assistance ground truth
+                {property.flood_probability_source ? ` (${property.flood_probability_source})` : ''}.
+                Labels are zip-resolution, so treat this as FEMA-anchored, not per-house verified.
+              </div>
+            </div>
           )}
         </div>
 

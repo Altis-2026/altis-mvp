@@ -79,6 +79,13 @@ from radar and route to manual Review; FEMA NFHL flood zones exist only for US \
 properties; optical Sentinel-2 imagery requires a cloud-free pass.
 - Loss figures are depth-damage reserving estimates for claims operations, not \
 adjusted claims. Say so if the user treats them as final.
+- Two different numbers exist and must not be conflated. Confidence score is how \
+sure the model is about the triage decision; it is a model-internal score, not a \
+probability. Flood probability, when present, is a calibrated probability that the \
+property flooded, fitted against FEMA Individual Assistance ground truth at \
+zip-code resolution. If flood probability is absent, say calibration has not been \
+run for this event rather than presenting confidence as if it were validated \
+accuracy.
 - Never invent claims numbers, adjuster names, or addresses not present in CONTEXT.
 """
 
@@ -113,7 +120,8 @@ def _build_context(event_meta: dict | None, event_stats: dict | None,
         keep = ('property_id', 'address', 'impact_class', 'max_depth_ft',
                 'pct_flooded', 'confidence_score', 'adjuster_note', 'flood_zone',
                 'sfha_flag', 'severity_mid_usd', 'coverage_amount',
-                'subrogation_flag', 'surge_check_flag', 'duration_days')
+                'subrogation_flag', 'surge_check_flag', 'duration_days',
+                'flood_probability', 'flood_probability_source')
         snippet = {k: property_row.get(k) for k in keep if k in property_row}
         parts.append(f"SELECTED PROPERTY: {json.dumps(snippet, default=str)}")
     return "\n".join(parts) if parts else (
