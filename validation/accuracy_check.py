@@ -98,10 +98,33 @@ COUNTY_FIELD_CANDIDATES = ['county', 'damagedCounty']
 # FEMA DATA FETCH
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _fema_get(params: dict, timeout: int = 60, retries: int = 3, backoff: float = 5.0):
+    """
+    GET against FEMA_API with retries. The public OpenFEMA API is prone to
+    slow responses under sustained request volume — observed in practice: a
+    large paginated fetch for one disaster immediately followed by the very
+    first request for the next one can trip a read timeout, even though the
+    endpoint itself is healthy (retrying shortly after succeeds). Raises the
+    last error if every attempt fails, so callers keep their existing
+    failure handling unchanged.
+    """
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            return requests.get(FEMA_API, params=params, timeout=timeout)
+        except requests.RequestException as e:
+            last_err = e
+            if attempt < retries:
+                print(f"  FEMA request timed out/failed (attempt {attempt}/{retries}), "
+                      f"retrying in {backoff:.0f}s...")
+                time.sleep(backoff)
+    raise last_err
+
+
 def discover_fields() -> list[str]:
     """Probe the live OpenFEMA endpoint for one record to learn actual field names."""
     try:
-        resp = requests.get(FEMA_API, params={'$top': 1}, timeout=20)
+        resp = _fema_get({'$top': 1})
         resp.raise_for_status()
         records = resp.json().get('IndividualAssistanceHousingRegistrantsLargeDisasters', [])
         if records:
@@ -149,11 +172,11 @@ def fetch_fema_data(event_id: str) -> pd.DataFrame:
     while True:
         filter_str = f"disasterNumber eq {meta['disaster_number']}"
         try:
-            resp = requests.get(FEMA_API, params={
+            resp = _fema_get({
                 '$filter': filter_str,
                 '$top':    page_size,
                 '$skip':   skip,
-            }, timeout=30)
+            })
             resp.raise_for_status()
             data    = resp.json()
             records = data.get('IndividualAssistanceHousingRegistrantsLargeDisasters', [])
@@ -683,7 +706,14 @@ if __name__ == '__main__':
     events = args.event or ['harvey', 'ian']
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    for evt in events:
+    for i, evt in enumerate(events):
+        if i > 0:
+            # A brief cooldown between events. A large paginated fetch for one
+            # disaster (Harvey alone can be 200+ sequential requests) followed
+            # immediately by the first request for the next one has been
+            # observed to trip a read timeout on FEMA's side even though nothing
+            # is actually wrong — this gives their API a moment to recover.
+            time.sleep(5)
         try:
             run_validation(evt)
         except FileNotFoundError as e:
