@@ -55,7 +55,10 @@ import requests
 
 BASE_DIR   = Path(__file__).parent.parent
 OUTPUT_DIR = BASE_DIR / 'outputs'
-FEMA_API   = "https://www.fema.gov/api/open/v2/IndividualAssistanceHousingRegistrantsLargeDisasters"
+# This specific dataset lives under v1, not v2 like most current OpenFEMA
+# datasets — confirmed live (200) against v1, while v2 404s. Verified directly
+# against fema.gov rather than assumed; do not "fix" this back to v2.
+FEMA_API   = "https://www.fema.gov/api/open/v1/IndividualAssistanceHousingRegistrantsLargeDisasters"
 
 # Make the pipeline's calibration core importable from this validation script.
 sys.path.insert(0, str(BASE_DIR / 'pipeline'))
