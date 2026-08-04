@@ -167,7 +167,14 @@ def fetch_fema_data(event_id: str) -> pd.DataFrame:
 
     all_records = []
     skip = 0
-    page_size = 1000
+    # Smaller than Harvey's working 1000-row page size on purpose: Ian (DR-4673)
+    # has a much larger underlying registrant volume (Hurricane Ian was one of
+    # the costliest storms on record), and a full 1000-row page computation for
+    # it was consistently exceeding FEMA's server-side response time even
+    # though trivial small-$top requests for the same filter answered
+    # instantly. Smaller pages trade more round trips for each one finishing
+    # well inside the timeout.
+    page_size = 200
 
     while True:
         filter_str = f"disasterNumber eq {meta['disaster_number']}"
