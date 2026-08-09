@@ -44,6 +44,36 @@ def gee_available() -> bool:
     return bool(GEE_SERVICE_ACCOUNT_KEY or GEE_SERVICE_ACCOUNT_KEY_JSON)
 
 
+def _ffh(match):
+    """First-floor height (ft) from an NSI match row, or None."""
+    if not match:
+        return None
+    from pipeline.structures import first_floor_height_ft
+    return first_floor_height_ft(match.get('found_ht'))
+
+
+def _foundation(match):
+    """Human-readable foundation type from an NSI match row, or None."""
+    if not match:
+        return None
+    from pipeline.structures import foundation_label
+    return foundation_label(match.get('found_type'))
+
+
+def _depth_ffe(match, depth_above_ground_ft):
+    """
+    Depth above first floor, or None when the foundation height is unknown.
+
+    Never falls back to depth above ground — reporting an unadjusted number in
+    a field labelled "above first floor" is exactly the confusion Phase 2
+    exists to remove.
+    """
+    if not match:
+        return None
+    from pipeline.structures import depth_above_first_floor
+    return depth_above_first_floor(depth_above_ground_ft, match.get('found_ht'))
+
+
 def init_ee() -> bool:
     """
     Initialize Earth Engine with the service-account credentials. Idempotent.
@@ -249,13 +279,108 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         else f'unavailable: only {with_scenes} post-window slice(s) have scenes')
     print(f"  [signals] {signal_status}")
 
+    # ── Phase 1a: multi-temporal baseline (per-pixel mean/std over ~a year of
+    #    same-orbit pre-event scenes). Degrades to the single pre-event
+    #    composite exactly like every other auxiliary signal here.
+    baseline_mean = baseline_std = None
+    baseline_n = 0
+    base_start = base_end = None
+    try:
+        from pipeline.flood_detect import load_sar_baseline, baseline_window
+        from pipeline.config import BASELINE
+        base_start, base_end = baseline_window(windows['post_start'])
+        baseline_mean, baseline_std, baseline_n = load_sar_baseline(
+            bbox, base_start, base_end, orbit)
+        if baseline_n < BASELINE['min_scenes']:
+            baseline_mean = baseline_std = None
+            signal_status['baseline'] = (
+                f'unavailable: only {baseline_n} pre-event scenes on orbit '
+                f'{orbit} (need {BASELINE["min_scenes"]})')
+        else:
+            signal_status['baseline'] = f'ok: {baseline_n} scenes'
+    except Exception as e:
+        baseline_mean = baseline_std = None
+        signal_status['baseline'] = f'error: {e}'
+        print(f"  [signal] multi-temporal baseline failed: {e}")
+
+    # ── Phase 1c: cross-orbit stacking — every other orbit with post-event
+    #    coverage contributes an independently-thresholded mask.
+    orbit_stack = {}
+    try:
+        from pipeline.flood_detect import load_sar_orbits, load_sar_baseline
+        from pipeline.config import CROSS_ORBIT, BASELINE
+        if CROSS_ORBIT['enabled']:
+            for other, (composite, n_sc) in load_sar_orbits(
+                    bbox, windows['post_start'], windows['post_end']).items():
+                if other == orbit:
+                    continue
+                o_mean, o_std, o_n = (None, None, 0)
+                if base_start:
+                    o_mean, o_std, o_n = load_sar_baseline(
+                        bbox, base_start, base_end, other)
+                    if o_n < BASELINE['min_scenes']:
+                        o_mean = o_std = None
+                orbit_stack[other] = {'post': composite, 'pre': None,
+                                      'baseline_mean': o_mean, 'baseline_std': o_std}
+            signal_status['cross_orbit'] = (
+                f'ok: {len(orbit_stack) + 1} orbits' if orbit_stack
+                else 'unavailable: only one orbit covers this window')
+    except Exception as e:
+        orbit_stack = {}
+        signal_status['cross_orbit'] = f'error: {e}'
+        print(f"  [signal] cross-orbit stacking failed: {e}")
+
+    # ── Phase 1b: HAND for the DEM-hydrology plausibility vote.
+    hand_img, hand_source = None, 'unavailable'
+    try:
+        from pipeline.flood_detect import load_hand
+        hand_img, hand_source = load_hand(bbox)
+        signal_status['hand'] = ('ok' if hand_img is not None
+                                 else f'unavailable: {hand_source}')
+    except Exception as e:
+        signal_status['hand'] = f'error: {e}'
+        print(f"  [signal] HAND failed: {e}")
+
     combined = build_flood_depth_image(
         bbox, pre_img, post_img, dem, wse_radius_m,
         optical_water=optical_water, optical_valid=optical_valid,
         pre_vh=pre_vh, post_vh=post_vh, rain=rain_img,
-        ndvi_pre=ndvi_pre, ndvi_post=ndvi_post, post_slices=post_slices)
+        ndvi_pre=ndvi_pre, ndvi_post=ndvi_post, post_slices=post_slices,
+        hand=hand_img, baseline_mean=baseline_mean, baseline_std=baseline_std,
+        orbit_stack=orbit_stack)
 
-    sampled = sample_properties(combined, props_df, batch_size=100, throttle=False)
+    # ── Phase 2: structure attributes (CONUS only). When a property matches an
+    #    NSI structure we sample its footprint at Sentinel-1's native 10m
+    #    spacing instead of a 50m circle centred on the geocoded point.
+    nsi_by_pid = {}
+    sample_df = props_df.copy()
+    sample_scale = 30
+    try:
+        from pipeline import structures as struct
+        nsi_df = struct.fetch_nsi_structures(bbox, verbose=False)
+        nsi_match = struct.match_properties_to_structures(props_df, nsi_df)
+        n_matched = int(nsi_match['nsi_matched'].sum())
+        nsi_by_pid = {r['property_id']: r for r in nsi_match.to_dict('records')}
+        if n_matched:
+            m = nsi_match.set_index('property_id')
+            sample_df['sample_lat'] = sample_df['property_id'].map(
+                m['nsi_lat'].where(m['nsi_matched']))
+            sample_df['sample_lon'] = sample_df['property_id'].map(
+                m['nsi_lon'].where(m['nsi_matched']))
+            sample_df['sample_radius_m'] = sample_df['property_id'].map(
+                {pid: struct.footprint_radius_m(a) if ok else None
+                 for pid, a, ok in zip(m.index, m['ftprntsqft'], m['nsi_matched'])})
+            sample_scale = 10
+        signal_status['structures'] = (
+            f'ok: {n_matched}/{len(props_df)} matched to NSI structures'
+            if n_matched else 'unavailable: no NSI structures (outside CONUS?)')
+    except Exception as e:
+        nsi_by_pid = {}
+        signal_status['structures'] = f'error: {e}'
+        print(f"  [signal] NSI structures failed: {e}")
+
+    sampled = sample_properties(combined, sample_df, batch_size=100,
+                                throttle=False, scale=sample_scale)
     sampled = sampled.set_index('property_id')
 
     # FEMA NFHL flood zones (US properties only; non-US resolve to None
@@ -297,6 +422,11 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'wse_spread_ft':     float(s.get('wse_spread_ft', 0.0)),
             'vh_available':      int(s.get('vh_available', 0) or 0),
             'vh_water_pct':      float(s.get('vh_water_pct', 0.0) or 0.0),
+            # Phase 1: HAND drives the DEM-hydrology vote when present. Passed
+            # through as-is (including None) — ensemble_votes must be able to
+            # tell "no HAND here" from "HAND is 0", which means at the drainage
+            # line and is the most flood-prone value there is.
+            'hand_ft':           s.get('hand_ft'),
         }
 
         breakdown = confidence_breakdown(row, event_cfg)
@@ -400,6 +530,22 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'surge_check_flag':  int(surge_check),
             'flood_zone':        fema['flood_zone'],
             'sfha_flag':         fema['sfha'],
+            # ── Phase 2: what the adjuster needs to see which number drove the
+            #    call. depth_above_ffe_ft is None (not 0) where the first-floor
+            #    height is unknown, so the drawer can say "unavailable" instead
+            #    of implying the adjustment was made.
+            'first_floor_height_ft': _ffh(nsi_by_pid.get(pid)),
+            'foundation_type':   _foundation(nsi_by_pid.get(pid)),
+            'depth_above_ffe_ft': _depth_ffe(nsi_by_pid.get(pid),
+                                             row['max_depth_ft']),
+            'first_floor_source': ('USACE NSI (modeled)'
+                                   if _ffh(nsi_by_pid.get(pid)) is not None
+                                   else 'unavailable'),
+            'hand_ft':           (round(float(s['hand_ft']), 2)
+                                  if s.get('hand_ft') is not None
+                                  and not (isinstance(s.get('hand_ft'), float)
+                                           and math.isnan(s['hand_ft']))
+                                  else None),
             'severity_low_usd':  sev['low'] if sev else None,
             'severity_mid_usd':  sev['mid'] if sev else None,
             'severity_high_usd': sev['high'] if sev else None,

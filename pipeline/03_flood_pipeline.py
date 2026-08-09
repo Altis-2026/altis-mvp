@@ -11,7 +11,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ee
 import pandas as pd
-from config import GEE_PROJECT, HARVEY, IAN, OUTPUT_DIR, SAR, OPTICAL, UNCERTAINTY
+from config import (GEE_PROJECT, HARVEY, IAN, OUTPUT_DIR, SAR, OPTICAL,
+                    UNCERTAINTY, BASELINE, HAND, CROSS_ORBIT)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
 
@@ -21,7 +22,9 @@ from uncertainty import depth_interval_ft
 from flood_detect import (
     load_dem, otsu_threshold_gee, load_sar_composite,
     load_optical_water_mask, build_flood_depth_image, sample_properties,
+    load_sar_baseline, load_hand, load_sar_orbits, baseline_window,
 )
+import structures as struct
 
 ee.Initialize(project=GEE_PROJECT)
 
@@ -59,18 +62,108 @@ def run_flood_pipeline(event_config):
         print("  No cloud-free S2 scenes in window — optical cross-check unavailable "
               "(expected immediately after a storm; SAR-only result is unaffected)")
 
+    # ── Phase 1a: multi-temporal baseline. A year of same-orbit pre-event
+    #    scenes gives a per-pixel mean and variance, so "is this anomalous?"
+    #    replaces "is this darker than one earlier picture?".
+    base_start, base_end = baseline_window(event_config['post_start'])
+    print(f"\nBuilding multi-temporal baseline ({base_start} → {base_end}, "
+          f"orbit {orbit})...")
+    baseline_mean, baseline_std, baseline_n = load_sar_baseline(
+        event_config['bbox'], base_start, base_end, orbit)
+    if baseline_n >= BASELINE['min_scenes']:
+        print(f"  {baseline_n} baseline scenes — z-score change detection active "
+              f"(threshold {BASELINE['z_threshold']}σ)")
+    else:
+        print(f"  Only {baseline_n} baseline scenes (need "
+              f"{BASELINE['min_scenes']}) — falling back to single pre-event "
+              f"composite")
+        baseline_mean = baseline_std = None
+
+    # ── Phase 1c: cross-orbit stacking. Every other orbit with post-event
+    #    coverage contributes its own independently-thresholded mask, which is
+    #    what shrinks the revisit gap.
+    orbit_stack = {}
+    if CROSS_ORBIT['enabled']:
+        all_orbits = load_sar_orbits(
+            event_config['bbox'], event_config['post_start'], event_config['post_end'])
+        for other, (composite, n_scenes) in all_orbits.items():
+            if other == orbit:
+                continue
+            try:
+                o_pre, _, _ = load_sar_composite(
+                    event_config['bbox'], event_config['pre_start'],
+                    event_config['pre_end'], orbit_pass=other)
+            except ValueError:
+                # No pre-event scene on this orbit. Harmless: the baseline
+                # below is the primary reference, and orbit_flood_mask falls
+                # back to the absolute threshold if neither exists.
+                o_pre = None
+            o_base_mean, o_base_std, o_base_n = load_sar_baseline(
+                event_config['bbox'], base_start, base_end, other)
+            if o_base_n < BASELINE['min_scenes']:
+                o_base_mean = o_base_std = None
+            orbit_stack[other] = {
+                'post': composite, 'pre': o_pre,
+                'baseline_mean': o_base_mean, 'baseline_std': o_base_std,
+            }
+            print(f"  Cross-orbit: {other} contributes {n_scenes} post scenes "
+                  f"({o_base_n} baseline scenes)")
+        if not orbit_stack:
+            print("  Cross-orbit: no second orbit with coverage in this window")
+
+    # ── Phase 1b: HAND replaces the neighbourhood-minimum elevation heuristic
+    #    as the DEM-hydrology plausibility vote.
+    hand_img, hand_source = load_hand(event_config['bbox'])
+    print(f"  HAND source: {hand_source}")
+
     print("\nBuilding flood map (Otsu threshold + slope mask)...")
     combined = build_flood_depth_image(
         event_config['bbox'], pre_image, post_image, dem, event_config['wse_radius_m'],
-        optical_water=optical_water, optical_valid=optical_valid)
+        optical_water=optical_water, optical_valid=optical_valid,
+        hand=hand_img, baseline_mean=baseline_mean, baseline_std=baseline_std,
+        orbit_stack=orbit_stack)
 
-    print("\nSampling properties...")
-    flood_df = sample_properties(combined, properties_df, batch_size=100)
+    # ── Phase 2: structure attributes. Snapping the sample to the structure's
+    #    own footprint replaces a 50m circle that averaged ~33x the building's
+    #    area of street, yard and neighbouring parcels.
+    print("\nFetching National Structure Inventory attributes...")
+    nsi_df = struct.fetch_nsi_structures(event_config['bbox'])
+    nsi_match = struct.match_properties_to_structures(properties_df, nsi_df)
+    n_matched = int(nsi_match['nsi_matched'].sum())
+    print(f"  Matched {n_matched:,}/{len(properties_df):,} properties to a "
+          f"structure within {struct.DEFAULT_MAX_MATCH_M:.0f}m")
 
-    result_df = properties_df.merge(
+    sample_df = properties_df.copy()
+    sample_df['property_id'] = sample_df['property_id'].astype(str)
+    if n_matched:
+        sample_df = sample_df.merge(
+            nsi_match[['property_id', 'nsi_lat', 'nsi_lon', 'ftprntsqft',
+                       'nsi_matched']].assign(
+                property_id=lambda d: d['property_id'].astype(str)),
+            on='property_id', how='left')
+        matched_mask = sample_df['nsi_matched'].fillna(False).astype(bool)
+        sample_df['sample_lat'] = sample_df['nsi_lat'].where(matched_mask)
+        sample_df['sample_lon'] = sample_df['nsi_lon'].where(matched_mask)
+        sample_df['sample_radius_m'] = [
+            struct.footprint_radius_m(a) if m else None
+            for a, m in zip(sample_df['ftprntsqft'], matched_mask)]
+
+    # Footprint-constrained sampling reduces at Sentinel-1's native 10m pixel
+    # spacing; averaging a ~9m structure over 30m pixels would undo the point
+    # of snapping to it in the first place.
+    sample_scale = 10 if n_matched else 30
+    print(f"\nSampling properties (scale {sample_scale}m, "
+          f"{'footprint-constrained' if n_matched else 'fixed 50m buffer'})...")
+    flood_df = sample_properties(combined, sample_df, batch_size=100,
+                                 scale=sample_scale)
+
+    result_df = properties_df.copy()
+    result_df['property_id'] = result_df['property_id'].astype(str)
+    result_df = result_df.merge(
         flood_df[['property_id', 'pct_flooded', 'max_depth_ft', 'urban_flag',
                   'optical_available', 'optical_water_pct', 'wse_spread_ft',
-                  'rel_elev_ft']],
+                  'rel_elev_ft', 'hand_ft']].assign(
+            property_id=lambda d: d['property_id'].astype(str)),
         on='property_id', how='left'
     )
     result_df['pct_flooded']         = result_df['pct_flooded'].fillna(0.0)
@@ -80,7 +173,31 @@ def run_flood_pipeline(event_config):
     result_df['optical_water_pct']   = result_df['optical_water_pct'].fillna(0.0)
     result_df['wse_spread_ft']       = result_df['wse_spread_ft'].fillna(0.0)
     result_df['rel_elev_ft']         = result_df['rel_elev_ft'].fillna(0.0)
+    # hand_ft is deliberately NOT filled: None means "MERIT Hydro has no value
+    # here", and the ensemble must abstain rather than read a filled 0 as
+    # "at the drainage line", which is the most flood-prone value there is.
     result_df['dem_resolution_m']    = dem_res
+
+    # ── Phase 2 columns: first-floor height and depth above it.
+    nsi_cols = nsi_match.assign(
+        property_id=lambda d: d['property_id'].astype(str))
+    result_df = result_df.merge(
+        nsi_cols[['property_id', 'found_ht', 'found_type', 'num_story',
+                  'occtype', 'val_struct', 'val_cont', 'ftprntsqft',
+                  'med_yr_blt', 'nsi_match_m', 'nsi_matched']],
+        on='property_id', how='left')
+    result_df['first_floor_height_ft'] = [
+        struct.first_floor_height_ft(v) for v in result_df['found_ht']]
+    result_df['foundation_type'] = [
+        struct.foundation_label(v) for v in result_df['found_type']]
+    result_df['depth_above_ffe_ft'] = [
+        struct.depth_above_first_floor(d, h)
+        for d, h in zip(result_df['max_depth_ft'], result_df['found_ht'])]
+    # Provenance an adjuster can read: which number drove the call, and where
+    # the first-floor height came from.
+    result_df['first_floor_source'] = [
+        'USACE NSI (modeled)' if m else 'unavailable'
+        for m in result_df['nsi_matched'].fillna(False)]
 
     # Round 3: per-depth ±1σ uncertainty interval, from DEM vertical accuracy
     # combined with the measured local water-surface spread.
@@ -113,9 +230,35 @@ def run_flood_pipeline(event_config):
     result_df.to_csv(out, index=False)
     print(f"\n✓ Saved → {out}")
 
+    ffe = result_df['depth_above_ffe_ft'].dropna()
+    if len(ffe):
+        above_ground = result_df.loc[ffe.index, 'max_depth_ft']
+        print(f"  First-floor height known: {len(ffe):,} properties "
+              f"(mean {result_df['first_floor_height_ft'].dropna().mean():.2f} ft)")
+        print(f"  Mean depth above ground {above_ground.mean():.2f} ft vs "
+              f"above first floor {ffe.mean():.2f} ft — the difference is the "
+              f"bias Phase 2 removes")
+
     write_manifest(event_id, 'flood_detection', {
         'dem_resolution_m':      dem_res,
         'sar_orbit_pass':        orbit,
+        # ── Phase 1 provenance
+        'baseline_window':       [base_start, base_end],
+        'baseline_scene_count':  baseline_n,
+        'baseline_method': (
+            f"per-pixel mean/stdDev z-score, threshold {BASELINE['z_threshold']}σ"
+            if baseline_mean is not None else 'unavailable — single pre-event composite'),
+        'cross_orbit_passes':    sorted([orbit] + list(orbit_stack.keys())),
+        'cross_orbit_combine':   CROSS_ORBIT['combine'] if orbit_stack else 'n/a',
+        'hand_source':           hand_source,
+        'hand_thresholds_ft':    [HAND['plausible_ft'], HAND['implausible_ft']],
+        # ── Phase 2 provenance
+        'structure_source':      'USACE National Structure Inventory',
+        'structures_matched':    int(n_matched),
+        'structure_match_max_m': struct.DEFAULT_MAX_MATCH_M,
+        'sample_geometry': ('structure footprint equal-area circle'
+                            if n_matched else 'fixed 50m buffer'),
+        'sample_scale_m':        sample_scale,
         'pre_event_scene_count': pre_count,
         'post_event_scene_count': post_count,
         'pre_event_window':      [event_config['pre_start'], event_config['pre_end']],

@@ -25,9 +25,11 @@ import ee
 import pandas as pd
 
 try:
-    from config import SAR, OPTICAL, SAR_VH, DURATION, RAIN
+    from config import (SAR, OPTICAL, SAR_VH, DURATION, RAIN,
+                        BASELINE, HAND, CROSS_ORBIT)
 except ImportError:  # pragma: no cover - import path guard
-    from pipeline.config import SAR, OPTICAL, SAR_VH, DURATION, RAIN
+    from pipeline.config import (SAR, OPTICAL, SAR_VH, DURATION, RAIN,
+                                 BASELINE, HAND, CROSS_ORBIT)
 
 
 def load_dem(bbox_coords):
@@ -178,6 +180,133 @@ def load_sar_composite(bbox_coords, start_date, end_date, orbit_pass=None,
     return composite, count, orbit_pass
 
 
+def baseline_window(post_start, months=None, gap_days=None):
+    """
+    Derive the (start, end) dates of the multi-temporal baseline window that
+    ends shortly before an event's post window opens.
+
+    Pure date arithmetic, no Earth Engine — kept separate so it stays unit
+    testable without a network round trip.
+    """
+    from datetime import datetime, timedelta
+
+    months = BASELINE['months'] if months is None else months
+    gap_days = BASELINE['gap_days'] if gap_days is None else gap_days
+
+    end = datetime.strptime(post_start, "%Y-%m-%d") - timedelta(days=gap_days)
+    start = end - timedelta(days=int(round(months * 30.44)))
+    return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+
+def load_sar_baseline(bbox_coords, baseline_start, baseline_end, orbit_pass,
+                      speckle_radius_m=None):
+    """
+    Per-pixel statistical baseline (mean + standard deviation, dB) from a long
+    run of pre-event Sentinel-1 scenes on ONE orbit.
+
+    This is the multi-temporal replacement for a single pre-event composite.
+    Returns (mean_image|None, std_image|None, scene_count). When fewer than
+    BASELINE['min_scenes'] scenes exist the caller is expected to fall back to
+    the single-composite path — we return the count so that decision is made
+    explicitly rather than by silently thresholding on a bad std estimate.
+
+    Same orbit only: ascending and descending passes see different backscatter
+    for the same ground, so a pooled baseline would have inflated variance and
+    a meaningless mean.
+    """
+    if speckle_radius_m is None:
+        speckle_radius_m = SAR['speckle_radius_m']
+
+    bbox = ee.Geometry.Rectangle(bbox_coords)
+    collection = (ee.ImageCollection("COPERNICUS/S1_GRD")
+                  .filterBounds(bbox)
+                  .filterDate(baseline_start, baseline_end)
+                  .filter(ee.Filter.eq('instrumentMode', 'IW'))
+                  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+                  .filter(ee.Filter.eq('orbitProperties_pass', orbit_pass))
+                  .select('VV'))
+
+    count = collection.size().getInfo()
+    if count < 1:
+        return None, None, 0
+
+    # Speckle-filter each scene BEFORE reducing, so the variance we measure is
+    # real scene-to-scene variability rather than per-scene speckle noise.
+    if speckle_radius_m and speckle_radius_m > 0:
+        collection = collection.map(
+            lambda img: img.focal_mean(radius=speckle_radius_m,
+                                       kernelType='circle', units='meters')
+                           .rename('VV').copyProperties(img, ['system:time_start']))
+
+    mean = collection.mean().rename('baseline_mean')
+    std = collection.reduce(ee.Reducer.stdDev()).rename('baseline_std')
+    return mean, std, count
+
+
+def load_hand(bbox_coords):
+    """
+    Height Above Nearest Drainage, in FEET, from MERIT Hydro.
+
+    Returns (image|None, source_label). MERIT Hydro's `hnd` band is global at
+    ~90m and stored in metres. Water bodies and ocean are masked in the source,
+    which is correct behaviour here: a pixel with no HAND value is one where
+    the "how high above drainage" question has no meaning, and the ensemble
+    vote should abstain rather than assume.
+    """
+    if not HAND.get('enabled', True):
+        return None, 'disabled'
+    try:
+        bbox = ee.Geometry.Rectangle(bbox_coords)
+        hand_m = ee.Image(HAND['asset']).select(HAND['band']).clip(bbox)
+        return hand_m.multiply(3.28084).rename('hand_ft'), HAND['asset']
+    except Exception as e:  # pragma: no cover - EE availability guard
+        print(f"  HAND unavailable ({e}); falling back to relative elevation.")
+        return None, 'unavailable'
+
+
+def load_sar_orbits(bbox_coords, start_date, end_date, speckle_radius_m=None,
+                    min_scenes=None):
+    """
+    VV median composite for EVERY orbit pass with data in the window, instead
+    of only the dominant one.
+
+    Returns {orbit_pass: (composite, scene_count)}. Keeping the orbits separate
+    is the whole point — each one carries its own incidence geometry, so each
+    gets its own Otsu threshold and its own baseline downstream, and only the
+    finished boolean flood masks are ever combined.
+
+    This is what shrinks the revisit gap: a flood that peaks between two
+    ascending passes may still have been caught by a descending one.
+    """
+    if speckle_radius_m is None:
+        speckle_radius_m = SAR['speckle_radius_m']
+    if min_scenes is None:
+        min_scenes = CROSS_ORBIT['min_scenes_per_orbit']
+
+    bbox = ee.Geometry.Rectangle(bbox_coords)
+    base = (ee.ImageCollection("COPERNICUS/S1_GRD")
+            .filterBounds(bbox)
+            .filterDate(start_date, end_date)
+            .filter(ee.Filter.eq('instrumentMode', 'IW'))
+            .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+            .select('VV'))
+
+    passes = base.aggregate_array('orbitProperties_pass').getInfo() or []
+    out = {}
+    for orbit in sorted(set(passes)):
+        subset = base.filter(ee.Filter.eq('orbitProperties_pass', orbit))
+        n = subset.size().getInfo()
+        if n < min_scenes:
+            continue
+        composite = subset.median()
+        if speckle_radius_m and speckle_radius_m > 0:
+            composite = composite.focal_mean(
+                radius=speckle_radius_m, kernelType='circle', units='meters'
+            ).rename('VV')
+        out[orbit] = (composite, n)
+    return out
+
+
 def load_sar_vh_composite(bbox_coords, start_date, end_date, orbit_pass):
     """
     Sentinel-1 VH median composite for the dual-polarization cross-check.
@@ -300,39 +429,123 @@ def load_optical_water_mask(bbox_coords, start_date, end_date):
     return water_mask, valid_mask, count
 
 
+def guarded_otsu(image, bbox_coords):
+    """
+    Per-scene Otsu threshold with the open-water range guard applied.
+
+    Factored out because cross-orbit stacking needs one threshold PER ORBIT —
+    ascending and descending scenes have different backscatter distributions,
+    so sharing a single threshold between them would systematically bias one
+    of the two.
+    """
+    raw = ee.Number(otsu_threshold_gee(image, bbox_coords))
+    in_range = raw.gte(SAR['water_db_min']).And(raw.lte(SAR['water_db_max']))
+    return ee.Number(ee.Algorithms.If(in_range, raw, SAR['otsu_fallback_db']))
+
+
+def orbit_flood_mask(post_img, threshold, slope_mask, permanent_water,
+                     pre_img=None, baseline_mean=None, baseline_std=None):
+    """
+    One orbit's flood mask, using the multi-temporal baseline when available.
+
+    Two independent tests, and by default a pixel must pass BOTH:
+
+      1. CHANGE — is this pixel anomalously dark relative to its own baseline
+         distribution? z = (post - baseline_mean) / baseline_std, flood when
+         z <= -z_threshold. This is the multi-temporal upgrade: the comparison
+         is against a whole year of that pixel's own history, so a single
+         unrepresentative pre-event scene can no longer swing the call, and a
+         naturally noisy pixel is held to a proportionally higher bar.
+
+      2. ABSOLUTE — is the backscatter actually in the open-water range?
+         Change alone flags any darkening, including harvested fields and
+         drying pavement, so the absolute Otsu test is what keeps the change
+         test honest.
+
+    Falls back to the original single-pre-scene change detection
+    (post < threshold AND NOT pre < threshold) when no baseline was built.
+    """
+    absolute = post_img.lt(threshold)
+
+    if baseline_mean is not None and baseline_std is not None:
+        std = baseline_std.max(BASELINE['min_std_db'])
+        z_score = post_img.subtract(baseline_mean).divide(std)
+        change = z_score.lte(-BASELINE['z_threshold'])
+        mask = change.And(absolute) if BASELINE['require_absolute'] else change
+    elif pre_img is not None:
+        mask = absolute.And(pre_img.lt(threshold).Not())
+    else:
+        mask = absolute
+
+    return mask.And(slope_mask).And(permanent_water.Not())
+
+
 def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_m,
                             optical_water=None, optical_valid=None,
                             pre_vh=None, post_vh=None, rain=None,
-                            ndvi_pre=None, ndvi_post=None, post_slices=None):
+                            ndvi_pre=None, ndvi_post=None, post_slices=None,
+                            hand=None, baseline_mean=None, baseline_std=None,
+                            orbit_stack=None):
     """
     Build the multi-band analysis image:
-    ['flood', 'depth_ft', 'urban', 'wse_spread_ft', 'rel_elev_ft',
+    ['flood', 'depth_ft', 'urban', 'wse_spread_ft', 'rel_elev_ft', 'hand_ft',
      'optical_water', 'optical_valid'] plus, when inputs are supplied:
     'vh_flood'/'vh_valid' (dual-pol cross-check), 'rain_mm' (CHIRPS event
     total), 'ndvi_delta'/'ndvi_valid' (vegetation loss), 'near_water'
     (proximity to permanent water — subrogation/false-positive context) and
     'flood_s{i}' per post-window slice (inundation duration).
     `post_slices` is a list of (vv_composite|None) per slice.
-    """
-    raw_threshold = ee.Number(otsu_threshold_gee(post_image, bbox_coords))
 
-    in_range = raw_threshold.gte(SAR['water_db_min']).And(
-        raw_threshold.lte(SAR['water_db_max']))
-    threshold = ee.Number(ee.Algorithms.If(
-        in_range, raw_threshold, SAR['otsu_fallback_db']))
+    Phase 1 additions, all optional and all backward compatible — omit them and
+    the detector behaves exactly as before:
+      `hand`          — HAND image (feet) for the DEM-hydrology vote.
+      `baseline_mean` / `baseline_std` — multi-temporal baseline for the
+                        primary orbit.
+      `orbit_stack`   — {orbit_pass: {'post', 'pre', 'baseline_mean',
+                        'baseline_std'}} for cross-orbit stacking. Each orbit
+                        is thresholded and masked independently; only the
+                        finished boolean masks are combined.
+    """
+    threshold = guarded_otsu(post_image, bbox_coords)
 
     slope_mask = ee.Terrain.slope(dem).lt(5)
 
-    pre_water  = pre_image.lt(threshold)
-    post_water = post_image.lt(threshold).And(slope_mask)
+    pre_water = pre_image.lt(threshold)
 
     permanent_water = (ee.Image("JRC/GSW1_4/GlobalSurfaceWater")
                        .select('seasonality').gte(8).unmask(0))
 
-    flood_mask = (post_water
-                  .And(pre_water.Not())
-                  .And(permanent_water.Not())
-                  .rename('flood'))
+    # ── Primary orbit mask (multi-temporal baseline when supplied).
+    primary_mask = orbit_flood_mask(
+        post_image, threshold, slope_mask, permanent_water,
+        pre_img=pre_image, baseline_mean=baseline_mean, baseline_std=baseline_std)
+
+    # ── Cross-orbit stacking: fold in every additional orbit's independent
+    #    mask. Union maximises temporal coverage (the revisit-gap fix); 'agree'
+    #    trades that coverage for precision.
+    masks = [primary_mask]
+    for spec in (orbit_stack or {}).values():
+        post_o = spec.get('post')
+        if post_o is None:
+            continue
+        masks.append(orbit_flood_mask(
+            post_o, guarded_otsu(post_o, bbox_coords), slope_mask, permanent_water,
+            pre_img=spec.get('pre'),
+            baseline_mean=spec.get('baseline_mean'),
+            baseline_std=spec.get('baseline_std')))
+
+    if len(masks) == 1:
+        flood_mask = masks[0].rename('flood')
+    elif CROSS_ORBIT['combine'] == 'agree':
+        combined_mask = masks[0]
+        for m in masks[1:]:
+            combined_mask = combined_mask.And(m)
+        flood_mask = combined_mask.rename('flood')
+    else:  # 'union'
+        combined_mask = masks[0]
+        for m in masks[1:]:
+            combined_mask = combined_mask.Or(m)
+        flood_mask = combined_mask.rename('flood')
 
     flooded_elevation = dem.updateMask(flood_mask)
     wse = (flooded_elevation
@@ -376,6 +589,15 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
                 .addBands(urban.float().unmask(0))
                 .addBands(wse_spread_ft.unmask(0))
                 .addBands(rel_elev_ft.unmask(0)))
+
+    # ── HAND (feet above nearest drainage) — the DEM-hydrology vote's input.
+    #    -1 marks "no HAND value here" so sampling can tell abstain from zero;
+    #    HAND of 0 is meaningful (you are AT the drainage line) and must not be
+    #    conflated with missing data.
+    if hand is not None:
+        combined = combined.addBands(hand.float().unmask(-1).rename('hand_ft'))
+    else:
+        combined = combined.addBands(ee.Image(-1).rename('hand_ft').float())
 
     if optical_water is not None:
         combined = combined.addBands(optical_water.float().unmask(0))
@@ -445,14 +667,54 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
     return combined
 
 
-def sample_properties(combined_image, properties_df, batch_size=100, throttle=True):
+DEFAULT_SAMPLE_RADIUS_M = 50
+DEFAULT_SAMPLE_SCALE_M = 30
+
+
+def _sample_geometry(row, default_radius_m):
+    """
+    The region sampled for one property.
+
+    Structure-constrained when the caller has supplied Phase-2 columns:
+      `sample_lat`/`sample_lon` — the matched structure's own location, rather
+          than the geocoded address point, which on a large parcel can sit at
+          the driveway entrance rather than the building.
+      `sample_radius_m` — the structure's equal-area footprint radius.
+
+    Falls back to the geocoded point and the fixed default radius otherwise, so
+    portfolios with no structure match behave exactly as before.
+    """
+    lon = row.get('sample_lon')
+    lat = row.get('sample_lat')
+    if lon is None or lat is None or pd.isna(lon) or pd.isna(lat):
+        lon, lat = row['longitude'], row['latitude']
+
+    radius = row.get('sample_radius_m')
+    try:
+        radius = float(radius)
+        if pd.isna(radius) or radius <= 0:
+            radius = default_radius_m
+    except (TypeError, ValueError):
+        radius = default_radius_m
+
+    return ee.Geometry.Point([float(lon), float(lat)]).buffer(float(radius))
+
+
+def sample_properties(combined_image, properties_df, batch_size=100, throttle=True,
+                      scale=DEFAULT_SAMPLE_SCALE_M,
+                      default_radius_m=DEFAULT_SAMPLE_RADIUS_M):
     """
     Sample flood fraction, max depth, urban flag, optical cross-check, WSE
-    spread, and relative elevation at each property (50m buffer).
+    spread, relative elevation and HAND at each property.
     Returns a DataFrame keyed by property_id.
 
     `throttle=False` skips the inter-batch sleeps — used for small live
     portfolios (a single batch) where the demo wants a fast turnaround.
+
+    `scale` is the reduction scale in metres. The 30 m default is retained for
+    the fixed-buffer path; footprint-constrained sampling should pass 10 m
+    (Sentinel-1 GRD IW native pixel spacing), since averaging a ~9 m-radius
+    structure over 30 m pixels would defeat the purpose of snapping to it.
     """
     combined_reducer = ee.Reducer.mean().combine(
         reducer2=ee.Reducer.max(), sharedInputs=True)
@@ -463,8 +725,7 @@ def sample_properties(combined_image, properties_df, batch_size=100, throttle=Tr
         batch_df = properties_df.iloc[batch_start: batch_start + batch_size]
         features = []
         for _, row in batch_df.iterrows():
-            point = ee.Geometry.Point([float(row['longitude']), float(row['latitude'])])
-            features.append(ee.Feature(point.buffer(50), {
+            features.append(ee.Feature(_sample_geometry(row, default_radius_m), {
                 'property_id': str(row['property_id']),
                 'address':     str(row.get('address', '')),
             }))
@@ -473,7 +734,7 @@ def sample_properties(combined_image, properties_df, batch_size=100, throttle=Tr
             sampled = combined_image.reduceRegions(
                 collection=ee.FeatureCollection(features),
                 reducer=combined_reducer,
-                scale=30
+                scale=scale
             )
             for feat in sampled.getInfo().get('features', []):
                 p = feat.get('properties', {})
@@ -484,11 +745,10 @@ def sample_properties(combined_image, properties_df, batch_size=100, throttle=Tr
             time.sleep(5)
             for _, row in batch_df.iterrows():
                 try:
-                    point = ee.Geometry.Point([float(row['longitude']), float(row['latitude'])])
                     result = combined_image.reduceRegion(
                         reducer=combined_reducer,
-                        geometry=point.buffer(50),
-                        scale=30
+                        geometry=_sample_geometry(row, default_radius_m),
+                        scale=scale
                     ).getInfo()
                     all_results.append(_row_from_sample(
                         str(row['property_id']), str(row.get('address', '')), result))
@@ -501,6 +761,17 @@ def sample_properties(combined_image, properties_df, batch_size=100, throttle=Tr
             time.sleep(1.5)
 
     return pd.DataFrame(all_results)
+
+
+def _hand_or_none(value):
+    """HAND sample -> float feet, or None when MERIT Hydro has no value."""
+    if value is None:
+        return None
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if v < 0 else round(v, 2)
 
 
 def _row_from_sample(property_id, address, p):
@@ -516,6 +787,10 @@ def _row_from_sample(property_id, address, p):
         'optical_water_pct': round(max(0.0, float(p.get('optical_water_mean') or 0)), 4),
         'wse_spread_ft': round(max(0.0, float(p.get('wse_spread_ft_mean') or 0)), 3),
         'rel_elev_ft':   round(max(0.0, float(p.get('rel_elev_ft_mean') or 0)), 3),
+        # HAND: -1 (or missing) means MERIT Hydro has no value here — reported
+        # as None so the ensemble abstains instead of reading it as "at the
+        # drainage line", which is what a 0 would mean.
+        'hand_ft':       _hand_or_none(p.get('hand_ft_mean')),
         # Round-7 bands — all default to "absent/abstain" when not sampled.
         'vh_available':  int(round(float(p.get('vh_valid_mean') or 0))),
         'vh_water_pct':  round(max(0.0, float(p.get('vh_flood_mean') or 0)), 4),

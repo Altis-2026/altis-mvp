@@ -138,6 +138,18 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   const sevMid    = num(property.severity_mid_usd);
   const sevHigh   = num(property.severity_high_usd);
   const floodZone = property.flood_zone && property.flood_zone !== 'null' ? property.flood_zone : null;
+
+  // Phase 2 structure attributes. Each stays null when unknown so the drawer
+  // renders an explicit "unavailable" reason rather than a misleading 0.
+  const numOrNull = (v) =>
+    v == null || v === '' || Number.isNaN(parseFloat(v)) ? null : parseFloat(v);
+  const firstFloorHeight = numOrNull(property.first_floor_height_ft);
+  const depthAboveFfe    = numOrNull(property.depth_above_ffe_ft);
+  const handFt           = numOrNull(property.hand_ft);
+  const foundationType   = property.foundation_type || null;
+  const firstFloorSource = property.first_floor_source &&
+    property.first_floor_source !== 'unavailable'
+      ? property.first_floor_source : null;
   const sfha      = property.sfha_flag === true || property.sfha_flag === 1 || property.sfha_flag === '1';
   const vhAvail   = property.vh_available == 1;
   const vhAgrees  = vhAvail && (
@@ -423,6 +435,25 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   <Mrow label="Max Flood Depth"   value={depthLabel} />
+                  {/* Phase 2: depth-damage curves take depth above the FIRST
+                      FLOOR, not above ground. The two differ by the foundation
+                      height, so both are shown with the source of the
+                      adjustment — an adjuster can see exactly which number
+                      drove the call. Absent (not zero) when unknown. */}
+                  <Mrow label="First-Floor Height"
+                        tech={firstFloorSource || 'USACE National Structure Inventory'}
+                        value={firstFloorHeight != null
+                          ? `${firstFloorHeight.toFixed(2)} ft${foundationType ? ` (${foundationType})` : ''}`
+                          : unavailable('no matched structure — NSI is US-only')} />
+                  <Mrow label="Depth Above First Floor"
+                        tech="water depth minus foundation height"
+                        value={depthAboveFfe != null
+                          ? `${depthAboveFfe.toFixed(2)} ft`
+                          : unavailable('first-floor height unknown')} />
+                  <Mrow label="Height Above Nearest Drainage" tech="HAND, MERIT Hydro"
+                        value={handFt != null
+                          ? `${handFt.toFixed(1)} ft`
+                          : unavailable('no HAND coverage here')} />
                   <Mrow label="Flooded Area" tech="SAR amplitude change" value={`${pct}%`} />
                   <Mrow label="Confidence Score"   value={`${conf}%`} />
                   <Mrow label="Water Visible from Optical" tech="Sentinel-2 MNDWI"

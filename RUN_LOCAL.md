@@ -103,18 +103,39 @@ Open **http://localhost:5173**. The globe should render and slowly rotate.
 
 ### Optional, for the full story
 
-8. **Real FEMA validation + calibration** (needs internet, no key):
+8. **Real NFIP claims validation + calibration** (needs internet, no key):
    ```bash
    python validation/accuracy_check.py --event harvey --event ian
    ```
-   Fetches real FEMA Individual Assistance records for each disaster, compares
-   them against Altis's output by zip code, fits a calibrated flood-probability
-   map on a zip-grouped hold-out, and writes:
+   Fetches real **NFIP Redacted Claims** (OpenFEMA v3) for each event's date-of-loss
+   window, compares them against Altis's output by zip code, fits a calibrated
+   flood-probability map on a zip-grouped hold-out, and writes:
 
    - `outputs/validation_{event}.md` — correlation report, zip-level detail,
      precision/recall by triage category, and the stated limitations
    - `outputs/calibration_{event}.json` — the fitted calibrator plus held-out
      Brier score and expected calibration error
+
+   **Why claims and not Individual Assistance registrants.** This replaced the
+   old IA ground truth in Phase 0, for three reasons. IA registrants are
+   self-selected federal aid applicants (a carrier's book is close to the
+   opposite population); the records carry only a binary flood flag, so there
+   was no depth to correlate against; and Hurricane Ian is *not in the IA
+   Housing Registrants table at all* — the endpoint returns `count: 0` for
+   DR-4673, so Ian could not be validated. NFIP claims fix all three: they are
+   settled insurance claims carrying a reported water depth and the dollars
+   actually paid on building and contents.
+
+   Two things worth knowing about the data:
+
+   - **ZIPs come from coordinates, not addresses.** Point-in-polygon against
+     Census ZCTA boundaries in Earth Engine. The previous address-regex
+     approach found no ZIP for 300 of 1000 Harvey properties and mistook street
+     numbers for ZIPs on others ("10005 Main Street, TX" → lower Manhattan).
+   - **`waterDepth` has a unit ambiguity and the report states it.** FEMA
+     documents the field as inches but notes some records were entered in feet,
+     and the feet branch dominates. Values ≤ 15 are read as feet, above that as
+     inches, and every report prints the resulting split rather than hiding it.
 
    **These files are what turn the confidence badge into a defensible number.**
    Once they exist, Altis replays the fitted calibrator at inference time and
@@ -129,8 +150,8 @@ Open **http://localhost:5173**. The globe should render and slowly rotate.
    event's calibrator and reports which one it used. Control the preference
    order with `CALIBRATION_EVENT_ORDER` (default `harvey,ian`).
 
-   Lismore is intentionally unsupported here: FEMA is US-only, and there is no
-   equivalent open Australian per-zip assistance dataset to validate against.
+   Lismore is intentionally unsupported here: NFIP is US-only, and there is no
+   equivalent open Australian claims dataset to validate against.
 
    To ship the result to production, commit the generated
    `outputs/calibration_*.json` and redeploy — `outputs/` is copied into the
@@ -138,6 +159,52 @@ Open **http://localhost:5173**. The globe should render and slowly rotate.
 
    Any adjuster verdicts submitted in step 2 are merged first and override the
    coarse zip-level FEMA label, since a human verdict is per-house truth.
+
+### What the detector measures (Phases 1–2)
+
+These apply to every run — the batch pipeline and live on-demand analysis both
+go through the same `pipeline/flood_detect.py`. Each one degrades on its own:
+if the data isn't there, the pipeline says so in the manifest / `signal_status`
+and falls back, rather than silently substituting a default.
+
+- **Multi-temporal baseline.** Instead of comparing the post-event scene to a
+  single pre-event composite, the detector builds a per-pixel mean and standard
+  deviation from ~12 months of same-orbit Sentinel-1 scenes and flags pixels
+  that are anomalously dark relative to *their own* history (z ≤ −2σ), AND in
+  the open-water backscatter range. One unrepresentative pre-event scene can no
+  longer swing a call, and naturally noisy pixels are held to a proportionally
+  higher bar. Falls back to the single-composite method below 8 baseline scenes.
+- **HAND replaces the relative-elevation heuristic.** The DEM-hydrology vote
+  now uses Height Above Nearest Drainage (MERIT Hydro, global, ~90m) instead of
+  "elevation minus the minimum within a 300–600m circle". On flat coastal
+  terrain the old measure was nearly meaningless — almost every parcel sits
+  within a few feet of its neighbourhood minimum — so the vote abstained
+  exactly where it was needed most. A missing HAND value abstains; it is never
+  read as 0, which would mean "at the drainage line".
+- **Cross-orbit stacking.** Every orbit with post-event coverage now
+  contributes, instead of only the dominant one. Ascending and descending
+  scenes are never merged into one composite (different incidence geometry);
+  each gets its own Otsu threshold and its own baseline, and only the finished
+  boolean masks are combined. This directly shrinks the revisit gap.
+- **Depth above first floor (Phase 2).** Depth-damage curves take depth above
+  the first floor; the detector measures depth above ground. The difference is
+  the foundation height, which comes from the USACE **National Structure
+  Inventory** (`found_ht`, plus foundation type, stories, occupancy and
+  structure/contents value). This is a systematic, signed bias, not noise: a
+  home on a 5.25 ft pier foundation with 4 ft of water around it has a dry
+  living space, and was previously scored as damaged. NSI is CONUS-only and its
+  heights are *modelled*, not surveyed — where it's unavailable,
+  `depth_above_ffe_ft` is `None` rather than a guess, and
+  `first_floor_source` records which.
+- **Footprint-constrained sampling (Phase 2).** Sampling snaps to the matched
+  structure at Sentinel-1's native 10m spacing instead of averaging a fixed 50m
+  circle at 30m. The median Harvey-area structure footprint is ~2,570 sqft — an
+  8.7m equal-area radius — so the old buffer averaged the target building
+  together with roughly 33× its own area of street, yard and neighbouring
+  parcels. USA Structures footprint *polygons* are the ideal input but are
+  served from an Esri host that isn't reachable here, so NSI's per-structure
+  footprint **area** drives an equal-area circle instead. That approximation is
+  labelled as such in the manifest.
 
 9. **Live event detection** (needs internet, no key):
    ```bash

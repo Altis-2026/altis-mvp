@@ -179,6 +179,99 @@ SAR = {
     'max_plausible_depth_ft': 20.0,
 }
 
+# ─── MULTI-TEMPORAL SAR BASELINE (Phase 1) ───────────────────────────────────
+# Replaces the single pre-event composite with a per-pixel statistical baseline
+# built from a long run of pre-event Sentinel-1 scenes.
+#
+# WHY: a single pre-event median can be skewed by one wet, windy, or
+# agriculturally disturbed scene, and there is no way to tell from the output
+# that it happened. With a mean and a standard deviation per pixel we can ask a
+# strictly better question — "is this pixel's post-event backscatter anomalous
+# RELATIVE TO ITS OWN NORMAL VARIABILITY?" — instead of "is it darker than one
+# arbitrary earlier picture?".
+#
+# The variance term also hands us a genuine per-pixel confidence for free:
+# permanently noisy pixels (vegetation, agriculture, rough water) need a much
+# larger drop before they count as flooded, while consistently stable pixels
+# (pavement, rooftops, bare ground) trip on a smaller one.
+#
+# Baselines are built PER ORBIT. Ascending and descending passes view the same
+# ground at different incidence angles and azimuths, so their backscatter
+# distributions are genuinely different — pooling them would inflate the
+# variance and blunt the whole method.
+BASELINE = {
+    'enabled':        True,
+    # 12 months captures a full seasonal cycle, so a flood isn't confused with
+    # normal seasonal wetness. Ends 2 days before the event window opens.
+    'months':          12,
+    'gap_days':        2,
+    # Below this many scenes the per-pixel std is not estimated reliably, and
+    # the detector falls back to the single pre-event composite. Sentinel-1's
+    # 6-12 day repeat gives ~30-60 scenes/year per orbit, so this is a floor
+    # for genuinely data-poor regions, not a normal operating point.
+    'min_scenes':      8,
+    # How many standard deviations below the baseline mean counts as a real
+    # change. 2.0 ≈ the 2.3rd percentile of a normal baseline.
+    'z_threshold':     2.0,
+    # Floor on the per-pixel std (dB). Without it, a pixel that happens to be
+    # near-constant across the baseline divides by ~0 and produces an enormous
+    # z-score from a physically trivial change.
+    'min_std_db':      0.8,
+    # Require BOTH the change test (z-score) and the absolute test (Otsu water
+    # threshold). Change alone flags any darkening — harvested fields, dry
+    # pavement after rain. Absolute alone is the old single-threshold method.
+    # Requiring both is what actually cuts false positives.
+    'require_absolute': True,
+}
+
+# ─── HAND — HEIGHT ABOVE NEAREST DRAINAGE (Phase 1) ──────────────────────────
+# Replaces `rel_elev_ft` (elevation minus the minimum within a 300-600m circle)
+# as the DEM-hydrology ensemble vote.
+#
+# The old heuristic answers "is this pixel low compared to its neighbours?",
+# which on flat coastal terrain is nearly meaningless — every parcel is within
+# a few feet of its neighbourhood minimum, so the vote abstained constantly.
+# HAND answers the hydrologically correct question: "how high is this point
+# above the drainage channel that water would actually have to rise from?"
+# It is the standard terrain descriptor for flood susceptibility and is used
+# operationally by NOAA/OWP and in FEMA-adjacent flood modelling.
+#
+# Source: MERIT Hydro (`hnd` band), global, ~90m, already in Earth Engine.
+# Resolution caveat: 90m is coarser than a parcel, which is exactly why HAND
+# votes on PLAUSIBILITY ("could water physically reach here?") and never
+# detects flooding on its own.
+HAND = {
+    'enabled':      True,
+    'asset':        'MERIT/Hydro/v1_0_1',
+    'band':         'hnd',
+    # Thresholds in feet. ~5 m and ~15 m above nearest drainage: below 5m is
+    # routinely inundated by extreme events, above 15m essentially is not.
+    'plausible_ft':   16.0,
+    'implausible_ft': 49.0,
+}
+
+# ─── CROSS-ORBIT STACKING (Phase 1) ──────────────────────────────────────────
+# The detector previously picked the single dominant orbit and discarded every
+# scene from the other pass, throwing away up to half the available
+# observations. That directly worsens the revisit-gap problem: a flood peaking
+# between two same-orbit passes may well have been seen by the other orbit.
+#
+# Scenes from different orbits are NOT directly comparable (different incidence
+# angle and look direction), so we never merge them into one composite. Each
+# orbit gets its own Otsu threshold and its own baseline, produces its own
+# independent flood mask, and only the finished BOOLEAN masks are combined.
+CROSS_ORBIT = {
+    'enabled':    True,
+    # 'union'  — flooded if any orbit saw water. Maximises temporal coverage,
+    #            which is the point of the exercise; a real flood seen by one
+    #            pass is still a real flood.
+    # 'agree'   — flooded only where every observing orbit agrees. Higher
+    #            precision, but discards the revisit benefit.
+    'combine':    'union',
+    # Minimum scenes for an orbit to contribute a mask at all.
+    'min_scenes_per_orbit': 1,
+}
+
 # ─── OPTICAL CROSS-CHECK PARAMETERS (Round 2) ────────────────────────────────
 # Sentinel-2 MNDWI is used as an independent second sensor to confirm or
 # contradict the SAR flood call. SAR alone is prone to false positives in
@@ -317,6 +410,12 @@ ENSEMBLE = {
     # DEM-hydrology: relative elevation above the local neighborhood minimum.
     # Near the local low/drainage -> flooding plausible; perched well above it
     # -> flooding implausible (a confident SAR "flood" there is suspect).
+    #
+    # SUPERSEDED BY HAND (Phase 1): these thresholds are still used, unchanged,
+    # whenever a property has no HAND value — older pre-computed runs, and any
+    # location MERIT Hydro doesn't cover. When `hand_ft` is present the
+    # HAND thresholds above take precedence, because HAND measures height above
+    # the actual drainage network rather than above an arbitrary circle.
     'dem_plausible_rel_ft':     6.0,   # <= this ft above local min: flood plausible
     'dem_implausible_rel_ft':   15.0,  # >= this ft above local min: flood implausible
     'downgrade_to_review':      True,
