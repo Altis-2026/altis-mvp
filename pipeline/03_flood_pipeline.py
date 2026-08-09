@@ -26,7 +26,17 @@ from flood_detect import (
 )
 import structures as struct
 
-ee.Initialize(project=GEE_PROJECT)
+# Prefer service-account credentials when available (GEE_SERVICE_ACCOUNT_KEY_JSON
+# / GEE_SERVICE_ACCOUNT_KEY, same as backend.live_pipeline.init_ee) — this
+# script otherwise assumes an interactive `earthengine authenticate` session,
+# which a headless/CI environment never has. Falls back to the interactive
+# default so local dev workflows that already ran `earthengine authenticate`
+# are unaffected.
+try:
+    from backend.live_pipeline import init_ee
+    init_ee()
+except Exception:
+    ee.Initialize(project=GEE_PROJECT)
 
 
 def run_flood_pipeline(event_config):
@@ -293,5 +303,13 @@ def run_flood_pipeline(event_config):
 
 if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    run_flood_pipeline(HARVEY)
-    run_flood_pipeline(IAN)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
+                        help='Run only this event (repeatable). Default: both.')
+    args = parser.parse_args()
+    events = args.event or ['harvey', 'ian']
+    if 'harvey' in events:
+        run_flood_pipeline(HARVEY)
+    if 'ian' in events:
+        run_flood_pipeline(IAN)

@@ -13,6 +13,51 @@ from provenance import write_manifest
 random.seed(42)
 
 
+def query_nsi_addresses(bbox, target=1000, seed=42, community_labeler=None):
+    """
+    Fallback property source: USACE National Structure Inventory.
+
+    Used when OSM Overpass is unreachable — this codebase's sandbox has
+    outbound access to fema.gov/usace.army.mil and Earth Engine but not to
+    OSM/Mapbox/Census geocoding, so the normal address path has no live
+    alternative there. NSI gives real, government-published structure
+    locations (see pipeline/structures.py), but no street address, so this
+    does NOT fabricate one. `community_labeler(lat, lon) -> str` supplies an
+    honest, coarse label (a named community/county) instead; the default
+    labels every property with its county and structure ID only.
+
+    This must never silently produce a nicer-looking but fake address —
+    the 'no fabricated data' rule from Phase 0 applies here too.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import structures as struct
+    import numpy as np
+
+    nsi = struct.fetch_nsi_structures(bbox)
+    if nsi.empty:
+        return []
+    res = nsi[nsi['st_damcat'] == 'RES'].reset_index(drop=True)
+    if res.empty:
+        res = nsi.reset_index(drop=True)
+
+    rng = np.random.default_rng(seed)
+    n = min(target, len(res))
+    idx = rng.choice(len(res), size=n, replace=False)
+    res = res.iloc[idx].reset_index(drop=True)
+
+    props = []
+    for _, row in res.iterrows():
+        lat, lon = float(row['latitude']), float(row['longitude'])
+        label = (community_labeler(lat, lon) if community_labeler
+                 else 'Harris County, TX')
+        props.append({
+            'latitude': round(lat, 6),
+            'longitude': round(lon, 6),
+            'address': f"NSI Structure {int(row['fd_id'])}, {label}",
+        })
+    return props
+
+
 def query_overpass_addresses(bbox, limit=2000):
     """
     Query OpenStreetMap Overpass API for buildings with addresses.
@@ -165,28 +210,51 @@ out geom {needed * 3};
     return synthetic
 
 
-def build_property_list(event_config, target=1000):
+def build_property_list(event_config, target=1000, community_labeler=None):
     """
     Build a property list for a flood event.
-    First tries OSM building addresses, augments with street addresses if needed.
+    First tries OSM building addresses, augments with street addresses if
+    needed, and falls back to USACE NSI structures (see query_nsi_addresses)
+    when OSM is unreachable at all — e.g. this sandbox has outbound access to
+    fema.gov/usace.army.mil/Earth Engine only, not OSM/Mapbox.
     Returns a clean pandas DataFrame.
     """
     event_id  = event_config['event_id']
     bbox      = event_config['bbox']
     event_name = event_config['event_name']
+    source = 'OpenStreetMap Overpass API'
 
     print(f"\nBuilding property list for {event_name}...")
     print(f"  Study area: {event_config['study_name']}")
 
     # Query OSM for addressed buildings
-    props = query_overpass_addresses(bbox, limit=target * 3)
-    print(f"  Got {len(props)} addressed buildings from OSM")
+    try:
+        props = query_overpass_addresses(bbox, limit=target * 3)
+        print(f"  Got {len(props)} addressed buildings from OSM")
+    except Exception as e:
+        print(f"  OSM Overpass unreachable ({e}); falling back to USACE NSI.")
+        props = []
 
     # Augment if we don't have enough
-    if len(props) < target:
-        extra = augment_from_street_network(bbox, needed=target - len(props))
-        props.extend(extra)
-        print(f"  Augmented to {len(props)} total properties")
+    if 0 < len(props) < target:
+        try:
+            extra = augment_from_street_network(bbox, needed=target - len(props))
+            props.extend(extra)
+            print(f"  Augmented to {len(props)} total properties")
+        except Exception as e:
+            print(f"  OSM street augmentation unreachable ({e}); continuing "
+                  f"with {len(props)} properties.")
+
+    if len(props) == 0:
+        print("  No OSM data available — sourcing properties from USACE "
+              "National Structure Inventory instead. Addresses will be "
+              "labeled 'NSI Structure <id>, <county>' rather than a street "
+              "address, since NSI does not publish one and this pipeline "
+              "never fabricates one.")
+        props = query_nsi_addresses(bbox, target=target,
+                                    community_labeler=community_labeler)
+        source = 'USACE National Structure Inventory (no OSM access; ' \
+                 'addresses are NSI structure IDs, not street addresses)'
 
     if len(props) == 0:
         raise ValueError(
@@ -209,20 +277,48 @@ def build_property_list(event_config, target=1000):
         'bbox':             bbox,
         'target_count':     target,
         'property_count':   len(df),
-        'source':           'OpenStreetMap Overpass API',
+        'source':           source,
     })
 
     return df
 
 
+def addicks_community_label(lat, lon):
+    """
+    Coarse, honest community label for the Addicks/Barker Reservoir bbox.
+    Bucketed on public knowledge of which named neighborhoods sit where in
+    this area — a label, not a fabricated street address.
+    """
+    if lat >= 29.80:
+        return 'Bear Creek Village, Harris County, TX'
+    if lon <= -95.66:
+        return 'Kelliwood, Harris County, TX'
+    return 'Canyon Gate / Concord Bridge, Harris County, TX'
+
+
 if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
+                        help='Regenerate this event\'s property list (repeatable). '
+                             'Default: ian only (Harvey normally already exists).')
+    args = parser.parse_args()
+    events = args.event or ['ian']
 
-    # Ian only (Harvey already done)
-    ian_df = build_property_list(IAN, target=1000)
-    ian_path = os.path.join(OUTPUT_DIR, 'ian_properties.csv')
-    ian_df.to_csv(ian_path, index=False)
-    print(f"\n✓ Ian properties saved → {ian_path}")
-    print(ian_df.head(3).to_string(index=False))
+    if 'harvey' in events:
+        harvey_df = build_property_list(HARVEY, target=1000,
+                                        community_labeler=addicks_community_label)
+        harvey_path = os.path.join(OUTPUT_DIR, 'harvey_properties.csv')
+        harvey_df.to_csv(harvey_path, index=False)
+        print(f"\n✓ Harvey properties saved → {harvey_path}")
+        print(harvey_df.head(3).to_string(index=False))
+
+    if 'ian' in events:
+        ian_df = build_property_list(IAN, target=1000)
+        ian_path = os.path.join(OUTPUT_DIR, 'ian_properties.csv')
+        ian_df.to_csv(ian_path, index=False)
+        print(f"\n✓ Ian properties saved → {ian_path}")
+        print(ian_df.head(3).to_string(index=False))
 
     print("\n✓ Day 1 Step 6 complete. Check your outputs/ folder.")

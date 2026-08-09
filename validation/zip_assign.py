@@ -103,12 +103,37 @@ def assign_zips(properties: pd.DataFrame, cache_path: Optional[str] = None,
     Requires an already-initialized Earth Engine session (the caller owns
     auth, matching the convention in pipeline/flood_detect.py).
     """
+    # Cache key includes a coordinate fingerprint, not just property_id.
+    # property_id is a positional label ("HARV-00001") that survives a
+    # property list being regenerated for an entirely different bounding
+    # box — matching on id alone would silently serve stale ZIPs for the
+    # new coordinates. This bit for real: regenerating Harvey's property
+    # list for a new study area kept the same HARV-00001..01000 ids.
+    coord_fingerprint_path = f"{cache_path}.coords" if cache_path else None
+    current_fingerprint = pd.util.hash_pandas_object(
+        properties[['property_id', 'latitude', 'longitude']]
+        .astype(str).sort_values('property_id')
+    ).sum()
+
     if cache_path and os.path.exists(cache_path):
-        cached = pd.read_csv(cache_path, dtype={'zip': str})
-        if set(cached['property_id']) >= set(properties['property_id'].astype(str)):
-            if verbose:
-                print(f"  ZIP assignment loaded from cache: {cache_path}")
-            return cached
+        cache_valid = True
+        if coord_fingerprint_path and os.path.exists(coord_fingerprint_path):
+            with open(coord_fingerprint_path) as f:
+                cache_valid = f.read().strip() == str(current_fingerprint)
+        else:
+            # No fingerprint recorded (older cache) — can't verify, so treat
+            # as stale rather than risk silently reusing mismatched ZIPs.
+            cache_valid = False
+
+        if cache_valid:
+            cached = pd.read_csv(cache_path, dtype={'zip': str})
+            if set(cached['property_id']) >= set(properties['property_id'].astype(str)):
+                if verbose:
+                    print(f"  ZIP assignment loaded from cache: {cache_path}")
+                return cached
+        elif verbose:
+            print(f"  ZIP cache at {cache_path} is stale (coordinates changed "
+                  f"since it was written) — recomputing.")
 
     if not ensure_ee(verbose=verbose):
         raise RuntimeError(
@@ -164,6 +189,9 @@ def assign_zips(properties: pd.DataFrame, cache_path: Optional[str] = None,
     if cache_path:
         Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
         out.to_csv(cache_path, index=False)
+        if coord_fingerprint_path:
+            with open(coord_fingerprint_path, 'w') as f:
+                f.write(str(current_fingerprint))
         if verbose:
             print(f"  ZIP assignment cached → {cache_path}")
     return out

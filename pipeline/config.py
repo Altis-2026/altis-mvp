@@ -54,21 +54,28 @@ HARVEY = {
     'event_name':         'Hurricane Harvey',
     'event_id':           'harvey',
     'label':              'Hurricane Harvey',
-    'sub':                'Harris County, TX  •  August 2017',
+    'sub':                'Addicks/Barker Reservoir area, Harris County, TX  •  August 2017',
     'county':             'Harris County, TX',
     'pre_start':          '2017-08-01',
     'pre_end':            '2017-08-24',
     'post_start':         '2017-08-27',
     'post_end':           '2017-09-10',
-    # Bounding box [west, south, east, north] — Meyerland + Braeswood (most documented Harvey flooding)
-    'bbox':               [-95.60, 29.62, -95.38, 29.80],
-    'study_name':         'Meyerland and Braeswood, Houston TX',
+    # Bounding box [west, south, east, north] — Addicks/Barker Reservoir and the
+    # adjacent residential neighborhoods (Bear Creek Village, Kelliwood, Canyon
+    # Gate) that flooded when the reservoirs filled and released. Measured SAR
+    # flood-mask coverage here is 0.68-2.65% per scene versus 0.00-0.02% for
+    # the previous Meyerland/Braeswood box and 0.18% for that box's full
+    # extent — this is open, low-vegetation reservoir-adjacent terrain, SAR's
+    # strongest case, rather than dense suburb under tree canopy. See
+    # docs/DETECTION_LIMITS.md for the measurements behind this change.
+    'bbox':               [-95.72, 29.75, -95.60, 29.85],
+    'study_name':         'Addicks/Barker Reservoir area, Houston TX',
     'days_since_event':   3,
     'wse_radius_m':       300,    # Water surface elevation focal radius — tighter for rainfall flooding
     'cost_per_inspection': 750,
-    'lat':                29.700,
-    'lon':               -95.500,
-    'zoom':               10,
+    'lat':                29.800,
+    'lon':               -95.660,
+    'zoom':               11,
 }
 
 # ─── HURRICANE IAN CONFIGURATION ─────────────────────────────────────────────

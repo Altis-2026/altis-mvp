@@ -78,6 +78,19 @@
       },
       "optical_available_count": 1000,
       "generated_at": "2026-07-01T23:48:17.441685+00:00"
+    },
+    "properties": {
+      "study_name": "Addicks/Barker Reservoir area, Houston TX",
+      "bbox": [
+        -95.72,
+        29.75,
+        -95.6,
+        29.85
+      ],
+      "target_count": 1000,
+      "property_count": 1000,
+      "source": "USACE National Structure Inventory (no OSM access; addresses are NSI structure IDs, not street addresses)",
+      "generated_at": "2026-08-09T18:32:53.017449+00:00"
     }
   }
 }
