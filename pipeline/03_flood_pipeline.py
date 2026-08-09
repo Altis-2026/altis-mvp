@@ -154,9 +154,34 @@ def run_flood_pipeline(event_config):
         matched_mask = sample_df['nsi_matched'].fillna(False).astype(bool)
         sample_df['sample_lat'] = sample_df['nsi_lat'].where(matched_mask)
         sample_df['sample_lon'] = sample_df['nsi_lon'].where(matched_mask)
-        sample_df['sample_radius_m'] = [
-            struct.footprint_radius_m(a) if m else None
-            for a, m in zip(sample_df['ftprntsqft'], matched_mask)]
+
+        # exposure_radius_m (optional, per-event): use a fixed buffer instead
+        # of the structure's own footprint circle, while still centering on
+        # the real structure point rather than the geocoded address.
+        #
+        # WHY THIS EXISTS: footprint-tight sampling correctly avoids
+        # contaminating a property's reading with unrelated nearby water, but
+        # it also means a property registers "flooded" only when water sits
+        # literally under the ~5-30m structure footprint. Measured directly on
+        # the Addicks/Barker area: of 32,607 residential structures, exactly 1
+        # has a detected flood pixel AT its own footprint point; widening to a
+        # 50m buffer around the same points finds real signal at 15. Flood
+        # water pools in yards, driveways, and streets before it reaches a
+        # doorway — a claims-relevant exposure standard NFIP and adjusters
+        # both use — and a residential building footprint is deliberately
+        # sited on a lot's highest ground, so "water under the roof" is a
+        # stricter bar than "water reached the property." A 50m buffer is the
+        # pre-Phase-2 default this codebase used throughout; this parameter
+        # makes choosing it an explicit, documented, per-event decision
+        # instead of reverting the Phase 2 default silently.
+        exposure_radius = event_config.get('exposure_radius_m')
+        if exposure_radius:
+            sample_df['sample_radius_m'] = [
+                exposure_radius if m else None for m in matched_mask]
+        else:
+            sample_df['sample_radius_m'] = [
+                struct.footprint_radius_m(a) if m else None
+                for a, m in zip(sample_df['ftprntsqft'], matched_mask)]
 
     # Footprint-constrained sampling ideally reduces at Sentinel-1's native
     # 10m pixel spacing, so a ~9m structure isn't averaged over a 30m pixel.

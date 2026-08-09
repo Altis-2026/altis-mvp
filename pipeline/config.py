@@ -72,6 +72,16 @@ HARVEY = {
     'study_name':         'Addicks/Barker Reservoir area, Houston TX',
     'days_since_event':   3,
     'wse_radius_m':       300,    # Water surface elevation focal radius — tighter for rainfall flooding
+    # Sample a 50m buffer centered on the real structure point instead of the
+    # Phase 2 footprint-tight circle. Measured directly here: of 32,607
+    # residential structures in this bbox, only 1 has a detected flood pixel
+    # literally under its own footprint; widening to 50m finds real signal at
+    # 15. Residential lots are graded so the building sits on the highest
+    # ground; flood water reaches the yard, driveway, and street first. A
+    # buffer captures that claims-relevant exposure; the tight footprint
+    # (the default everywhere else) captures only water under the roof.
+    # See docs/DETECTION_LIMITS.md.
+    'exposure_radius_m':  50,
     'cost_per_inspection': 750,
     'lat':                29.800,
     'lon':               -95.660,
