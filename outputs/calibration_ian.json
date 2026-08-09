@@ -1,0 +1,90 @@
+{
+  "n_total": 1000,
+  "n_train": 858,
+  "n_test": 142,
+  "n_positive": 11,
+  "split_kind": "grouped_by_zip",
+  "seed": 42,
+  "test_fraction": 0.3,
+  "decision_threshold": 0.5,
+  "holdout_metrics": {
+    "brier_score": 0.0702,
+    "expected_calibration_error": 0.0685,
+    "reliability_curve": [
+      {
+        "bin_lo": 0.0,
+        "bin_hi": 0.1,
+        "mean_predicted": 0.0019,
+        "observed_frequency": 0.0704,
+        "count": 142
+      }
+    ],
+    "classification": {
+      "true_positive": 0,
+      "false_positive": 0,
+      "false_negative": 10,
+      "true_negative": 132,
+      "precision": null,
+      "recall": 0.0,
+      "f1": null,
+      "accuracy": 0.9296,
+      "support": 142
+    },
+    "method": "platt"
+  },
+  "calibrator": {
+    "a": -0.22304221732245488,
+    "b": 4.56424293554795,
+    "x_mean": 0.00026869999999999997,
+    "x_std": 0.00781762050178953,
+    "method": "platt"
+  },
+  "event_id": "ian",
+  "label_source": "OpenFEMA NFIP Redacted Claims v3 \u2014 share of NFIP claims reporting standing water >= 50.0% (no policy denominator available - weaker label)",
+  "label_resolution": "zip_code",
+  "score_definition": "0.5*coverage_fraction + 0.5*min(depth_ft/3, 1)",
+  "triage_precision_recall": {
+    "by_category": {
+      "Dispatch": {
+        "n": 0,
+        "pct_truly_flooded": null,
+        "pct_truly_dry": null
+      },
+      "Remote-Approve": {
+        "n": 0,
+        "pct_truly_flooded": null,
+        "pct_truly_dry": null
+      },
+      "Remote-Deny": {
+        "n": 891,
+        "pct_truly_flooded": 0.8,
+        "pct_truly_dry": 99.2
+      },
+      "Review": {
+        "n": 109,
+        "pct_truly_flooded": 3.7,
+        "pct_truly_dry": 96.3
+      }
+    },
+    "overall": {
+      "true_positive": 0,
+      "false_positive": 0,
+      "false_negative": 11,
+      "true_negative": 989,
+      "precision": null,
+      "recall": 0.0,
+      "f1": null,
+      "accuracy": 0.989,
+      "support": 1000
+    }
+  },
+  "baseline": {
+    "base_rate": 0.011,
+    "constant_predictor_brier": 0.0109,
+    "properties_with_any_signal": 3,
+    "properties_total": 1000,
+    "brier_skill_score": -5.4528,
+    "beats_constant_predictor": false,
+    "warning": "Only 3 of 1000 properties (0.3%) have any flood signal at all. Every metric here rests on those few properties and should not be treated as a validation of the detector."
+  }
+}

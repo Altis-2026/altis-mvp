@@ -42,6 +42,55 @@ ZCTA_ASSET = 'TIGER/2020/ZCTA5'
 ZCTA_FIELD = 'ZCTA5CE20'
 
 
+def ensure_ee(verbose: bool = True) -> bool:
+    """
+    Initialize Earth Engine from the service-account credentials if it isn't
+    already. Returns True when EE is usable.
+
+    This module is imported by a standalone validation script, not by the
+    backend, so nothing else in the process performs EE auth. Without this the
+    first event would succeed only because its ZIP assignment was cached and
+    every later event would silently fall back to address parsing — which is
+    exactly the unreliable path this module exists to replace.
+    """
+    try:
+        import ee
+    except ImportError:
+        return False
+
+    try:
+        ee.Number(1).getInfo()      # cheap probe: already initialized?
+        return True
+    except Exception:
+        pass
+
+    try:
+        import json
+        import os
+        key_json = os.getenv('GEE_SERVICE_ACCOUNT_KEY_JSON')
+        project = os.getenv('GEE_PROJECT', 'altis-mvp')
+        if key_json:
+            email = json.loads(key_json)['client_email']
+            creds = ee.ServiceAccountCredentials(email, key_data=key_json)
+        else:
+            key_path = os.getenv('GEE_SERVICE_ACCOUNT_KEY') or os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                'secrets', 'ee-sa-key.json')
+            if not os.path.exists(key_path):
+                return False
+            with open(key_path) as f:
+                email = json.load(f)['client_email']
+            creds = ee.ServiceAccountCredentials(email, key_path)
+        ee.Initialize(creds, project=project)
+        if verbose:
+            print(f"  Earth Engine initialized ({email})")
+        return True
+    except Exception as e:  # noqa: BLE001 - caller falls back and says so
+        if verbose:
+            print(f"  Earth Engine unavailable for ZIP assignment: {e}")
+        return False
+
+
 def assign_zips(properties: pd.DataFrame, cache_path: Optional[str] = None,
                 batch_size: int = 500, verbose: bool = True) -> pd.DataFrame:
     """
@@ -60,6 +109,12 @@ def assign_zips(properties: pd.DataFrame, cache_path: Optional[str] = None,
             if verbose:
                 print(f"  ZIP assignment loaded from cache: {cache_path}")
             return cached
+
+    if not ensure_ee(verbose=verbose):
+        raise RuntimeError(
+            "Earth Engine is not available, so ZIP codes cannot be assigned "
+            "from coordinates. Set GEE_SERVICE_ACCOUNT_KEY_JSON (or "
+            "GEE_SERVICE_ACCOUNT_KEY).")
 
     import ee
 

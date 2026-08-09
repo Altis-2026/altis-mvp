@@ -298,21 +298,54 @@ def compute_metrics(merged: pd.DataFrame) -> dict:
             f"Only {len(merged)} overlapping zip codes — too few for a reliable "
             "correlation. Treat the numbers below as indicative only.")
 
-    def corr(a, b):
+    reasons = {}
+
+    def corr(a, b, name=None):
+        """
+        Correlation, with the REASON recorded when it can't be computed.
+
+        Distinguishing the reasons matters. "Not enough zips" and "one side is
+        constant" are very different findings, and reporting the second as the
+        first hides exactly what the reader needs to know: that the detector
+        returned an identical value everywhere, so there is nothing to
+        correlate against real claim depths.
+        """
+        key = name or f'{a}__{b}'
         if a not in merged.columns or b not in merged.columns:
+            reasons[key] = 'field not available in this run'
             return None
         valid = merged.dropna(subset=[a, b])
-        if len(valid) < 3 or valid[a].nunique() < 2 or valid[b].nunique() < 2:
+        if len(valid) < 3:
+            reasons[key] = (f'only {len(valid)} zips have both values '
+                            f'(need at least 3)')
+            return None
+        if valid[a].nunique() < 2:
+            reasons[key] = (f'`{a}` is constant across all {len(valid)} zips '
+                            f'(= {valid[a].iloc[0]}), so no correlation exists')
+            return None
+        if valid[b].nunique() < 2:
+            reasons[key] = (f'`{b}` is constant across all {len(valid)} zips '
+                            f'(= {valid[b].iloc[0]}) — the detector returned '
+                            f'the same value everywhere, so there is nothing '
+                            f'to correlate')
             return None
         return round(float(valid[a].corr(valid[b])), 3)
 
-    metrics['depth_corr'] = corr('nfip_mean_depth_ft', 'altis_mean_depth_ft')
-    metrics['median_depth_corr'] = corr('nfip_median_depth_ft', 'altis_mean_depth_ft')
+    metrics['depth_corr'] = corr('nfip_mean_depth_ft', 'altis_mean_depth_ft',
+                                 'depth_corr')
+    metrics['median_depth_corr'] = corr('nfip_median_depth_ft',
+                                        'altis_mean_depth_ft',
+                                        'median_depth_corr')
     metrics['flagged_vs_claim_rate_corr'] = corr('nfip_claim_rate_pct',
-                                                 'altis_pct_flagged')
+                                                 'altis_pct_flagged',
+                                                 'flagged_vs_claim_rate_corr')
     metrics['flagged_vs_depth_share_corr'] = corr('nfip_pct_depth_gt0',
-                                                  'altis_pct_flagged')
-    metrics['paid_vs_depth_corr'] = corr('nfip_paid_building', 'altis_mean_depth_ft')
+                                                  'altis_pct_flagged',
+                                                  'flagged_vs_depth_share_corr')
+    metrics['paid_vs_depth_corr'] = corr('nfip_paid_building',
+                                         'altis_mean_depth_ft',
+                                         'paid_vs_depth_corr')
+    metrics['corr_reasons'] = reasons
 
     metrics['nfip_total_claims'] = int(merged['nfip_claims'].sum())
     metrics['altis_total_properties'] = int(merged['altis_properties'].sum())
@@ -551,6 +584,42 @@ def run_calibration(event_id: str, labeled_df: pd.DataFrame,
     result['score_definition'] = '0.5*coverage_fraction + 0.5*min(depth_ft/3, 1)'
     result['triage_precision_recall'] = precision_recall_by_category(labeled_df)
 
+    # ALWAYS REPORT THE BASELINE NEXT TO THE BRIER SCORE.
+    #
+    # A Brier score alone is uninterpretable. The trivial model — predict the
+    # base rate for everyone — scores p(1-p), and on rare-event data that is
+    # already a small number. Harvey's celebrated 0.0239 was exactly this.
+    # Ian's fitted model scores 0.0702 against a 0.0109 baseline, i.e. it is
+    # WORSE than the trivial model, which a bare Brier score would have hidden.
+    #
+    # The skill score makes it unambiguous: > 0 beats the baseline, <= 0 does
+    # not.
+    base_rate = float(labeled_df['flooded_truth'].mean())
+    baseline_brier = base_rate * (1 - base_rate)
+    n_nonzero = int((labeled_df['raw_flood_score'] > 0).sum())
+    result['baseline'] = {
+        'base_rate': round(base_rate, 4),
+        'constant_predictor_brier': round(baseline_brier, 4),
+        'properties_with_any_signal': n_nonzero,
+        'properties_total': int(len(labeled_df)),
+    }
+
+    hm = result.get('holdout_metrics') or {}
+    if hm.get('brier_score') is not None and baseline_brier > 0:
+        skill = 1.0 - (hm['brier_score'] / baseline_brier)
+        result['baseline']['brier_skill_score'] = round(skill, 4)
+        result['baseline']['beats_constant_predictor'] = bool(skill > 0)
+
+    # Near-degenerate: technically fittable, but resting on so few detections
+    # that the numbers describe noise. Ian: 3 of 1,000 properties.
+    signal_frac = n_nonzero / max(len(labeled_df), 1)
+    if signal_frac < 0.02:
+        result['baseline']['warning'] = (
+            f'Only {n_nonzero} of {len(labeled_df)} properties '
+            f'({signal_frac * 100:.1f}%) have any flood signal at all. Every '
+            f'metric here rests on those few properties and should not be '
+            f'treated as a validation of the detector.')
+
     out_path = OUTPUT_DIR / f"calibration_{event_id}.json"
     out_path.write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(f"  Calibration written -> {out_path}")
@@ -574,9 +643,12 @@ def write_report(event_id: str, merged: pd.DataFrame, metrics: dict,
     meta = EVENT_META[event_id]
     out_path = OUTPUT_DIR / f"validation_{event_id}.md"
 
-    def fmt_corr(c):
+    reasons = metrics.get('corr_reasons', {})
+
+    def fmt_corr(c, key=None):
         if c is None:
-            return "N/A (insufficient overlapping zip codes)"
+            why = reasons.get(key)
+            return f"not computable — {why}" if why else "not computable"
         strength = ("strong" if abs(c) >= 0.6 else
                     "moderate" if abs(c) >= 0.35 else
                     "weak")
@@ -615,15 +687,15 @@ def write_report(event_id: str, merged: pd.DataFrame, metrics: dict,
         "Individual Assistance ground truth could support.",
         "",
         f"- **Mean detected depth vs mean claimed water depth**, by zip: "
-        f"{fmt_corr(metrics.get('depth_corr'))}",
+        f"{fmt_corr(metrics.get('depth_corr'), 'depth_corr')}",
         f"- Mean detected depth vs *median* claimed depth, by zip: "
-        f"{fmt_corr(metrics.get('median_depth_corr'))}",
+        f"{fmt_corr(metrics.get('median_depth_corr'), 'median_depth_corr')}",
         f"- % flagged flooded vs NFIP claim rate, by zip: "
-        f"{fmt_corr(metrics.get('flagged_vs_claim_rate_corr'))}",
+        f"{fmt_corr(metrics.get('flagged_vs_claim_rate_corr'), 'flagged_vs_claim_rate_corr')}",
         f"- % flagged flooded vs % claims reporting standing water, by zip: "
-        f"{fmt_corr(metrics.get('flagged_vs_depth_share_corr'))}",
+        f"{fmt_corr(metrics.get('flagged_vs_depth_share_corr'), 'flagged_vs_depth_share_corr')}",
         f"- Mean paid building claim vs mean detected depth, by zip: "
-        f"{fmt_corr(metrics.get('paid_vs_depth_corr'))}",
+        f"{fmt_corr(metrics.get('paid_vs_depth_corr'), 'paid_vs_depth_corr')}",
         "",
     ]
 
@@ -746,12 +818,39 @@ def _calibration_report_lines(cal: dict) -> list:
     if not hm:
         lines += ["", f"> {cal.get('warning', 'Held-out metrics unavailable.')}", ""]
         return lines
+    base = cal.get('baseline') or {}
     lines += [
         f"- Calibration method: **{hm['method']}**",
         f"- **Brier score:** {hm['brier_score']} (lower is better; "
         "0 is perfect, 0.25 is uninformative)",
         f"- **Expected calibration error:** {hm['expected_calibration_error']} "
         "(lower is better)",
+    ]
+
+    # The Brier score is meaningless without the trivial baseline beside it.
+    if base:
+        skill = base.get('brier_skill_score')
+        lines += [
+            "",
+            "### Is this better than guessing?",
+            "",
+            f"- Label base rate: **{base.get('base_rate')}**",
+            f"- A constant predictor (base rate for everyone) scores Brier "
+            f"**{base.get('constant_predictor_brier')}**",
+        ]
+        if skill is not None:
+            verdict = ("**beats** the constant predictor"
+                       if base.get('beats_constant_predictor')
+                       else "**does NOT beat** the constant predictor")
+            lines.append(f"- Brier skill score: **{skill}** — this model "
+                         f"{verdict}.")
+        lines.append(f"- Properties with any flood signal: "
+                     f"**{base.get('properties_with_any_signal')}** of "
+                     f"{base.get('properties_total')}")
+        if base.get('warning'):
+            lines += ["", f"> {base['warning']}"]
+
+    lines += [
         "",
         "### Precision / Recall by Triage Category (held-out positive = "
         "Dispatch + Remote-Approve)",
