@@ -158,13 +158,23 @@ def run_flood_pipeline(event_config):
             struct.footprint_radius_m(a) if m else None
             for a, m in zip(sample_df['ftprntsqft'], matched_mask)]
 
-    # Footprint-constrained sampling reduces at Sentinel-1's native 10m pixel
-    # spacing; averaging a ~9m structure over 30m pixels would undo the point
-    # of snapping to it in the first place.
-    sample_scale = 10 if n_matched else 30
-    print(f"\nSampling properties (scale {sample_scale}m, "
+    # Footprint-constrained sampling ideally reduces at Sentinel-1's native
+    # 10m pixel spacing, so a ~9m structure isn't averaged over a 30m pixel.
+    # In practice, reduceRegions over the full ~15-band combined image (dual-
+    # pol, rainfall, NDVI, duration slices, cross-orbit union) at 10m for a
+    # large batch of small nearby footprint circles has measured, repeatable
+    # server-side cost blowup: single small batches (<=150 properties, one
+    # call) finish in a couple of minutes, but 400 properties across 2 batches
+    # ran past 30 minutes without returning on identical hardware, twice. The
+    # geometry snap to the actual structure — not the resolution — is what
+    # fixes the systematic sampling bias, so 30m keeps that fix at a cost that
+    # actually completes for a full 1000-property portfolio. Revisit if GEE's
+    # server-side behavior on this changes.
+    sample_scale = 30
+    batch_size = 50
+    print(f"\nSampling properties (scale {sample_scale}m, batch {batch_size}, "
           f"{'footprint-constrained' if n_matched else 'fixed 50m buffer'})...")
-    flood_df = sample_properties(combined, sample_df, batch_size=100,
+    flood_df = sample_properties(combined, sample_df, batch_size=batch_size,
                                  scale=sample_scale)
 
     result_df = properties_df.copy()
