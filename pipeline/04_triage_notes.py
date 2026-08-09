@@ -252,5 +252,13 @@ def run_triage_pipeline(event_config):
 
 if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    run_triage_pipeline(HARVEY)
-    run_triage_pipeline(IAN)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
+                        help='Run only this event (repeatable). Default: both.')
+    args = parser.parse_args()
+    events = args.event or ['harvey', 'ian']
+    if 'harvey' in events:
+        run_triage_pipeline(HARVEY)
+    if 'ian' in events:
+        run_triage_pipeline(IAN)

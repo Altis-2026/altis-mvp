@@ -50,8 +50,8 @@
       "permanent_water_dataset": "JRC/GSW1_4/GlobalSurfaceWater (seasonality >= 8mo)",
       "building_mask_dataset": "GOOGLE/Research/open-buildings/v3",
       "urban_density_dataset": "JRC/GHSL/P2023A/GHS_BUILT_S/2020",
-      "flooded_property_count": 0,
-      "urban_property_count": 897,
+      "flooded_property_count": 4,
+      "urban_property_count": 904,
       "optical_dataset": "COPERNICUS/S2_SR_HARMONIZED (MNDWI, SCL cloud mask)",
       "optical_max_cloud_pct": 40,
       "optical_scene_count": 3,
@@ -61,7 +61,7 @@
         "dem_vertical_rmse_m": 0.3,
         "interval": "\u00b11\u03c3 (~68%): quadrature of DEM vertical accuracy + measured WSE spread"
       },
-      "generated_at": "2026-08-09T19:18:37.422345+00:00"
+      "generated_at": "2026-08-09T19:24:39.456177+00:00"
     },
     "triage": {
       "pipeline_version": "1.0.0",
@@ -78,13 +78,13 @@
         "remote_approve_conf": 78
       },
       "category_counts": {
-        "Dispatch": 0,
+        "Dispatch": 1,
         "Remote-Approve": 0,
-        "Remote-Deny": 842,
-        "Review": 158
+        "Remote-Deny": 984,
+        "Review": 15
       },
-      "estimated_savings_usd": 631500,
-      "remote_resolution_count": 842,
+      "estimated_savings_usd": 738000,
+      "remote_resolution_count": 984,
       "cost_per_inspection_usd": 750,
       "optical_cross_check": {
         "max_cloud_pct": 40,
@@ -98,7 +98,7 @@
         "contradict_penalty": -12
       },
       "optical_available_count": 1000,
-      "generated_at": "2026-07-01T23:48:17.441685+00:00"
+      "generated_at": "2026-08-09T19:27:30.971570+00:00"
     },
     "properties": {
       "study_name": "Addicks/Barker Reservoir area, Houston TX",

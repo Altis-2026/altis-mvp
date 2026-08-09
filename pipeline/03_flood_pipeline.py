@@ -197,8 +197,14 @@ def run_flood_pipeline(event_config):
     # server-side behavior on this changes.
     sample_scale = 30
     batch_size = 50
+    if not n_matched:
+        geometry_label = 'fixed 50m buffer (no NSI match)'
+    elif exposure_radius:
+        geometry_label = f'fixed {exposure_radius}m buffer on real structure point'
+    else:
+        geometry_label = 'footprint-constrained'
     print(f"\nSampling properties (scale {sample_scale}m, batch {batch_size}, "
-          f"{'footprint-constrained' if n_matched else 'fixed 50m buffer'})...")
+          f"{geometry_label})...")
     flood_df = sample_properties(combined, sample_df, batch_size=batch_size,
                                  scale=sample_scale)
 
@@ -301,8 +307,8 @@ def run_flood_pipeline(event_config):
         'structure_source':      'USACE National Structure Inventory',
         'structures_matched':    int(n_matched),
         'structure_match_max_m': struct.DEFAULT_MAX_MATCH_M,
-        'sample_geometry': ('structure footprint equal-area circle'
-                            if n_matched else 'fixed 50m buffer'),
+        'sample_geometry': geometry_label,
+        'exposure_radius_m_override': exposure_radius,
         'sample_scale_m':        sample_scale,
         'pre_event_scene_count': pre_count,
         'post_event_scene_count': post_count,
