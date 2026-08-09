@@ -494,6 +494,43 @@ def run_calibration(event_id: str, labeled_df: pd.DataFrame,
         print("  Calibration skipped — need both flooded and dry labelled zips.")
         return None
 
+    # DEGENERATE-SCORE GUARD. If the detector produced the same score for every
+    # property, a fitted calibrator can only ever emit one number — the base
+    # rate — and its Brier score is p(1-p) BY CONSTRUCTION, describing the
+    # label prevalence rather than any detection skill.
+    #
+    # This is not hypothetical: Harvey's committed output has max_depth_ft = 0
+    # and pct_flooded = 0 for all 1,000 properties, so every raw_flood_score is
+    # 0.0, and the resulting Brier of 0.0239 is exactly the variance of a 2.45%
+    # base rate. That number was previously mistaken for an accuracy result.
+    # See docs/DETECTION_LIMITS.md.
+    n_distinct = labeled_df['raw_flood_score'].nunique()
+    if n_distinct < 2:
+        only = float(labeled_df['raw_flood_score'].iloc[0])
+        base_rate = float(labeled_df['flooded_truth'].mean())
+        print(f"  Calibration REFUSED — every property has the same "
+              f"raw_flood_score ({only:.4f}), so any calibrator is constant and "
+              f"its Brier score would just be the base rate variance "
+              f"({base_rate:.4f} -> {base_rate * (1 - base_rate):.4f}). "
+              f"The detector found nothing to calibrate.")
+        return {
+            'event_id': event_id,
+            'label_source': label_source,
+            'label_resolution': 'zip_code',
+            'degenerate': True,
+            'n_total': int(len(labeled_df)),
+            'n_positive': int(labeled_df['flooded_truth'].sum()),
+            'distinct_scores': int(n_distinct),
+            'constant_score': only,
+            'base_rate': round(base_rate, 4),
+            'holdout_metrics': None,
+            'warning': (
+                'Calibration not fitted: the detector produced an identical '
+                'score for every property, so no probability model is '
+                'identifiable. Any Brier score here would measure label '
+                'prevalence, not accuracy. See docs/DETECTION_LIMITS.md.'),
+        }
+
     result = calib.fit_and_evaluate(
         scores=labeled_df['raw_flood_score'].values,
         labels=labeled_df['flooded_truth'].values,
@@ -669,6 +706,33 @@ def write_report(event_id: str, merged: pd.DataFrame, metrics: dict,
 
 def _calibration_report_lines(cal: dict) -> list:
     lines = ["", "## Calibrated Flood Probability (held-out)", ""]
+
+    # Degenerate case: the detector produced one score for every property, so
+    # no calibrator was fitted and none was persisted. Say exactly that, and
+    # show the arithmetic, rather than printing a Brier score that would only
+    # describe label prevalence.
+    if cal.get('degenerate'):
+        base = cal.get('base_rate', 0.0)
+        lines += [
+            "**No calibration was fitted, and no calibrator file was written.**",
+            "",
+            f"- Labelled properties: **{cal.get('n_total')}** "
+            f"({cal.get('n_positive')} flooded-truth)",
+            f"- Distinct `raw_flood_score` values: "
+            f"**{cal.get('distinct_scores')}** (constant at "
+            f"{cal.get('constant_score')})",
+            f"- Label base rate: **{base}**",
+            "",
+            "With a constant score, any fitted calibrator emits a single "
+            f"number and its Brier score is `p(1-p)` = "
+            f"**{round(base * (1 - base), 4)}** by construction — a restatement "
+            "of the base rate, not a measure of detection accuracy.",
+            "",
+            f"> {cal.get('warning', '')}",
+            "",
+        ]
+        return lines
+
     lines.append(f"- Labelled properties: **{cal['n_total']}** "
                  f"({cal['n_positive']} flooded-truth), split **{cal['split_kind']}** "
                  f"-> train {cal['n_train']} / test {cal['n_test']}")

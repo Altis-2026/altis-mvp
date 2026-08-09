@@ -93,6 +93,45 @@ def test_run_calibration_writes_files_and_holdout(tmp_path, monkeypatch):
     assert blob['label_resolution'] == 'zip_code'
 
 
+def test_run_calibration_refuses_degenerate_constant_scores(tmp_path, monkeypatch):
+    """
+    The Harvey trap: when the detector finds nothing, every property gets the
+    same raw_flood_score, and any calibrator fitted on it is constant. Its
+    Brier score is then p(1-p) — the base rate variance — which looks like a
+    good accuracy number but measures only label prevalence.
+
+    Calibration must refuse, and must NOT persist a calibrator file, since
+    backend/calibrated_confidence.py would otherwise replay it at inference
+    and show a meaningless flood_probability on every property.
+    """
+    monkeypatch.setattr(acc, 'OUTPUT_DIR', tmp_path)
+    labeled = acc.derive_property_labels(_altis_df(), _fema_agg())
+    labeled['raw_flood_score'] = 0.0          # what a zero-detection event gives
+
+    res = acc.run_calibration('harvey', labeled)
+
+    assert res is not None
+    assert res['degenerate'] is True
+    assert res['holdout_metrics'] is None
+    assert res['distinct_scores'] == 1
+    assert 'DETECTION_LIMITS' in res['warning']
+    # Nothing persisted — a degenerate calibrator must never reach inference.
+    assert not (tmp_path / "calibration_harvey.json").exists()
+
+
+def test_degenerate_calibration_report_states_the_arithmetic(tmp_path, monkeypatch):
+    """The report must show why the number is meaningless, not just omit it."""
+    monkeypatch.setattr(acc, 'OUTPUT_DIR', tmp_path)
+    labeled = acc.derive_property_labels(_altis_df(), _fema_agg())
+    labeled['raw_flood_score'] = 0.0
+    res = acc.run_calibration('harvey', labeled)
+
+    lines = "\n".join(acc._calibration_report_lines(res))
+    assert 'No calibration was fitted' in lines
+    assert 'by construction' in lines
+    assert 'Brier' in lines
+
+
 def test_run_calibration_single_class_returns_none(tmp_path, monkeypatch):
     monkeypatch.setattr(acc, 'OUTPUT_DIR', tmp_path)
     altis = _altis_df()

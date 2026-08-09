@@ -246,7 +246,8 @@ def fetch_event_claims(zips: Iterable[str], start_date: str, end_date: str,
 
 
 def fetch_policies_in_force(zips: Iterable[str], as_of: str,
-                            verbose: bool = True) -> pd.DataFrame:
+                            verbose: bool = True,
+                            give_up_after: int = 5) -> pd.DataFrame:
     """
     Count NFIP policies in force per zip as of a date — the DENOMINATOR that
     turns a raw claim count into a claim RATE.
@@ -256,25 +257,45 @@ def fetch_policies_in_force(zips: Iterable[str], as_of: str,
     statistic, whereas "N people applied for aid" is not.
 
     Uses $inlinecount so we pay for a count, not for the records. Returns a
-    DataFrame [zip, policies_in_force]; zips whose count could not be
-    retrieved are omitted rather than defaulted to zero.
+    DataFrame [zip, policies_in_force]; zips whose count could not be retrieved
+    are omitted rather than defaulted to zero.
+
+    FAILS FAST BY DESIGN. The policies dataset is very large and this
+    date-in-force filter is expensive, so OpenFEMA frequently answers it with a
+    503 no matter how patiently we retry — observed failing on essentially
+    every zip for 40 minutes straight. After `give_up_after` consecutive
+    failures we abandon the denominator entirely and return what we have; the
+    caller then falls back to a weaker label and says so in the report. Grinding
+    through every zip to collect the same failure is not worth the wall clock.
     """
     rows = []
     zips = sorted({str(z).strip() for z in zips if str(z).strip()})
+    consecutive_failures = 0
+
     for n, z in enumerate(zips, 1):
         flt = (f"reportedZipCode eq '{z}' and policyEffectiveDate le '{as_of}' "
                f"and policyTerminationDate ge '{as_of}'")
         data = _get(POLICIES_API, {
             '$filter': flt, '$top': 1, '$inlinecount': 'allpages', '$format': 'json',
-        })
-        if data is None:
+        }, retries=2)
+
+        count = None if data is None else data.get('metadata', {}).get('count')
+        if count is None:
+            consecutive_failures += 1
+            if consecutive_failures >= give_up_after:
+                if verbose:
+                    print(f"    Policy denominator abandoned after "
+                          f"{consecutive_failures} consecutive failures "
+                          f"({len(rows)}/{len(zips)} zips retrieved).")
+                break
             continue
-        count = data.get('metadata', {}).get('count')
-        if count is not None:
-            rows.append({'zip': z, 'policies_in_force': int(count)})
+
+        consecutive_failures = 0
+        rows.append({'zip': z, 'policies_in_force': int(count)})
         if verbose and n % 10 == 0:
             print(f"    policy counts: {n}/{len(zips)} zips")
         time.sleep(0.15)
+
     return pd.DataFrame(rows)
 
 
