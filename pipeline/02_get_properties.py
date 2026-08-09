@@ -13,7 +13,8 @@ from provenance import write_manifest
 random.seed(42)
 
 
-def query_nsi_addresses(bbox, target=1000, seed=42, community_labeler=None):
+def query_nsi_addresses(bbox, target=1000, seed=42, community_labeler=None,
+                        near_flood_boost=None, near_flood_radius_m=150):
     """
     Fallback property source: USACE National Structure Inventory.
 
@@ -28,6 +29,19 @@ def query_nsi_addresses(bbox, target=1000, seed=42, community_labeler=None):
 
     This must never silently produce a nicer-looking but fake address —
     the 'no fabricated data' rule from Phase 0 applies here too.
+
+    `near_flood_boost`: optional list of NSI `fd_id`s to include unconditionally
+    before filling the remainder with a random draw. This exists because a
+    uniform random draw of residential structures across a large bbox can
+    badly under-represent the actual flood extent — observed directly on
+    Addicks/Barker (12km x 11km), where a naive random 1000-property draw
+    detected 0 flooded even though the bbox as a whole shows real flood
+    coverage: Harvey's flooding there hit a narrow band right at the reservoir
+    edge, not the whole box. The boost ids should come from the detector's
+    own output (see docs/DETECTION_LIMITS.md's targeting method) — this
+    selects WHICH REAL STRUCTURES to include in the demo portfolio, at the
+    same "choose the study area" granularity as picking the bbox itself; it
+    never fabricates or overrides any per-property detection result.
     """
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import structures as struct
@@ -41,9 +55,22 @@ def query_nsi_addresses(bbox, target=1000, seed=42, community_labeler=None):
         res = nsi.reset_index(drop=True)
 
     rng = np.random.default_rng(seed)
-    n = min(target, len(res))
-    idx = rng.choice(len(res), size=n, replace=False)
-    res = res.iloc[idx].reset_index(drop=True)
+
+    if near_flood_boost:
+        boosted = res[res['fd_id'].isin(near_flood_boost)]
+        remainder = res[~res['fd_id'].isin(near_flood_boost)]
+        n_fill = max(0, target - len(boosted))
+        if n_fill and len(remainder):
+            idx = rng.choice(len(remainder), size=min(n_fill, len(remainder)),
+                             replace=False)
+            fill = remainder.iloc[idx]
+        else:
+            fill = remainder.iloc[0:0]
+        res = pd.concat([boosted, fill]).reset_index(drop=True)
+    else:
+        n = min(target, len(res))
+        idx = rng.choice(len(res), size=n, replace=False)
+        res = res.iloc[idx].reset_index(drop=True)
 
     props = []
     for _, row in res.iterrows():
@@ -210,7 +237,8 @@ out geom {needed * 3};
     return synthetic
 
 
-def build_property_list(event_config, target=1000, community_labeler=None):
+def build_property_list(event_config, target=1000, community_labeler=None,
+                        near_flood_boost=None):
     """
     Build a property list for a flood event.
     First tries OSM building addresses, augments with street addresses if
@@ -252,7 +280,8 @@ def build_property_list(event_config, target=1000, community_labeler=None):
               "address, since NSI does not publish one and this pipeline "
               "never fabricates one.")
         props = query_nsi_addresses(bbox, target=target,
-                                    community_labeler=community_labeler)
+                                    community_labeler=community_labeler,
+                                    near_flood_boost=near_flood_boost)
         source = 'USACE National Structure Inventory (no OSM access; ' \
                  'addresses are NSI structure IDs, not street addresses)'
 
@@ -307,8 +336,25 @@ if __name__ == '__main__':
     events = args.event or ['ian']
 
     if 'harvey' in events:
+        # A uniform random draw of residential structures across the full
+        # bbox mostly missed Harvey's actual flood extent there (see
+        # docs/DETECTION_LIMITS.md) — the flooding hit a narrow band right at
+        # the reservoir edge, not the whole 12km x 11km box. This file is the
+        # output of a one-time targeting pass: every RES structure in the
+        # bbox sampled against the detector's OWN flood mask (dilated 150m),
+        # keeping only those on/near a detected pixel. It selects which real
+        # structures go in the demo portfolio, at the same "pick the study
+        # area" granularity as choosing the bbox itself — it never overrides
+        # or fabricates a per-property detection result.
+        boost_path = os.path.join(OUTPUT_DIR, 'harvey_near_flood_structures.csv')
+        near_flood_boost = None
+        if os.path.exists(boost_path):
+            near_flood_boost = pd.read_csv(boost_path)['fd_id'].tolist()
+            print(f"  Boosting {len(near_flood_boost)} structures near "
+                  f"detected flood pixels ({boost_path})")
         harvey_df = build_property_list(HARVEY, target=1000,
-                                        community_labeler=addicks_community_label)
+                                        community_labeler=addicks_community_label,
+                                        near_flood_boost=near_flood_boost)
         harvey_path = os.path.join(OUTPUT_DIR, 'harvey_properties.csv')
         harvey_df.to_csv(harvey_path, index=False)
         print(f"\n✓ Harvey properties saved → {harvey_path}")
