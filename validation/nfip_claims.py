@@ -85,17 +85,27 @@ FEET_MAX          = 15     # raw value <= this is read as FEET
 MAX_VALID_IN      = 200    # raw value above this is uninterpretable -> dropped
 MIN_VALID_FT      = -30    # below this is uninterpretable -> dropped
 
-# Fields we actually use. Requesting a subset keeps payloads small; OpenFEMA
-# rejects nothing if a field is absent, so this stays safe across versions.
+# Fields fetched by default: exactly what validation and zip aggregation
+# consume. Payload size is the dominant cost on this endpoint — requesting the
+# full 21-field set below turned a sub-minute fetch into a 40-minute one for
+# the same 16,578 Harvey claims, because OpenFEMA has to serialize roughly
+# three times the bytes. Fetch what you use.
 CLAIM_FIELDS = [
-    'reportedZipCode', 'dateOfLoss', 'yearOfLoss', 'countyCode', 'state',
-    'waterDepth', 'floodWaterDuration',
+    'reportedZipCode', 'dateOfLoss', 'waterDepth',
     'amountPaidOnBuildingClaim', 'amountPaidOnContentsClaim',
-    'buildingDamageAmount', 'contentsDamageAmount', 'buildingPropertyValue',
-    'occupancyType', 'numberOfFloorsInTheInsuredBuilding',
-    'elevatedBuildingIndicator', 'basementEnclosureCrawlspaceType',
-    'lowestFloorElevation', 'lowestAdjacentGrade', 'elevationDifference',
-    'ratedFloodZone', 'originalConstructionDate', 'causeOfDamage',
+    'buildingDamageAmount', 'buildingPropertyValue',
+]
+
+# Structural and elevation attributes. Not needed to validate detection, but
+# they are the feature set for the multi-curve severity work and the learned
+# model, so the fetcher can opt into them with extended_fields=True.
+CLAIM_FIELDS_EXTENDED = CLAIM_FIELDS + [
+    'yearOfLoss', 'countyCode', 'state', 'floodWaterDuration',
+    'contentsDamageAmount', 'occupancyType',
+    'numberOfFloorsInTheInsuredBuilding', 'elevatedBuildingIndicator',
+    'basementEnclosureCrawlspaceType', 'lowestFloorElevation',
+    'lowestAdjacentGrade', 'elevationDifference', 'ratedFloodZone',
+    'originalConstructionDate', 'causeOfDamage',
 ]
 
 
@@ -160,7 +170,8 @@ def _get(url: str, params: dict, timeout: int = 120, retries: int = 5) -> Option
 
 def fetch_event_claims(zips: Iterable[str], start_date: str, end_date: str,
                        zip_chunk: int = 40, page_size: int = 10000,
-                       verbose: bool = True) -> pd.DataFrame:
+                       verbose: bool = True,
+                       extended_fields: bool = False) -> pd.DataFrame:
     """
     Fetch NFIP claims whose date of loss falls inside [start_date, end_date]
     for the given zip codes.
@@ -189,6 +200,7 @@ def fetch_event_claims(zips: Iterable[str], start_date: str, end_date: str,
         return pd.DataFrame()
 
     date_clause = f"dateOfLoss ge '{start_date}' and dateOfLoss le '{end_date}'"
+    fields = CLAIM_FIELDS_EXTENDED if extended_fields else CLAIM_FIELDS
     records = []
 
     for i in range(0, len(zips), zip_chunk):
@@ -198,7 +210,7 @@ def fetch_event_claims(zips: Iterable[str], start_date: str, end_date: str,
         while True:
             data = _get(CLAIMS_API, {
                 '$filter': flt,
-                '$select': ",".join(CLAIM_FIELDS),
+                '$select': ",".join(fields),
                 '$top': page_size,
                 '$skip': skip,
                 '$format': 'json',
@@ -224,30 +236,42 @@ def fetch_event_claims(zips: Iterable[str], start_date: str, end_date: str,
     depths = raw['waterDepth'].apply(normalize_water_depth) \
         if 'waterDepth' in raw.columns else pd.Series([(None, 'null')] * len(raw))
 
+    def num(col):
+        """Numeric column, or an all-NaN column when the field wasn't fetched."""
+        if col not in raw.columns:
+            return pd.Series([float('nan')] * len(raw), index=raw.index)
+        return pd.to_numeric(raw[col], errors='coerce')
+
+    def passthrough(col):
+        if col not in raw.columns:
+            return pd.Series([None] * len(raw), index=raw.index)
+        return raw[col]
+
     out = pd.DataFrame({
         'zip':                 raw.get('reportedZipCode', pd.Series(dtype=str)).astype(str).str[:5],
         'depth_ft':            [d for d, _ in depths],
         'depth_unit_assumed':  [u for _, u in depths],
-        'paid_building':       pd.to_numeric(raw.get('amountPaidOnBuildingClaim'), errors='coerce'),
-        'paid_contents':       pd.to_numeric(raw.get('amountPaidOnContentsClaim'), errors='coerce'),
-        'damage_building':     pd.to_numeric(raw.get('buildingDamageAmount'), errors='coerce'),
-        'property_value':      pd.to_numeric(raw.get('buildingPropertyValue'), errors='coerce'),
-        'occupancy_type':      raw.get('occupancyType'),
-        'n_floors':            pd.to_numeric(raw.get('numberOfFloorsInTheInsuredBuilding'), errors='coerce'),
-        'elevated':            raw.get('elevatedBuildingIndicator'),
-        'basement_type':       raw.get('basementEnclosureCrawlspaceType'),
-        'lowest_floor_elev':   pd.to_numeric(raw.get('lowestFloorElevation'), errors='coerce'),
-        'lowest_adjacent_grade': pd.to_numeric(raw.get('lowestAdjacentGrade'), errors='coerce'),
-        'duration_raw':        pd.to_numeric(raw.get('floodWaterDuration'), errors='coerce'),
-        'flood_zone':          raw.get('ratedFloodZone'),
-        'cause_of_damage':     raw.get('causeOfDamage'),
+        'paid_building':       num('amountPaidOnBuildingClaim'),
+        'paid_contents':       num('amountPaidOnContentsClaim'),
+        'damage_building':     num('buildingDamageAmount'),
+        'property_value':      num('buildingPropertyValue'),
+        'occupancy_type':      passthrough('occupancyType'),
+        'n_floors':            num('numberOfFloorsInTheInsuredBuilding'),
+        'elevated':            passthrough('elevatedBuildingIndicator'),
+        'basement_type':       passthrough('basementEnclosureCrawlspaceType'),
+        'lowest_floor_elev':   num('lowestFloorElevation'),
+        'lowest_adjacent_grade': num('lowestAdjacentGrade'),
+        'duration_raw':        num('floodWaterDuration'),
+        'flood_zone':          passthrough('ratedFloodZone'),
+        'cause_of_damage':     passthrough('causeOfDamage'),
     })
     return out[out['zip'].str.match(r'^\d{5}$', na=False)].reset_index(drop=True)
 
 
 def fetch_policies_in_force(zips: Iterable[str], as_of: str,
                             verbose: bool = True,
-                            give_up_after: int = 5) -> pd.DataFrame:
+                            give_up_after: int = 3,
+                            timeout: int = 40) -> pd.DataFrame:
     """
     Count NFIP policies in force per zip as of a date — the DENOMINATOR that
     turns a raw claim count into a claim RATE.
@@ -275,9 +299,12 @@ def fetch_policies_in_force(zips: Iterable[str], as_of: str,
     for n, z in enumerate(zips, 1):
         flt = (f"reportedZipCode eq '{z}' and policyEffectiveDate le '{as_of}' "
                f"and policyTerminationDate ge '{as_of}'")
+        # Short timeout on purpose: this count either answers in ~10s or the
+        # service is struggling with it. Waiting 120s per attempt only converts
+        # a fast failure into a slow one.
         data = _get(POLICIES_API, {
             '$filter': flt, '$top': 1, '$inlinecount': 'allpages', '$format': 'json',
-        }, retries=2)
+        }, timeout=timeout, retries=2)
 
         count = None if data is None else data.get('metadata', {}).get('count')
         if count is None:

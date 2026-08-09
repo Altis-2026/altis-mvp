@@ -196,7 +196,7 @@ def load_altis_data(event_id: str, use_coordinates: bool = True) -> pd.DataFrame
 # GROUND TRUTH ASSEMBLY
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_ground_truth(event_id: str, zips) -> tuple:
+def build_ground_truth(event_id: str, zips, use_policy_denominator: bool = True) -> tuple:
     """
     Assemble the NFIP ground truth for one event's zips.
 
@@ -218,6 +218,12 @@ def build_ground_truth(event_id: str, zips) -> tuple:
           f"waterDepth interpretation: {diagnostics['unit_split'].get('counts')}")
 
     zip_agg = nfip.aggregate_by_zip(claims)
+
+    if not use_policy_denominator:
+        diagnostics['policy_zips'] = 0
+        print("  Policy denominator skipped (--no-policies) — using "
+              "depth-share labels.")
+        return zip_agg, claims, diagnostics
 
     print(f"  Fetching policy-in-force counts as of {meta['as_of']} "
           f"(the claim-rate denominator)...")
@@ -779,7 +785,7 @@ def _calibration_report_lines(cal: dict) -> list:
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_validation(event_id: str):
+def run_validation(event_id: str, use_policy_denominator: bool = True):
     print(f"\n{'=' * 60}")
     print(f"  Validating: {EVENT_META[event_id]['label']}")
     print(f"{'=' * 60}")
@@ -789,7 +795,8 @@ def run_validation(event_id: str):
           f"{altis_df['zip'].nunique()} zips")
 
     zips = sorted(altis_df['zip'].unique())
-    zip_agg, claims, diagnostics = build_ground_truth(event_id, zips)
+    zip_agg, claims, diagnostics = build_ground_truth(
+        event_id, zips, use_policy_denominator=use_policy_denominator)
     if zip_agg.empty:
         print(f"  Skipping {event_id} — no NFIP ground truth retrieved.")
         return
@@ -834,6 +841,11 @@ if __name__ == '__main__':
         description='Validate Altis output against NFIP claims ground truth')
     parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
                         help='Event to validate (repeatable). Default: both.')
+    parser.add_argument('--no-policies', action='store_true',
+                        help="Skip the NFIP policy-in-force denominator. That "
+                             "query is expensive and OpenFEMA often 503s on "
+                             "it; skipping falls back to a weaker "
+                             "depth-share label, which the report states.")
     args = parser.parse_args()
 
     events = args.event or ['harvey', 'ian']
@@ -843,7 +855,7 @@ if __name__ == '__main__':
         if i > 0:
             time.sleep(5)
         try:
-            run_validation(evt)
+            run_validation(evt, use_policy_denominator=not args.no_policies)
         except FileNotFoundError as e:
             print(f"\n  {e}")
         except Exception as e:

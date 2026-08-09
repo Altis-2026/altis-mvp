@@ -160,6 +160,23 @@ Open **http://localhost:5173**. The globe should render and slowly rotate.
    Any adjuster verdicts submitted in step 2 are merged first and override the
    coarse zip-level FEMA label, since a human verdict is per-house truth.
 
+### Before you quote an accuracy number
+
+Read **`docs/DETECTION_LIMITS.md`** first. Two things in it change how the
+existing outputs should be read:
+
+- The committed **Harvey** run detects **0 of 1000** properties as flooded, and
+  Ian effectively 1 of 1000. Lismore (open floodplain) detects 266. The cause is
+  measured and it is terrain, not code: C-band VV cannot see flooding under
+  dense tree canopy, and water among buildings double-bounces *brighter*. No
+  Sentinel-1 scene on either orbit — including 29 and 30 August, Meyerland's
+  flood peak — shows a flood signature.
+- Because every Harvey property scores 0.0, any calibrator fitted on it is
+  constant, and its Brier score is the base-rate variance `p(1-p)` **by
+  construction**. The previously reported **Brier 0.0239** is exactly a 2.45%
+  base rate. It is not an accuracy result and should not be quoted as one.
+  `run_calibration()` now refuses this case and writes no calibrator file.
+
 ### What the detector measures (Phases 1–2)
 
 These apply to every run — the batch pipeline and live on-demand analysis both
