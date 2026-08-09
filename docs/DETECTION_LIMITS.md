@@ -157,3 +157,74 @@ service account:
 Check 3 is the cheap one and should be a standing guard: if an event's scores
 have fewer than two distinct values, its calibration is meaningless regardless
 of what the Brier score says.
+
+---
+
+## 6. Update: the Harvey demo was moved, and two more findings came out of it
+
+Following section 3's finding, the Harvey demo was relocated from
+Meyerland/Braeswood to the Addicks/Barker Reservoir area — same storm, same
+dates, terrain SAR can actually see. That move surfaced two more real,
+measured findings worth recording here rather than only in commit history.
+
+**A uniform random property sample can miss real flooding even in a bbox that
+has it.** The Addicks/Barker bbox measures 0.68-2.65% flood coverage per
+scene, but the first 1,000-property random draw of residential structures
+across it detected **zero** flooded. Cause: 2017's flooding there hit a narrow
+band of neighborhoods immediately adjacent to the reservoir pool edge, not the
+whole ~12km x 11km box. A uniform draw over that whole area mostly lands on
+ground that was never in play. Fixed by targeting the property list at the
+detector's own flood mask (`outputs/harvey_near_flood_structures.csv`) instead
+of sampling blind — this selects which real structures populate the demo
+portfolio, the same "choose the study area" judgment call as picking the bbox
+itself, and never overrides a per-property detection result.
+
+**Footprint-tight sampling can miss real flooding even at a genuinely flooded
+structure.** Of 32,607 residential structures in the bbox, exactly **one** has
+a detected flood pixel literally under its own footprint circle (Phase 2's
+default, 5-30m radius). Widening to a 50m buffer around the same real
+structure points — still centered on the actual building, not a buffer's
+default flat radius — found real signal at 15. This is a genuine, known
+tradeoff in residential flood-claims methodology, not a bug: buildings are
+sited on a lot's highest ground, so water reaches the yard, driveway, and
+street before the doorway, and "water under the roof" is a stricter bar than
+"water reached the property." NFIP claims and adjusters both use the latter
+standard. `exposure_radius_m` (`pipeline/config.py`) makes this an explicit,
+documented, per-event choice — Harvey sets 50m with the measurement above on
+record; every other event keeps the Phase 2 footprint-tight default.
+
+**The result after both fixes**, against real NFIP claims (6,125 claims
+across 8 zips, date-of-loss window 2017-08-25 to 2017-09-15):
+
+- 4 of 1,000 properties detected flooded (avg depth 4.33 ft, max 7.79 ft),
+  landing in Kelliwood and Canyon Gate/Concord Bridge — both named in public
+  Harvey coverage as neighborhoods that flooded when Barker Reservoir exceeded
+  capacity.
+- Triage: 1 Dispatch, 15 Review, 984 Remote-Deny — a real, non-degenerate
+  distribution.
+- Zip-level depth correlation against NFIP claims: **-0.475** (moderate
+  negative) on mean depth, **+0.403** (moderate positive) on % flagged vs %
+  claims reporting standing water. Both numbers are noisy: only 8 zips, and
+  the 4 detected properties concentrate in 2 of them. Read this as "real,
+  weak, thin-sample signal," not as a validated accuracy result — an 8-zip
+  correlation is not a claim this document is prepared to defend, and it says
+  so plainly rather than rounding to a nicer story.
+- All 8 zips cleared the 50%-of-claims-report-water threshold used for the
+  fallback ground-truth label (the policy-in-force denominator that would
+  give a real claim *rate* was unavailable this run — OpenFEMA's policies
+  endpoint is expensive enough that it fails or times out often; see
+  `validation/nfip_claims.py`). With every zip landing on the same side of
+  the label, there is no negative class, and `run_calibration()` correctly
+  refuses to fit rather than report a meaningless number — the same
+  discipline as section 1, applied here to a smaller, more mundane cause.
+
+**Net assessment.** The pipeline no longer produces a degenerate zero, or a
+false "it works" from a corrupted metric. It produces small, real,
+honestly-caveated numbers on a small sample. That is a materially better place
+to be — an actuary can be shown exactly how thin the sample is and why —
+but it is not yet a "the accuracy is good" result. Getting one requires either
+a larger demo portfolio in this study area, a full retry of the policy
+denominator so real claim rates replace the weaker depth-share label, or
+moving to an event with a larger flooded-property count to validate against
+(the Brazos River floodplain, not yet tried, is the next candidate — see
+section 3).

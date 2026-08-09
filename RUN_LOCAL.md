@@ -162,20 +162,31 @@ Open **http://localhost:5173**. The globe should render and slowly rotate.
 
 ### Before you quote an accuracy number
 
-Read **`docs/DETECTION_LIMITS.md`** first. Two things in it change how the
-existing outputs should be read:
+Read **`docs/DETECTION_LIMITS.md`** first, all the way through — it has grown
+into the record of several real findings, not just the first one.
 
-- The committed **Harvey** run detects **0 of 1000** properties as flooded, and
-  Ian effectively 1 of 1000. Lismore (open floodplain) detects 266. The cause is
-  measured and it is terrain, not code: C-band VV cannot see flooding under
-  dense tree canopy, and water among buildings double-bounces *brighter*. No
-  Sentinel-1 scene on either orbit — including 29 and 30 August, Meyerland's
-  flood peak — shows a flood signature.
-- Because every Harvey property scores 0.0, any calibrator fitted on it is
-  constant, and its Brier score is the base-rate variance `p(1-p)` **by
-  construction**. The previously reported **Brier 0.0239** is exactly a 2.45%
-  base rate. It is not an accuracy result and should not be quoted as one.
-  `run_calibration()` now refuses this case and writes no calibrator file.
+- The **Harvey** demo originally ran in Meyerland/Braeswood, dense suburb
+  under tree canopy, where it detected **0 of 1,000** properties — C-band VV
+  cannot see flooding under mature canopy, and water among buildings
+  double-bounces *brighter* rather than darker. It has since been **moved to
+  the Addicks/Barker Reservoir area**, terrain SAR can actually see, and now
+  detects 4 of 1,000 (real depths, real named flooded neighborhoods) — see
+  DETECTION_LIMITS.md section 6 for the two more findings that surfaced while
+  fixing this (a uniform random property sample can miss real flooding even in
+  a bbox that has it; footprint-tight sampling can miss real flooding even at
+  a genuinely flooded structure) and the honest limits of the current result
+  (an 8-zip correlation, both directions of sign across two metrics — treat as
+  thin-sample signal, not a validated accuracy claim).
+- **Ian** still detects almost nothing (1 of 1,000) because the satellite's
+  first usable pass was four days after landfall — a revisit-timing miss, not
+  a terrain one, and not fixable by relocating the study area.
+- Every Harvey property in the *original* Meyerland run scored 0.0, so any
+  calibrator fitted on it was constant, and its Brier score was the base-rate
+  variance `p(1-p)` **by construction** — the previously reported **Brier
+  0.0239** was exactly a 2.45% base rate, not an accuracy result.
+  `run_calibration()` now refuses this case (and the later single-class case
+  hit by the relocated Harvey run too) and writes no calibrator file either
+  time.
 
 ### What the detector measures (Phases 1–2)
 
