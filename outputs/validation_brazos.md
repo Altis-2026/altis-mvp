@@ -59,17 +59,15 @@ The rule is justified by the damage data: mean damage ratio rises monotonically 
 
 - Labelled properties: **3980** (832 flooded-truth), split **grouped_by_zip** -> train 3429 / test 551
 - Calibration method: **isotonic**
-- **Brier score:** 0.1714 (lower is better; 0 is perfect, 0.25 is uninformative)
-- **Expected calibration error:** 0.0134 (lower is better)
+- **Brier score:** 0.1719 (lower is better; 0 is perfect, 0.25 is uninformative)
+- **Expected calibration error:** 0.0166 (lower is better)
 
 ### Is this better than guessing?
 
 - Label base rate: **0.209**
 - A constant predictor (base rate for everyone) scores Brier **0.1653**
-- Brier skill score: **-0.0366** — this model **does NOT beat** the constant predictor.
-- Properties with any flood signal: **22** of 3980
-
-> Only 22 of 3980 properties (0.6%) have any flood signal at all. Every metric here rests on those few properties and should not be treated as a validation of the detector.
+- Brier skill score: **-0.0396** — this model **does NOT beat** the constant predictor.
+- Properties with any flood signal: **116** of 3980
 
 ### Precision / Recall by Triage Category (held-out positive = Dispatch + Remote-Approve)
 
