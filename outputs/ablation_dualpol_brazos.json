@@ -1,0 +1,149 @@
+{
+  "baseline": "binary_only",
+  "n_paired_splits": 267,
+  "comparisons": {
+    "binary_plus_dualpol": {
+      "brier": {
+        "mean_difference": 0.000652,
+        "standard_error": 8.8e-05,
+        "win_rate": 0.5206,
+        "n_paired": 267,
+        "verdict": "worse"
+      },
+      "ece": {
+        "mean_difference": 0.000975,
+        "standard_error": 0.000211,
+        "win_rate": 0.5393,
+        "n_paired": 267,
+        "verdict": "worse"
+      },
+      "brier_skill_score": {
+        "mean_difference": -0.005406,
+        "standard_error": 0.000749,
+        "win_rate": 0.5206,
+        "n_paired": 267,
+        "verdict": "worse"
+      },
+      "auc": {
+        "mean_difference": 0.001778,
+        "standard_error": 0.000824,
+        "win_rate": 0.5019,
+        "n_paired": 267,
+        "verdict": "better"
+      }
+    },
+    "dualpol_only": {
+      "brier": {
+        "mean_difference": 0.000652,
+        "standard_error": 8.8e-05,
+        "win_rate": 0.5206,
+        "n_paired": 267,
+        "verdict": "worse"
+      },
+      "ece": {
+        "mean_difference": 0.000974,
+        "standard_error": 0.000211,
+        "win_rate": 0.5393,
+        "n_paired": 267,
+        "verdict": "worse"
+      },
+      "brier_skill_score": {
+        "mean_difference": -0.005404,
+        "standard_error": 0.000748,
+        "win_rate": 0.5206,
+        "n_paired": 267,
+        "verdict": "worse"
+      },
+      "auc": {
+        "mean_difference": 0.00191,
+        "standard_error": 0.000821,
+        "win_rate": 0.5019,
+        "n_paired": 267,
+        "verdict": "better"
+      }
+    }
+  },
+  "per_candidate": {
+    "binary_only": {
+      "brier": {
+        "mean": 0.23365,
+        "std": 0.17338,
+        "p05": 0.0974,
+        "p95": 0.62659
+      },
+      "ece": {
+        "mean": 0.2346,
+        "std": 0.18277,
+        "p05": 0.02213,
+        "p95": 0.64468
+      },
+      "brier_skill_score": {
+        "mean": -0.00386,
+        "std": 0.00963,
+        "p05": -0.01342,
+        "p95": 0.00387
+      },
+      "auc": {
+        "mean": 0.49941,
+        "std": 0.00412,
+        "p05": 0.49332,
+        "p95": 0.50591
+      },
+      "n_splits_used": 267
+    },
+    "binary_plus_dualpol": {
+      "brier": {
+        "mean": 0.2343,
+        "std": 0.17295,
+        "p05": 0.09795,
+        "p95": 0.62615
+      },
+      "ece": {
+        "mean": 0.23558,
+        "std": 0.18205,
+        "p05": 0.02572,
+        "p95": 0.64437
+      },
+      "brier_skill_score": {
+        "mean": -0.00927,
+        "std": 0.01946,
+        "p05": -0.04674,
+        "p95": 0.00548
+      },
+      "auc": {
+        "mean": 0.50119,
+        "std": 0.01532,
+        "p05": 0.47878,
+        "p95": 0.52531
+      },
+      "n_splits_used": 267
+    },
+    "dualpol_only": {
+      "brier": {
+        "mean": 0.2343,
+        "std": 0.17295,
+        "p05": 0.09796,
+        "p95": 0.62615
+      },
+      "ece": {
+        "mean": 0.23557,
+        "std": 0.18205,
+        "p05": 0.02572,
+        "p95": 0.64437
+      },
+      "brier_skill_score": {
+        "mean": -0.00927,
+        "std": 0.01944,
+        "p05": -0.04672,
+        "p95": 0.00547
+      },
+      "auc": {
+        "mean": 0.50132,
+        "std": 0.01524,
+        "p05": 0.47936,
+        "p95": 0.52566
+      },
+      "n_splits_used": 267
+    }
+  }
+}

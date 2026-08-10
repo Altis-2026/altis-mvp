@@ -46,6 +46,13 @@ class Px:
     def clamp(self, lo, hi): return Px(max(lo, min(hi, self.v)))
     def rename(self, _):    return self
     def float(self):        return self
+    def gt(self, o):        return Px(1.0 if self.v > self._v(o) else 0.0)
+    def Or(self, o):        return Px(1.0 if (self.v or self._v(o)) else 0.0)
+    def And(self, o):       return Px(1.0 if (self.v and self._v(o)) else 0.0)
+    # A scalar stand-in is never masked, so unmask() is the identity here.
+    # That is faithful: the real call exists to turn MASKED pixels into -1,
+    # and this harness has no masked pixels to turn.
+    def unmask(self, _=0):  return self
 
     def where(self, cond, val):
         return Px(self._v(val)) if self._v(cond) else Px(self.v)
@@ -231,3 +238,94 @@ def test_gates_are_ordered():
     assert DUALPOL['z_full'] > DUALPOL['z_min'] > 0
     assert 0.0 <= DUALPOL['min_score'] < 1.0
     assert DUALPOL['min_vh_baseline_scenes'] >= 1
+
+
+# ── Phase 4e: urban double-bounce ───────────────────────────────────────────
+#
+# The sign inversion this catches is the whole point: an open-water detector
+# looks for darkening, and a flooded street in a built-up block gets BRIGHTER.
+
+def _db(post, mean, std=1.0, hand=2.0, urban=True, perm=None, cfg=None):
+    import flood_detect as fd
+    from config import DOUBLE_BOUNCE
+    cfg = cfg or DOUBLE_BOUNCE
+    # urban_built_mask() reads a GHSL image from Earth Engine, which is not
+    # available offline; the mask is a pure gate on the score, so substituting
+    # a constant here tests the same arithmetic the image path runs.
+    import types
+    orig = fd.urban_built_mask
+    fd.urban_built_mask = lambda c=None: Px(1.0 if urban else 0.0)
+    try:
+        return fd.double_bounce_score(
+            Px(post), Px(mean), Px(std),
+            hand=(Px(hand) if hand is not None else None),
+            permanent_water=(Px(perm) if perm is not None else None),
+            cfg=cfg).v
+    finally:
+        fd.urban_built_mask = orig
+
+
+def test_urban_brightening_is_detected():
+    """+4 sigma against baseline, in a built-up low-HAND pixel: a flood."""
+    assert _db(post=-6.0, mean=-10.0) > 0.0
+
+
+def test_darkening_is_not_double_bounce():
+    """
+    The open-water detector's job, not this one's. A pixel that got darker
+    must score exactly zero here, or the two regimes would double-count the
+    same event.
+    """
+    assert _db(post=-14.0, mean=-10.0) == 0.0
+
+
+def test_non_urban_brightening_is_rejected():
+    """
+    Without walls there is no dihedral. Brightening on open ground is
+    agriculture, moisture or noise -- not a corner reflector.
+    """
+    assert _db(post=-6.0, mean=-10.0, urban=False) == 0.0
+
+
+def test_weak_absolute_return_is_rejected():
+    """
+    A pixel 4 sigma above a very dark baseline is still dark in absolute
+    terms. A dihedral is a strong reflector; -20 dB is not one.
+    """
+    assert _db(post=-20.0, mean=-24.0) == 0.0
+
+
+def test_high_ground_is_rejected():
+    """Water does not climb 100 ft above the drainage network."""
+    assert _db(post=-6.0, mean=-10.0, hand=100.0) == 0.0
+
+
+def test_unknown_hand_is_rejected_not_waved_through():
+    """
+    HAND of -1 marks "MERIT Hydro has no value here". Unknown must fail the
+    plausibility gate, never pass it by default.
+    """
+    assert _db(post=-6.0, mean=-10.0, hand=-1.0) == 0.0
+
+
+def test_permanent_water_is_rejected():
+    assert _db(post=-6.0, mean=-10.0, perm=1) == 0.0
+
+
+def test_score_ramps_with_z():
+    from config import DOUBLE_BOUNCE
+    lo, hi = DOUBLE_BOUNCE['z_threshold'], DOUBLE_BOUNCE['z_full']
+    mid = _db(post=-10.0 + (lo + hi) / 2.0, mean=-10.0)
+    full = _db(post=-10.0 + hi + 2.0, mean=-10.0)
+    assert mid == pytest.approx(0.5)
+    assert full == pytest.approx(1.0)
+
+
+def test_double_bounce_gate_is_stricter_than_the_darkening_gate():
+    """
+    Brightening has more innocent causes than darkening (construction,
+    vehicles, harvest), so it must clear a higher bar. Pins the ordering so a
+    future tweak cannot quietly make false positives easier.
+    """
+    from config import DOUBLE_BOUNCE, BASELINE
+    assert DOUBLE_BOUNCE['z_threshold'] > BASELINE['z_threshold']

@@ -12,7 +12,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import ee
 import pandas as pd
 from config import (GEE_PROJECT, HARVEY, BRAZOS, OUTPUT_DIR, SAR, OPTICAL,
-                    UNCERTAINTY, BASELINE, HAND, CROSS_ORBIT, DUALPOL)
+                    UNCERTAINTY, BASELINE, HAND, CROSS_ORBIT, DUALPOL,
+                    DOUBLE_BOUNCE)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
 
@@ -279,7 +280,8 @@ def run_flood_pipeline(event_config):
     carry_cols = ['property_id', 'pct_flooded', 'max_depth_ft', 'urban_flag',
                   'optical_available', 'optical_water_pct', 'wse_spread_ft',
                   'rel_elev_ft', 'hand_ft', 'water_fraction',
-                  'dpol_water', 'dpol_available']
+                  'dpol_water', 'dpol_available',
+                  'double_bounce', 'db_available']
     missing = [c for c in carry_cols if c not in flood_df.columns]
     if missing:
         raise RuntimeError(
@@ -293,6 +295,8 @@ def run_flood_pipeline(event_config):
     )
     result_df['dpol_water']      = result_df['dpol_water'].fillna(0.0)
     result_df['dpol_available']  = result_df['dpol_available'].fillna(0).astype(int)
+    result_df['double_bounce']   = result_df['double_bounce'].fillna(0.0)
+    result_df['db_available']    = result_df['db_available'].fillna(0).astype(int)
     result_df['pct_flooded']         = result_df['pct_flooded'].fillna(0.0)
     result_df['max_depth_ft']        = result_df['max_depth_ft'].fillna(0.0)
     result_df['urban_flag']          = result_df['urban_flag'].fillna(0).astype(int)
@@ -390,6 +394,12 @@ def run_flood_pipeline(event_config):
         'dualpol_active':        bool(vh_base_mean is not None),
         'vh_post_scene_count':   vh_post_n,
         'vh_baseline_scene_count': vh_base_n,
+        'double_bounce_enabled': bool(DOUBLE_BOUNCE.get('enabled', True)),
+        'double_bounce_active':  bool(baseline_mean is not None),
+        'double_bounce_method': (
+            f"urban brightening, z >= {DOUBLE_BOUNCE['z_threshold']}σ, "
+            f"HAND <= {DOUBLE_BOUNCE.get('max_hand_ft') or HAND['plausible_ft']} ft"
+            if baseline_mean is not None else 'inactive — no multi-temporal baseline'),
         'dualpol_method': (
             f"min(VV,VH) z-evidence over [{DUALPOL['z_min']}, {DUALPOL['z_full']}]σ"
             + (f", co/cross ratio rise >= {DUALPOL['ratio_rise_db']} dB"

@@ -457,6 +457,69 @@ DUALPOL = {
     'min_score': 0.05,
 }
 
+# ─── PHASE 4e: URBAN DOUBLE-BOUNCE ───────────────────────────────────────────
+# The detector has been looking for the wrong sign in exactly the places that
+# matter most, and Phase 4c is what finally proved it.
+#
+# THE EVIDENCE. Brazos ground truth resolves to 14 zips. Split by truth label:
+#     flooded-truth zips (5):  90.2% urban, mean detection 0.0993%
+#     dry-truth zips     (9):  80.0% urban, mean detection 0.1520%
+# Detection is LOWER where the claims actually are. Four of the five
+# flooded-truth zips are 94-100% urban and return essentially nothing. That is
+# not a threshold that needs tuning; it is the wrong physics.
+#
+# THE PHYSICS. Open water is specular: it reflects energy away from the sensor,
+# so a flooded field goes DARK. That is the only case the detector tests for.
+# But water standing against a vertical wall forms a dihedral corner reflector
+# — the flat water surface and the building side bounce the pulse back along
+# the path it arrived on. Double-bounce sends MORE energy to the sensor, not
+# less, and a flooded street in a built-up block gets BRIGHTER, routinely by
+# 3-10 dB. A detector that only tests `post < threshold` cannot see it, and a
+# multi-temporal z-score gate that only accepts negative z actively rejects it.
+#
+# This is standard in the SAR flood-mapping literature and is why operational
+# urban flood products treat built-up areas as a separate regime rather than
+# feeding them through the open-water threshold. We were feeding a suburb
+# through a rice-paddy detector.
+#
+# WHY IT NEEDS TIGHT CONSTRAINTS. Backscatter increases for many reasons that
+# are not floods: construction, vehicles, harvest, even soil moisture on rough
+# ground. So brightening is only accepted where a flood is independently
+# plausible:
+#   - inside built-up pixels only (GHSL), where the dihedral geometry exists
+#   - HAND below the plausible threshold, so water could physically reach
+#   - a large z against the pixel's own multi-temporal baseline
+#   - not permanent water
+# Double-bounce is strongly geometry-dependent — it needs the wall roughly
+# perpendicular to the look direction — so a given orbit sees only some of the
+# flooded blocks. That argues for UNION across orbits (a flood seen by one
+# pass is still a flood), never agreement.
+#
+# HONEST STATUS: enabled to be MEASURED, same contract as 4a and 4b. It is
+# reported as its own band so its contribution can be isolated, and it will be
+# disabled with the numbers recorded here if it does not earn its place.
+DOUBLE_BOUNCE = {
+    'enabled': True,
+    # Standard deviations ABOVE the pixel's own baseline mean. Deliberately
+    # stricter than the darkening gate (2.0): brightening has more benign
+    # causes than darkening does, so it must clear a higher bar.
+    'z_threshold': 3.0,
+    # Ramp to full confidence, for the graded score.
+    'z_full': 6.0,
+    # GHSL built surface (m² per 100m cell) above which dihedral geometry is
+    # assumed to exist. 1000 is the same cutoff the `urban` band already uses,
+    # kept identical so the two cannot disagree about what "urban" means.
+    'min_built_surface_m2': 1000,
+    # Water cannot reach an arbitrary height above the drainage network. Reuses
+    # HAND['plausible_ft'] by default; set a number here to override.
+    'max_hand_ft': None,
+    # Minimum absolute backscatter for a double-bounce return. A dihedral is a
+    # strong reflector; a "bright" pixel still sitting at -18 dB is noise, not
+    # a corner reflector.
+    'min_backscatter_db': -12.0,
+    'min_score': 0.05,
+}
+
 # ─── HAND — HEIGHT ABOVE NEAREST DRAINAGE (Phase 1) ──────────────────────────
 # Replaces `rel_elev_ft` (elevation minus the minimum within a 300-600m circle)
 # as the DEM-hydrology ensemble vote.

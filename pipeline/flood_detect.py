@@ -26,11 +26,12 @@ import pandas as pd
 
 try:
     from config import (SAR, OPTICAL, SAR_VH, DURATION, RAIN,
-                        BASELINE, HAND, CROSS_ORBIT, SUBPIXEL, DUALPOL)
+                        BASELINE, HAND, CROSS_ORBIT, SUBPIXEL, DUALPOL,
+                        DOUBLE_BOUNCE)
 except ImportError:  # pragma: no cover - import path guard
     from pipeline.config import (SAR, OPTICAL, SAR_VH, DURATION, RAIN,
                                  BASELINE, HAND, CROSS_ORBIT, SUBPIXEL,
-                                 DUALPOL)
+                                 DUALPOL, DOUBLE_BOUNCE)
 
 
 def load_dem(bbox_coords):
@@ -632,6 +633,74 @@ def dualpol_water_score(post_vv, post_vh,
     return score.rename('dpol_water').float()
 
 
+def urban_built_mask(cfg=DOUBLE_BOUNCE):
+    """
+    Built-up pixels, where dihedral (wall + water) geometry can exist.
+
+    Uses the same GHSL layer and cutoff as the `urban` band the pipeline
+    already reports, deliberately: two different definitions of "urban" in one
+    detector is a bug waiting to happen.
+    """
+    return (ee.Image("JRC/GHSL/P2023A/GHS_BUILT_S/2020")
+            .select('built_surface')
+            .gt(cfg['min_built_surface_m2'])
+            .unmask(0))
+
+
+def double_bounce_score(post_img, baseline_mean, baseline_std, hand=None,
+                        permanent_water=None, cfg=DOUBLE_BOUNCE):
+    """
+    Graded [0, 1] evidence of URBAN flooding, detected by BRIGHTENING.
+
+    Phase 4e. The open-water detector looks for darkening, which is correct on
+    an open field and backwards in a built-up block: water standing against a
+    wall forms a corner reflector and returns MORE energy to the sensor. See
+    the DOUBLE_BOUNCE block in config.py for the evidence that this is the
+    dominant failure mode — at Brazos, the flooded-truth zips are 90% urban
+    and return LESS detection than the dry ones.
+
+    Constraints, all of which must hold, because brightening has more innocent
+    causes than darkening does:
+      - built-up pixel (the geometry has to exist)
+      - z above cfg['z_threshold'] against the pixel's own baseline
+      - absolute backscatter above cfg['min_backscatter_db'] (a dihedral is a
+        strong reflector; a "bright" pixel still at -18 dB is noise)
+      - HAND below the plausible ceiling, when HAND is available
+      - not permanent water
+
+    Returns a band named 'double_bounce'. HAND being unavailable relaxes that
+    one constraint rather than voiding the whole score — the other three still
+    apply — but callers should note it, because HAND is the constraint doing
+    the most work against construction-site false positives.
+    """
+    std = baseline_std.max(BASELINE['min_std_db'])
+    z = post_img.subtract(baseline_mean).divide(std)
+
+    span = float(cfg['z_full'] - cfg['z_threshold'])
+    if span <= 0:
+        score = z.gte(cfg['z_threshold']).float()
+    else:
+        score = z.subtract(cfg['z_threshold']).divide(span).clamp(0.0, 1.0)
+
+    score = score.where(urban_built_mask(cfg).Not(), 0)
+    score = score.where(post_img.lt(cfg['min_backscatter_db']), 0)
+
+    if hand is not None:
+        ceiling = cfg.get('max_hand_ft') or HAND['plausible_ft']
+        # Unmask to -1 here rather than trusting the caller: MERIT Hydro masks
+        # water bodies, and a MASKED pixel in a where() condition leaves the
+        # value untouched, which would let unknown-HAND pixels sail through the
+        # plausibility gate. -1 makes "unknown" explicit and rejects it.
+        h = hand.unmask(-1)
+        score = score.where(h.lt(0).Or(h.gt(ceiling)), 0)
+
+    if permanent_water is not None:
+        score = score.where(permanent_water, 0)
+
+    score = score.where(score.lt(cfg['min_score']), 0)
+    return score.rename('double_bounce').float()
+
+
 def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_m,
                             optical_water=None, optical_valid=None,
                             pre_vh=None, post_vh=None, rain=None,
@@ -826,6 +895,29 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
     else:
         combined = (combined.addBands(ee.Image(0).rename('dpol_water').float())
                     .addBands(ee.Image(0).rename('dpol_valid').float()))
+
+    # ── Phase 4e: urban double-bounce. The one regime the open-water detector
+    #    gets backwards, and the regime that holds most of the claims.
+    if DOUBLE_BOUNCE.get('enabled', True) and baseline_mean is not None \
+            and baseline_std is not None:
+        db = double_bounce_score(post_image, baseline_mean, baseline_std,
+                                 hand=hand, permanent_water=permanent_water)
+        # Union across orbits, never agreement: double-bounce needs the wall
+        # roughly perpendicular to the look direction, so each pass sees a
+        # different subset of the flooded blocks. Requiring both orbits to
+        # agree would reject most true detections by construction.
+        for spec in (orbit_stack or {}).values():
+            post_o, m_o, s_o = (spec.get('post'), spec.get('baseline_mean'),
+                                spec.get('baseline_std'))
+            if post_o is None or m_o is None or s_o is None:
+                continue
+            db = db.max(double_bounce_score(
+                post_o, m_o, s_o, hand=hand, permanent_water=permanent_water))
+        combined = (combined.addBands(db.unmask(0))
+                    .addBands(ee.Image(1).rename('db_valid').float()))
+    else:
+        combined = (combined.addBands(ee.Image(0).rename('double_bounce').float())
+                    .addBands(ee.Image(0).rename('db_valid').float()))
 
     if optical_water is not None:
         combined = combined.addBands(optical_water.float().unmask(0))
@@ -1027,6 +1119,10 @@ def _row_from_sample(property_id, address, p):
         # dpol_water means different things in those two cases.
         'dpol_available': int(round(float(p.get('dpol_valid_mean') or 0))),
         'dpol_water':     round(max(0.0, float(p.get('dpol_water_mean') or 0)), 4),
+        # Phase 4e: urban double-bounce (flood detected by BRIGHTENING, the
+        # regime the open-water threshold gets backwards).
+        'db_available':   int(round(float(p.get('db_valid_mean') or 0))),
+        'double_bounce':  round(max(0.0, float(p.get('double_bounce_mean') or 0)), 4),
         # Round-7 bands — all default to "absent/abstain" when not sampled.
         'vh_available':  int(round(float(p.get('vh_valid_mean') or 0))),
         'vh_water_pct':  round(max(0.0, float(p.get('vh_flood_mean') or 0)), 4),
