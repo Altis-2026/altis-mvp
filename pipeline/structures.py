@@ -47,6 +47,7 @@ HONEST LIMITS — these travel with every number this module produces
      and callers can reject weak matches.
 """
 import math
+import time
 from typing import Optional
 
 import pandas as pd
@@ -84,7 +85,7 @@ DEFAULT_MAX_MATCH_M = 60.0
 
 
 def fetch_nsi_structures(bbox_coords, timeout: int = 240,
-                         verbose: bool = True) -> pd.DataFrame:
+                         verbose: bool = True, retries: int = 3) -> pd.DataFrame:
     """
     Fetch every NSI structure inside a bounding box.
 
@@ -95,6 +96,13 @@ def fetch_nsi_structures(bbox_coords, timeout: int = 240,
 
     Returns an empty DataFrame outside CONUS — the caller treats that as
     "first-floor height unknown", never as zero.
+
+    Retries on transient transport failures. A county-scale response is tens of
+    MB, and a truncated read part way through it (IncompleteRead) is common
+    enough that a single attempt silently costs the whole run its Phase 2
+    columns — the pipeline reports "0 matched" and carries on sampling geocoded
+    points, which is a materially different and worse analysis that looks
+    identical in the output CSV. Backoff is exponential.
     """
     west, south, east, north = bbox_coords
     body = {
@@ -109,14 +117,23 @@ def fetch_nsi_structures(bbox_coords, timeout: int = 240,
             },
         }],
     }
-    try:
-        resp = requests.post(NSI_API, json=body, timeout=timeout)
-        resp.raise_for_status()
-        feats = resp.json().get('features', [])
-    except Exception as e:  # noqa: BLE001 - reported, never silently zeroed
-        if verbose:
-            print(f"  NSI unavailable ({e}); first-floor heights will be unknown.")
-        return pd.DataFrame()
+    feats = None
+    for attempt in range(1, max(1, retries) + 1):
+        try:
+            resp = requests.post(NSI_API, json=body, timeout=timeout)
+            resp.raise_for_status()
+            feats = resp.json().get('features', [])
+            break
+        except Exception as e:  # noqa: BLE001 - reported, never silently zeroed
+            if attempt >= max(1, retries):
+                if verbose:
+                    print(f"  NSI unavailable after {attempt} attempts ({e}); "
+                          f"first-floor heights will be unknown.")
+                return pd.DataFrame()
+            wait = 2 ** attempt
+            if verbose:
+                print(f"  NSI attempt {attempt} failed ({e}); retrying in {wait}s...")
+            time.sleep(wait)
 
     if not feats:
         if verbose:
