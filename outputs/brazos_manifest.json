@@ -76,6 +76,43 @@
         "interval": "\u00b11\u03c3 (~68%): quadrature of DEM vertical accuracy + measured WSE spread"
       },
       "generated_at": "2026-08-10T04:14:07.363999+00:00"
+    },
+    "triage": {
+      "pipeline_version": "1.0.0",
+      "triage_thresholds": {
+        "dispatch_depth_ft": 3.0,
+        "dispatch_low_depth_ft": 1.0,
+        "dispatch_pct": 0.5,
+        "remote_deny_depth_ft": 0.3,
+        "remote_deny_pct": 0.05,
+        "remote_deny_conf": 80,
+        "remote_approve_min_depth": 0.5,
+        "remote_approve_max_depth": 3.0,
+        "remote_approve_min_pct": 0.2,
+        "remote_approve_conf": 78
+      },
+      "category_counts": {
+        "Dispatch": 1,
+        "Remote-Approve": 0,
+        "Remote-Deny": 3888,
+        "Review": 111
+      },
+      "estimated_savings_usd": 2916000,
+      "remote_resolution_count": 3888,
+      "cost_per_inspection_usd": 750,
+      "optical_cross_check": {
+        "max_cloud_pct": 40,
+        "water_mndwi_min": 0.0,
+        "min_valid_fraction": 0.5,
+        "sar_flood_pct": 0.1,
+        "water_confirm_pct": 0.1,
+        "water_contradict_pct": 0.05,
+        "confirm_bonus": 10,
+        "confirm_dry_bonus": 6,
+        "contradict_penalty": -12
+      },
+      "optical_available_count": 4000,
+      "generated_at": "2026-08-10T04:23:11.323381+00:00"
     }
   }
 }

@@ -14,3 +14,8 @@ dist/
 *.log
 monitor/events.log
 monitor/state.json
+
+# ZIP-assignment cache fingerprints. The cache CSV itself is worth committing
+# (it saves an Earth Engine round trip), but the .coords sidecar is a local
+# invalidation marker, not data.
+outputs/*_zips.csv.coords
