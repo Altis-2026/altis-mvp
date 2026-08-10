@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ee
 import pandas as pd
-from config import (GEE_PROJECT, HARVEY, IAN, OUTPUT_DIR, SAR, OPTICAL,
+from config import (GEE_PROJECT, HARVEY, BRAZOS, OUTPUT_DIR, SAR, OPTICAL,
                     UNCERTAINTY, BASELINE, HAND, CROSS_ORBIT)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
@@ -131,7 +131,10 @@ def run_flood_pipeline(event_config):
         event_config['bbox'], pre_image, post_image, dem, event_config['wse_radius_m'],
         optical_water=optical_water, optical_valid=optical_valid,
         hand=hand_img, baseline_mean=baseline_mean, baseline_std=baseline_std,
-        orbit_stack=orbit_stack)
+        orbit_stack=orbit_stack,
+        # Resolve each orbit's Otsu threshold once instead of recomputing that
+        # whole-bbox histogram on every sampling batch (see guarded_otsu).
+        precompute_thresholds=True)
 
     # ── Phase 2: structure attributes. Snapping the sample to the structure's
     #    own footprint replaces a 50m circle that averaged ~33x the building's
@@ -346,11 +349,11 @@ if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
+    parser.add_argument('--event', action='append', choices=['harvey', 'brazos'],
                         help='Run only this event (repeatable). Default: both.')
     args = parser.parse_args()
-    events = args.event or ['harvey', 'ian']
+    events = args.event or ['harvey', 'brazos']
     if 'harvey' in events:
         run_flood_pipeline(HARVEY)
-    if 'ian' in events:
-        run_flood_pipeline(IAN)
+    if 'brazos' in events:
+        run_flood_pipeline(BRAZOS)

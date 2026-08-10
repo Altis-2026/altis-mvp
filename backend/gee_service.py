@@ -29,7 +29,7 @@ def get_flood_tile_url(event_id: str) -> Optional[str]:
     """
     try:
         import ee
-        from pipeline.config import HARVEY, IAN
+        from pipeline.config import HARVEY, BRAZOS
         from backend.live_pipeline import init_ee, gee_available, LiveAnalysisError
 
         # Same service-account auth as live analysis (file path locally, raw
@@ -42,7 +42,7 @@ def get_flood_tile_url(event_id: str) -> Optional[str]:
         except LiveAnalysisError:
             return None
 
-        event_map = {'harvey': HARVEY, 'ian': IAN}
+        event_map = {'harvey': HARVEY, 'brazos': BRAZOS}
         cfg = event_map.get(event_id)
         if not cfg:
             return None
@@ -275,12 +275,12 @@ def precache_gee_thumbnails(event_id: str, sample_size: int = 100):
     """
     try:
         import ee
-        from pipeline.config import GEE_PROJECT, HARVEY, IAN
+        from pipeline.config import GEE_PROJECT, HARVEY, BRAZOS
         from backend.database import load_event_data, save_thumbnail_cache
 
         ee.Initialize(project=GEE_PROJECT)
 
-        event_map = {'harvey': HARVEY, 'ian': IAN}
+        event_map = {'harvey': HARVEY, 'brazos': BRAZOS}
         cfg = event_map.get(event_id)
         df  = load_event_data(event_id)
         if df is None or cfg is None:

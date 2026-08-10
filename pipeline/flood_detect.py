@@ -429,7 +429,7 @@ def load_optical_water_mask(bbox_coords, start_date, end_date):
     return water_mask, valid_mask, count
 
 
-def guarded_otsu(image, bbox_coords):
+def guarded_otsu(image, bbox_coords, evaluate=False):
     """
     Per-scene Otsu threshold with the open-water range guard applied.
 
@@ -437,10 +437,25 @@ def guarded_otsu(image, bbox_coords):
     ascending and descending scenes have different backscatter distributions,
     so sharing a single threshold between them would systematically bias one
     of the two.
+
+    `evaluate=True` resolves the threshold to a plain Python float via a single
+    getInfo() and returns it as a CONSTANT.
+
+    WHY THAT MATTERS: the Otsu threshold is a reduceRegion over the entire
+    study-area bbox. Left symbolic, it sits inside the flood-mask graph, so
+    Earth Engine recomputes that whole-bbox histogram on every sampling batch.
+    At 20 batches that is merely wasteful; on a widened bbox at 80+ batches it
+    is the difference between a run finishing and a run that has to be killed
+    (observed twice, past 30 minutes with no output). Resolving it once up
+    front costs one round trip and changes no result — the threshold is a
+    per-scene constant either way.
     """
     raw = ee.Number(otsu_threshold_gee(image, bbox_coords))
     in_range = raw.gte(SAR['water_db_min']).And(raw.lte(SAR['water_db_max']))
-    return ee.Number(ee.Algorithms.If(in_range, raw, SAR['otsu_fallback_db']))
+    threshold = ee.Number(ee.Algorithms.If(in_range, raw, SAR['otsu_fallback_db']))
+    if evaluate:
+        return ee.Number(float(threshold.getInfo()))
+    return threshold
 
 
 def orbit_flood_mask(post_img, threshold, slope_mask, permanent_water,
@@ -485,7 +500,7 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
                             pre_vh=None, post_vh=None, rain=None,
                             ndvi_pre=None, ndvi_post=None, post_slices=None,
                             hand=None, baseline_mean=None, baseline_std=None,
-                            orbit_stack=None):
+                            orbit_stack=None, precompute_thresholds=False):
     """
     Build the multi-band analysis image:
     ['flood', 'depth_ft', 'urban', 'wse_spread_ft', 'rel_elev_ft', 'hand_ft',
@@ -505,8 +520,13 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
                         'baseline_std'}} for cross-orbit stacking. Each orbit
                         is thresholded and masked independently; only the
                         finished boolean masks are combined.
+      `precompute_thresholds` — resolve each orbit's Otsu threshold to a
+                        constant up front (one getInfo each) instead of leaving
+                        it in the graph. Strongly recommended for batch runs
+                        over a large bbox; see guarded_otsu().
     """
-    threshold = guarded_otsu(post_image, bbox_coords)
+    threshold = guarded_otsu(post_image, bbox_coords,
+                             evaluate=precompute_thresholds)
 
     slope_mask = ee.Terrain.slope(dem).lt(5)
 
@@ -529,7 +549,9 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
         if post_o is None:
             continue
         masks.append(orbit_flood_mask(
-            post_o, guarded_otsu(post_o, bbox_coords), slope_mask, permanent_water,
+            post_o, guarded_otsu(post_o, bbox_coords,
+                                 evaluate=precompute_thresholds),
+            slope_mask, permanent_water,
             pre_img=spec.get('pre'),
             baseline_mean=spec.get('baseline_mean'),
             baseline_std=spec.get('baseline_std')))

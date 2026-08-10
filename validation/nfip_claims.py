@@ -72,6 +72,7 @@ the schema but empty in v3 for these events, and `latitude`/`longitude` are
 redacted to one decimal place (~11 km), so ZIP is the finest honest join key.
 """
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterable, Optional
 
 import pandas as pd
@@ -270,8 +271,8 @@ def fetch_event_claims(zips: Iterable[str], start_date: str, end_date: str,
 
 def fetch_policies_in_force(zips: Iterable[str], as_of: str,
                             verbose: bool = True,
-                            give_up_after: int = 3,
-                            timeout: int = 40) -> pd.DataFrame:
+                            timeout: int = 40,
+                            max_workers: int = 8) -> pd.DataFrame:
     """
     Count NFIP policies in force per zip as of a date — the DENOMINATOR that
     turns a raw claim count into a claim RATE.
@@ -284,19 +285,20 @@ def fetch_policies_in_force(zips: Iterable[str], as_of: str,
     DataFrame [zip, policies_in_force]; zips whose count could not be retrieved
     are omitted rather than defaulted to zero.
 
-    FAILS FAST BY DESIGN. The policies dataset is very large and this
-    date-in-force filter is expensive, so OpenFEMA frequently answers it with a
-    503 no matter how patiently we retry — observed failing on essentially
-    every zip for 40 minutes straight. After `give_up_after` consecutive
-    failures we abandon the denominator entirely and return what we have; the
-    caller then falls back to a weaker label and says so in the report. Grinding
-    through every zip to collect the same failure is not worth the wall clock.
+    RUNS CONCURRENTLY. The policies dataset is very large and this
+    date-in-force filter is expensive server-side, so a serial sweep spent ~40
+    minutes on 39 zips and still mostly returned 503s. The requests are tiny
+    and independent, so a small thread pool overlaps the server-side query time
+    and brings that down to minutes. Zips that still fail are simply omitted —
+    never defaulted to zero — and the caller falls back to
+    structure_counts_by_zip() and says so in the report.
     """
-    rows = []
     zips = sorted({str(z).strip() for z in zips if str(z).strip()})
-    consecutive_failures = 0
+    if not zips:
+        return pd.DataFrame()
 
-    for n, z in enumerate(zips, 1):
+    def one(z):
+        """Count for a single zip. Returns (zip, count|None)."""
         flt = (f"reportedZipCode eq '{z}' and policyEffectiveDate le '{as_of}' "
                f"and policyTerminationDate ge '{as_of}'")
         # Short timeout on purpose: this count either answers in ~10s or the
@@ -305,25 +307,63 @@ def fetch_policies_in_force(zips: Iterable[str], as_of: str,
         data = _get(POLICIES_API, {
             '$filter': flt, '$top': 1, '$inlinecount': 'allpages', '$format': 'json',
         }, timeout=timeout, retries=2)
-
         count = None if data is None else data.get('metadata', {}).get('count')
-        if count is None:
-            consecutive_failures += 1
-            if consecutive_failures >= give_up_after:
-                if verbose:
-                    print(f"    Policy denominator abandoned after "
-                          f"{consecutive_failures} consecutive failures "
-                          f"({len(rows)}/{len(zips)} zips retrieved).")
-                break
-            continue
+        return z, count
 
-        consecutive_failures = 0
-        rows.append({'zip': z, 'policies_in_force': int(count)})
-        if verbose and n % 10 == 0:
-            print(f"    policy counts: {n}/{len(zips)} zips")
-        time.sleep(0.15)
+    # Run the per-zip counts CONCURRENTLY. Each one is an independent, tiny
+    # request whose cost is server-side query time, not bandwidth, so they
+    # overlap almost perfectly. Serially this took ~40 minutes for 39 zips and
+    # usually failed anyway; a small pool turns that into a couple of minutes
+    # and makes the denominator actually obtainable often enough to be worth
+    # attempting. Kept modest so we don't hammer a public API.
+    rows, failures = [], 0
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(one, z): z for z in zips}
+        for done, fut in enumerate(as_completed(futures), 1):
+            try:
+                z, count = fut.result()
+            except Exception:  # noqa: BLE001 - counted as a failure below
+                failures += 1
+                continue
+            if count is None:
+                failures += 1
+            else:
+                rows.append({'zip': z, 'policies_in_force': int(count)})
+            if verbose and done % 10 == 0:
+                print(f"    policy counts: {done}/{len(zips)} zips "
+                      f"({len(rows)} retrieved, {failures} failed)")
 
+    if verbose:
+        print(f"    Policy denominator: {len(rows)}/{len(zips)} zips retrieved"
+              + (f", {failures} failed" if failures else ""))
     return pd.DataFrame(rows)
+
+
+def structure_counts_by_zip(properties: pd.DataFrame) -> pd.DataFrame:
+    """
+    Fallback denominator: residential structures per zip, from the study area's
+    own NSI structure list.
+
+    WHY THIS IS A REAL FALLBACK AND NOT A FUDGE: the point of a denominator is
+    to turn "this zip filed a lot of claims" into a RATE, so a big zip doesn't
+    outrank a badly-flooded small one. Policies-in-force is the ideal
+    denominator because claims can only come from insured structures. Total
+    residential structures is a different but still legitimate population
+    base — claims per building rather than claims per policy. It understates
+    the true rate wherever insurance take-up is below 100%, but take-up varies
+    far less between neighbouring zips in one metro than claim counts do, so it
+    preserves the between-zip ORDERING that the correlation and the label
+    actually depend on.
+
+    It is strictly better than the depth-share fallback it replaces, which had
+    no denominator at all and collapsed to a single class on real data.
+    `properties` needs columns: zip.
+    """
+    if properties.empty or 'zip' not in properties.columns:
+        return pd.DataFrame()
+    counts = (properties.dropna(subset=['zip'])
+              .groupby('zip').size().reset_index(name='structures_in_zip'))
+    return counts
 
 
 def aggregate_by_zip(claims: pd.DataFrame) -> pd.DataFrame:

@@ -115,14 +115,14 @@ def _nsi():
          'found_type': 'S', 'num_story': 1, 'sqft': 2000, 'ftprntsqft': 2000,
          'val_struct': 300000, 'val_cont': 150000, 'ground_elv': 50.0,
          'med_yr_blt': 1980, 'firmzone': 'AE', 'bldheight': 5.0,
-         'usastrucid': 'X1'},
+         'usastrucid': 'X1', 'cbfips': '482014312001000'},
         # far from everything (~1km from P2)
         {'latitude': 29.7200, 'longitude': -95.4100, 'fd_id': 2,
          'occtype': 'RES1-2SNB', 'st_damcat': 'RES', 'found_ht': 2.0,
          'found_type': 'C', 'num_story': 2, 'sqft': 3000, 'ftprntsqft': 1500,
          'val_struct': 400000, 'val_cont': 200000, 'ground_elv': 55.0,
          'med_yr_blt': 1995, 'firmzone': 'X', 'bldheight': 7.0,
-         'usastrucid': 'X2'},
+         'usastrucid': 'X2', 'cbfips': '482014312001001'},
     ])
 
 

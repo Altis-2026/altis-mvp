@@ -10,7 +10,7 @@ from openai import OpenAI
 import json
 import math
 import time
-from config import (OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR,
+from config import (OPENROUTER_API_KEY, HARVEY, BRAZOS, TRIAGE, OUTPUT_DIR,
                     PIPELINE_VERSION, OPTICAL, ENSEMBLE)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
@@ -254,11 +254,11 @@ if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
+    parser.add_argument('--event', action='append', choices=['harvey', 'brazos'],
                         help='Run only this event (repeatable). Default: both.')
     args = parser.parse_args()
-    events = args.event or ['harvey', 'ian']
+    events = args.event or ['harvey', 'brazos']
     if 'harvey' in events:
         run_triage_pipeline(HARVEY)
-    if 'ian' in events:
-        run_triage_pipeline(IAN)
+    if 'brazos' in events:
+        run_triage_pipeline(BRAZOS)

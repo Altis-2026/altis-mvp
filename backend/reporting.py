@@ -34,8 +34,8 @@ class ReportError(Exception):
 
 
 def _event_config(event_id: str) -> dict:
-    from pipeline.config import HARVEY, IAN, LISMORE
-    cfg = {'harvey': HARVEY, 'ian': IAN, 'lismore': LISMORE}.get(event_id)
+    from pipeline.config import HARVEY, BRAZOS, LISMORE
+    cfg = {'harvey': HARVEY, 'brazos': BRAZOS, 'lismore': LISMORE}.get(event_id)
     if cfg is None:
         raise ReportError(f"Unknown event '{event_id}'.")
     return cfg

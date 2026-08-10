@@ -60,16 +60,25 @@ HARVEY = {
     'pre_end':            '2017-08-24',
     'post_start':         '2017-08-27',
     'post_end':           '2017-09-10',
-    # Bounding box [west, south, east, north] — Addicks/Barker Reservoir and the
-    # adjacent residential neighborhoods (Bear Creek Village, Kelliwood, Canyon
-    # Gate) that flooded when the reservoirs filled and released. Measured SAR
-    # flood-mask coverage here is 0.68-2.65% per scene versus 0.00-0.02% for
-    # the previous Meyerland/Braeswood box and 0.18% for that box's full
-    # extent — this is open, low-vegetation reservoir-adjacent terrain, SAR's
-    # strongest case, rather than dense suburb under tree canopy. See
+    # Bounding box [west, south, east, north] — the Addicks/Barker Reservoir
+    # corridor and surrounding west/northwest Houston. Measured SAR flood-mask
+    # coverage at the reservoir edge is 0.68-2.65% per scene versus 0.00-0.02%
+    # for the original Meyerland/Braeswood box (0.18% over that box's full
+    # extent) — open, low-vegetation reservoir-adjacent terrain is SAR's
+    # strongest case, dense suburb under tree canopy its worst. See
     # docs/DETECTION_LIMITS.md for the measurements behind this change.
-    'bbox':               [-95.72, 29.75, -95.60, 29.85],
-    'study_name':         'Addicks/Barker Reservoir area, Houston TX',
+    #
+    # Widened from the tight [-95.72, 29.75, -95.60, 29.85] reservoir-edge box.
+    # WHY: validation correlates per-ZIP flood rate against per-ZIP NFIP claim
+    # rate, so it needs CONTRAST — zips that flooded badly and zips that barely
+    # did. The tight box gave 8 zips that ALL cleared the ground-truth
+    # threshold, leaving no negative class to correlate against or calibrate
+    # on, and 542 of 1000 properties landed in a single zip. This box spans
+    # west and northwest Houston either side of the Addicks/Barker pools,
+    # covering both the neighborhoods that flooded on reservoir release and
+    # surrounding ones that stayed dry.
+    'bbox':               [-95.88, 29.66, -95.46, 30.00],
+    'study_name':         'West & Northwest Houston (Addicks/Barker corridor), TX',
     'days_since_event':   3,
     'wse_radius_m':       300,    # Water surface elevation focal radius — tighter for rainfall flooding
     # Sample a 50m buffer centered on the real structure point instead of the
@@ -83,31 +92,63 @@ HARVEY = {
     # See docs/DETECTION_LIMITS.md.
     'exposure_radius_m':  50,
     'cost_per_inspection': 750,
-    'lat':                29.800,
-    'lon':               -95.660,
-    'zoom':               11,
+    'lat':                29.830,
+    'lon':               -95.670,
+    'zoom':               10,
 }
 
-# ─── HURRICANE IAN CONFIGURATION ─────────────────────────────────────────────
-IAN = {
-    'event_name':         'Hurricane Ian',
-    'event_id':           'ian',
-    'label':              'Hurricane Ian',
-    'sub':                'Charlotte County, FL  •  September 2022',
-    'county':             'Charlotte County, FL',
-    'pre_start':          '2022-09-01',
-    'pre_end':            '2022-09-25',
-    'post_start':         '2022-09-28',
-    'post_end':           '2022-10-12',
-    # Bounding box [west, south, east, north] — Port Charlotte + Punta Gorda
-    'bbox':               [-82.15, 26.88, -81.92, 27.08],
-    'study_name':         'Port Charlotte and Punta Gorda, FL',
-    'days_since_event':   2,
-    'wse_radius_m':       600,    # Wider for storm surge (more spatially uniform WSE)
+# ─── HURRICANE IAN — REMOVED ─────────────────────────────────────────────────
+# Ian (Port Charlotte / Punta Gorda, Sept 2022) was dropped as a demo and
+# benchmark event. It is not a tuning problem and not fixable by relocating the
+# study area: Sentinel-1's first usable pass over the area was 2 October, four
+# days after the 28 September landfall, by which time the surge had receded.
+# Only ASCENDING scenes covered the window. The large dark fractions present in
+# those scenes (14-32% below -16 dB) are Port Charlotte's permanent canal
+# network and coastline — they show near-zero z-scores against a 12-month
+# baseline, i.e. they are dark all the time, not flooded.
+#
+# The satellite never observed the event, so no amount of detection work
+# recovers it. Keeping it as a demo meant repeatedly explaining a number that
+# could not improve. Measurements behind this: docs/DETECTION_LIMITS.md.
+#
+# The revisit-gap limitation Ian illustrates is real and still disclosed in the
+# product; it just no longer needs a broken demo event to represent it.
+
+# ─── BRAZOS RIVER FLOODPLAIN (HARVEY) CONFIGURATION ──────────────────────────
+# Second US validation area, same storm as HARVEY. The Brazos crested at a
+# record ~55 ft at Richmond on 1 September 2017, inundating the floodplain
+# through Richmond, Rosenberg, and Simonton.
+#
+# WHY THIS ONE: it is open riverine floodplain — SAR's strongest detection
+# case, the same physical setting as the Lismore event that has always worked
+# in this repo — and it is a genuinely independent second sample. Addicks and
+# Barker are reservoir-release flooding; the Brazos is river-crest flooding, so
+# agreement across both is stronger evidence than either alone. Measured flood
+# coverage here is 0.79-2.21% per scene (docs/DETECTION_LIMITS.md section 3).
+BRAZOS = {
+    'event_name':         'Hurricane Harvey — Brazos River',
+    'event_id':           'brazos',
+    'label':              'Harvey: Brazos River',
+    'sub':                'Fort Bend County, TX  •  August–September 2017',
+    'county':             'Fort Bend County, TX',
+    'pre_start':          '2017-08-01',
+    'pre_end':            '2017-08-24',
+    # The Brazos crested days AFTER Harvey's rainfall ended — river flooding
+    # lags the storm, unlike the reservoir releases in the HARVEY box. The post
+    # window is shifted later to cover the actual crest.
+    'post_start':         '2017-08-29',
+    'post_end':           '2017-09-12',
+    'bbox':               [-95.90, 29.45, -95.60, 29.72],
+    'study_name':         'Brazos River floodplain: Richmond, Rosenberg, Simonton TX',
+    'days_since_event':   3,
+    'wse_radius_m':       300,
+    # Same claims-relevant exposure standard as HARVEY — see that entry and
+    # docs/DETECTION_LIMITS.md section 6 for the measurements behind it.
+    'exposure_radius_m':  50,
     'cost_per_inspection': 750,
-    'lat':                26.970,
-    'lon':               -82.050,
-    'zoom':               10,
+    'lat':                29.585,
+    'lon':               -95.755,
+    'zoom':               11,
 }
 
 # ─── NORTHERN RIVERS (LISMORE) FLOODS CONFIGURATION ──────────────────────────
@@ -151,7 +192,7 @@ EVENTS = {
         'bbox':  cfg['bbox'],          # zone-summary + globe event-zone box
         'event_date': cfg['post_start'],  # prefill for live analysis settings
     }
-    for cfg in (LISMORE, HARVEY, IAN)
+    for cfg in (LISMORE, HARVEY, BRAZOS)
 }
 
 # ─── TRIAGE THRESHOLDS ────────────────────────────────────────────────────────

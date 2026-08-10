@@ -81,8 +81,18 @@ import nfip_claims as nfip  # noqa: E402
 # genuinely inundated zips.
 ZIP_CLAIM_RATE_THRESHOLD_PCT = 5.0
 
-# Fallback when the policy denominator can't be retrieved: label on the share
-# of claims reporting standing water above the reference level.
+# First fallback denominator: NFIP claims per residential structure. Lower
+# threshold than the policy rate because the denominator is larger (all
+# residential buildings, not just insured ones), so the same flooding produces
+# a smaller percentage. Calibrated against observed Harvey values rather than
+# picked round: badly-flooded Harris County zips run several percent here,
+# untouched ones well under one.
+ZIP_STRUCTURE_RATE_THRESHOLD_PCT = 2.0
+
+# Last-resort fallback with no denominator at all: label on the share of claims
+# reporting standing water above the reference level. Known to collapse to a
+# single class on real data — retained only so the pipeline still produces a
+# report when both denominators are unavailable.
 ZIP_DEPTH_LABEL_THRESHOLD_PCT = 50.0
 
 # Legacy IA-based threshold, retained because derive_property_labels() still
@@ -103,12 +113,14 @@ EVENT_META = {
         'claims_end':   '2017-09-15',
         'as_of':        '2017-08-25',
     },
-    'ian': {
-        'label':        'Hurricane Ian',
-        'county':       'Charlotte County, FL',
-        'claims_start': '2022-09-28',
-        'claims_end':   '2022-10-15',
-        'as_of':        '2022-09-28',
+    'brazos': {
+        'label':        'Hurricane Harvey — Brazos River',
+        'county':       'Fort Bend County, TX',
+        # The Brazos crested days after Harvey's rainfall ended, so the claims
+        # window runs later than the HARVEY box's to cover the actual crest.
+        'claims_start': '2017-08-27',
+        'claims_end':   '2017-09-20',
+        'as_of':        '2017-08-25',
     },
 }
 
@@ -196,7 +208,8 @@ def load_altis_data(event_id: str, use_coordinates: bool = True) -> pd.DataFrame
 # GROUND TRUTH ASSEMBLY
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_ground_truth(event_id: str, zips, use_policy_denominator: bool = True) -> tuple:
+def build_ground_truth(event_id: str, zips, use_policy_denominator: bool = True,
+                       structures: Optional[pd.DataFrame] = None) -> tuple:
     """
     Assemble the NFIP ground truth for one event's zips.
 
@@ -219,15 +232,14 @@ def build_ground_truth(event_id: str, zips, use_policy_denominator: bool = True)
 
     zip_agg = nfip.aggregate_by_zip(claims)
 
-    if not use_policy_denominator:
-        diagnostics['policy_zips'] = 0
-        print("  Policy denominator skipped (--no-policies) — using "
-              "depth-share labels.")
-        return zip_agg, claims, diagnostics
+    policies = pd.DataFrame()
+    if use_policy_denominator:
+        print(f"  Fetching policy-in-force counts as of {meta['as_of']} "
+              f"(the claim-rate denominator)...")
+        policies = nfip.fetch_policies_in_force(zips, meta['as_of'])
+    else:
+        print("  Policy denominator skipped (--no-policies).")
 
-    print(f"  Fetching policy-in-force counts as of {meta['as_of']} "
-          f"(the claim-rate denominator)...")
-    policies = nfip.fetch_policies_in_force(zips, meta['as_of'])
     if not policies.empty:
         zip_agg = zip_agg.merge(policies, on='zip', how='left')
         with np.errstate(divide='ignore', invalid='ignore'):
@@ -236,9 +248,29 @@ def build_ground_truth(event_id: str, zips, use_policy_denominator: bool = True)
         bad = ~np.isfinite(zip_agg['nfip_claim_rate_pct'].to_numpy(dtype=float))
         zip_agg.loc[bad, 'nfip_claim_rate_pct'] = np.nan
         diagnostics['policy_zips'] = int(policies['zip'].nunique())
+        diagnostics['denominator'] = 'policies_in_force'
+    elif structures is not None and not structures.empty:
+        # Fallback denominator: residential structures per zip, from this
+        # study area's own NSI list. Not as good as policies-in-force, but a
+        # real population base — and vastly better than the depth-share label,
+        # which has no denominator at all and collapsed to a single class on
+        # real data (every zip above threshold, nothing to calibrate against).
+        zip_agg = zip_agg.merge(structures, on='zip', how='left')
+        with np.errstate(divide='ignore', invalid='ignore'):
+            zip_agg['claims_per_structure_pct'] = (
+                100.0 * zip_agg['nfip_claims'] / zip_agg['structures_in_zip'])
+        bad = ~np.isfinite(
+            zip_agg['claims_per_structure_pct'].to_numpy(dtype=float))
+        zip_agg.loc[bad, 'claims_per_structure_pct'] = np.nan
+        diagnostics['policy_zips'] = 0
+        diagnostics['denominator'] = 'residential_structures'
+        print(f"  Policy counts unavailable — using residential-structure "
+              f"counts as the denominator instead "
+              f"({structures['zip'].nunique()} zips).")
     else:
         diagnostics['policy_zips'] = 0
-        print("  Policy counts unavailable - falling back to depth-share labels.")
+        diagnostics['denominator'] = 'none'
+        print("  No denominator available - falling back to depth-share labels.")
 
     return zip_agg, claims, diagnostics
 
@@ -256,10 +288,16 @@ def label_column_for(zip_agg: pd.DataFrame) -> tuple:
         return ('nfip_claim_rate_pct', ZIP_CLAIM_RATE_THRESHOLD_PCT,
                 f"NFIP claim rate (claims per policy in force) "
                 f">= {ZIP_CLAIM_RATE_THRESHOLD_PCT}%")
+    if ('claims_per_structure_pct' in zip_agg.columns and
+            zip_agg['claims_per_structure_pct'].notna().sum() >= 3):
+        return ('claims_per_structure_pct', ZIP_STRUCTURE_RATE_THRESHOLD_PCT,
+                f"NFIP claims per residential structure "
+                f">= {ZIP_STRUCTURE_RATE_THRESHOLD_PCT}% (policies-in-force "
+                f"denominator unavailable; structure counts substituted)")
     return ('nfip_pct_depth_gt0', ZIP_DEPTH_LABEL_THRESHOLD_PCT,
             f"share of NFIP claims reporting standing water "
-            f">= {ZIP_DEPTH_LABEL_THRESHOLD_PCT}% (no policy denominator "
-            f"available - weaker label)")
+            f">= {ZIP_DEPTH_LABEL_THRESHOLD_PCT}% (no denominator "
+            f"available - weakest label)")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -339,6 +377,9 @@ def compute_metrics(merged: pd.DataFrame) -> dict:
     metrics['flagged_vs_claim_rate_corr'] = corr('nfip_claim_rate_pct',
                                                  'altis_pct_flagged',
                                                  'flagged_vs_claim_rate_corr')
+    metrics['flagged_vs_structure_rate_corr'] = corr(
+        'claims_per_structure_pct', 'altis_pct_flagged',
+        'flagged_vs_structure_rate_corr')
     metrics['flagged_vs_depth_share_corr'] = corr('nfip_pct_depth_gt0',
                                                   'altis_pct_flagged',
                                                   'flagged_vs_depth_share_corr')
@@ -895,7 +936,8 @@ def run_validation(event_id: str, use_policy_denominator: bool = True):
 
     zips = sorted(altis_df['zip'].unique())
     zip_agg, claims, diagnostics = build_ground_truth(
-        event_id, zips, use_policy_denominator=use_policy_denominator)
+        event_id, zips, use_policy_denominator=use_policy_denominator,
+        structures=nfip.structure_counts_by_zip(altis_df))
     if zip_agg.empty:
         print(f"  Skipping {event_id} — no NFIP ground truth retrieved.")
         return
@@ -938,7 +980,7 @@ def run_validation(event_id: str, use_policy_denominator: bool = True):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Validate Altis output against NFIP claims ground truth')
-    parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
+    parser.add_argument('--event', action='append', choices=['harvey', 'brazos'],
                         help='Event to validate (repeatable). Default: both.')
     parser.add_argument('--no-policies', action='store_true',
                         help="Skip the NFIP policy-in-force denominator. That "
@@ -947,7 +989,7 @@ if __name__ == '__main__':
                              "depth-share label, which the report states.")
     args = parser.parse_args()
 
-    events = args.event or ['harvey', 'ian']
+    events = args.event or ['harvey', 'brazos']
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     for i, evt in enumerate(events):

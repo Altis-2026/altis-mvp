@@ -7,14 +7,13 @@ import requests
 import pandas as pd
 import random
 import time
-from config import HARVEY, IAN, OUTPUT_DIR
+from config import HARVEY, BRAZOS, OUTPUT_DIR
 from provenance import write_manifest
 
 random.seed(42)
 
 
-def query_nsi_addresses(bbox, target=1000, seed=42, community_labeler=None,
-                        near_flood_boost=None, near_flood_radius_m=150):
+def query_nsi_addresses(bbox, target=1000, seed=42):
     """
     Fallback property source: USACE National Structure Inventory.
 
@@ -23,25 +22,18 @@ def query_nsi_addresses(bbox, target=1000, seed=42, community_labeler=None,
     OSM/Mapbox/Census geocoding, so the normal address path has no live
     alternative there. NSI gives real, government-published structure
     locations (see pipeline/structures.py), but no street address, so this
-    does NOT fabricate one. `community_labeler(lat, lon) -> str` supplies an
-    honest, coarse label (a named community/county) instead; the default
-    labels every property with its county and structure ID only.
+    does NOT fabricate one: each property is labeled with its NSI structure id
+    and its county, the latter derived exactly from the structure's census
+    block FIPS rather than guessed from coordinates.
 
-    This must never silently produce a nicer-looking but fake address —
-    the 'no fabricated data' rule from Phase 0 applies here too.
+    This must never silently produce a nicer-looking but fake address — the
+    'no fabricated data' rule from Phase 0 applies here too.
 
-    `near_flood_boost`: optional list of NSI `fd_id`s to include unconditionally
-    before filling the remainder with a random draw. This exists because a
-    uniform random draw of residential structures across a large bbox can
-    badly under-represent the actual flood extent — observed directly on
-    Addicks/Barker (12km x 11km), where a naive random 1000-property draw
-    detected 0 flooded even though the bbox as a whole shows real flood
-    coverage: Harvey's flooding there hit a narrow band right at the reservoir
-    edge, not the whole box. The boost ids should come from the detector's
-    own output (see docs/DETECTION_LIMITS.md's targeting method) — this
-    selects WHICH REAL STRUCTURES to include in the demo portfolio, at the
-    same "choose the study area" granularity as picking the bbox itself; it
-    never fabricates or overrides any per-property detection result.
+    SAMPLING IS A PLAIN UNIFORM RANDOM DRAW, and must stay that way for any
+    event whose output feeds validation. An earlier revision biased this draw
+    toward structures near the detector's own flood mask; that inflates
+    apparent agreement with claims because it conditions the sample on the
+    thing being measured. See the note in __main__ for the full reasoning.
     """
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import structures as struct
@@ -55,28 +47,14 @@ def query_nsi_addresses(bbox, target=1000, seed=42, community_labeler=None,
         res = nsi.reset_index(drop=True)
 
     rng = np.random.default_rng(seed)
-
-    if near_flood_boost:
-        boosted = res[res['fd_id'].isin(near_flood_boost)]
-        remainder = res[~res['fd_id'].isin(near_flood_boost)]
-        n_fill = max(0, target - len(boosted))
-        if n_fill and len(remainder):
-            idx = rng.choice(len(remainder), size=min(n_fill, len(remainder)),
-                             replace=False)
-            fill = remainder.iloc[idx]
-        else:
-            fill = remainder.iloc[0:0]
-        res = pd.concat([boosted, fill]).reset_index(drop=True)
-    else:
-        n = min(target, len(res))
-        idx = rng.choice(len(res), size=n, replace=False)
-        res = res.iloc[idx].reset_index(drop=True)
+    n = min(target, len(res))
+    idx = rng.choice(len(res), size=n, replace=False)
+    res = res.iloc[idx].reset_index(drop=True)
 
     props = []
     for _, row in res.iterrows():
         lat, lon = float(row['latitude']), float(row['longitude'])
-        label = (community_labeler(lat, lon) if community_labeler
-                 else 'Harris County, TX')
+        label = county_label_from_cbfips(row.get('cbfips'))
         props.append({
             'latitude': round(lat, 6),
             'longitude': round(lon, 6),
@@ -237,8 +215,7 @@ out geom {needed * 3};
     return synthetic
 
 
-def build_property_list(event_config, target=1000, community_labeler=None,
-                        near_flood_boost=None):
+def build_property_list(event_config, target=1000):
     """
     Build a property list for a flood event.
     First tries OSM building addresses, augments with street addresses if
@@ -279,9 +256,7 @@ def build_property_list(event_config, target=1000, community_labeler=None,
               "labeled 'NSI Structure <id>, <county>' rather than a street "
               "address, since NSI does not publish one and this pipeline "
               "never fabricates one.")
-        props = query_nsi_addresses(bbox, target=target,
-                                    community_labeler=community_labeler,
-                                    near_flood_boost=near_flood_boost)
+        props = query_nsi_addresses(bbox, target=target)
         source = 'USACE National Structure Inventory (no OSM access; ' \
                  'addresses are NSI structure IDs, not street addresses)'
 
@@ -295,7 +270,7 @@ def build_property_list(event_config, target=1000, community_labeler=None,
     df = df.drop_duplicates(subset='address').reset_index(drop=True)
     df = df.head(target).reset_index(drop=True)
 
-    prefix = 'HARV' if event_id == 'harvey' else 'IAN'
+    prefix = {'harvey': 'HARV', 'brazos': 'BRZ'}.get(event_id, event_id[:4].upper())
     df['property_id'] = [f"{prefix}-{str(i + 1).zfill(5)}" for i in range(len(df))]
     df = df[['property_id', 'address', 'latitude', 'longitude']]
 
@@ -312,59 +287,61 @@ def build_property_list(event_config, target=1000, community_labeler=None,
     return df
 
 
-def addicks_community_label(lat, lon):
-    """
-    Coarse, honest community label for the Addicks/Barker Reservoir bbox.
-    Bucketed on public knowledge of which named neighborhoods sit where in
-    this area — a label, not a fabricated street address.
-    """
-    if lat >= 29.80:
-        return 'Bear Creek Village, Harris County, TX'
-    if lon <= -95.66:
-        return 'Kelliwood, Harris County, TX'
-    return 'Canyon Gate / Concord Bridge, Harris County, TX'
+# County FIPS -> name, for the counties the configured study areas span.
+# NSI publishes each structure's census block FIPS (`cbfips`); its first five
+# digits are the state+county code. Deriving the label from that is exact,
+# rather than guessing a county (or worse, a neighborhood) from a bounding box
+# that may straddle a county line.
+COUNTY_FIPS = {
+    '48201': 'Harris County, TX',
+    '48157': 'Fort Bend County, TX',
+    '48473': 'Waller County, TX',
+    '48339': 'Montgomery County, TX',
+    '48291': 'Liberty County, TX',
+    '48071': 'Chambers County, TX',
+    '48039': 'Brazoria County, TX',
+}
+
+
+def county_label_from_cbfips(cbfips, default='TX'):
+    """Exact county label from an NSI census-block FIPS, or a neutral default."""
+    code = str(cbfips or '')[:5]
+    return COUNTY_FIPS.get(code, default)
 
 
 if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
+    parser.add_argument('--event', action='append', choices=['harvey', 'brazos'],
                         help='Regenerate this event\'s property list (repeatable). '
-                             'Default: ian only (Harvey normally already exists).')
+                             'Default: both.')
+    parser.add_argument('--target', type=int, default=4000,
+                        help='Properties per event (default 4000).')
     args = parser.parse_args()
-    events = args.event or ['ian']
+    events = args.event or ['harvey', 'brazos']
 
-    if 'harvey' in events:
-        # A uniform random draw of residential structures across the full
-        # bbox mostly missed Harvey's actual flood extent there (see
-        # docs/DETECTION_LIMITS.md) — the flooding hit a narrow band right at
-        # the reservoir edge, not the whole 12km x 11km box. This file is the
-        # output of a one-time targeting pass: every RES structure in the
-        # bbox sampled against the detector's OWN flood mask (dilated 150m),
-        # keeping only those on/near a detected pixel. It selects which real
-        # structures go in the demo portfolio, at the same "pick the study
-        # area" granularity as choosing the bbox itself — it never overrides
-        # or fabricates a per-property detection result.
-        boost_path = os.path.join(OUTPUT_DIR, 'harvey_near_flood_structures.csv')
-        near_flood_boost = None
-        if os.path.exists(boost_path):
-            near_flood_boost = pd.read_csv(boost_path)['fd_id'].tolist()
-            print(f"  Boosting {len(near_flood_boost)} structures near "
-                  f"detected flood pixels ({boost_path})")
-        harvey_df = build_property_list(HARVEY, target=1000,
-                                        community_labeler=addicks_community_label,
-                                        near_flood_boost=near_flood_boost)
-        harvey_path = os.path.join(OUTPUT_DIR, 'harvey_properties.csv')
-        harvey_df.to_csv(harvey_path, index=False)
-        print(f"\n✓ Harvey properties saved → {harvey_path}")
-        print(harvey_df.head(3).to_string(index=False))
+    # NOTE ON SAMPLING — deliberately UNBIASED, and this reverses an earlier
+    # decision in this codebase's history.
+    #
+    # An earlier revision targeted the property list at structures near the
+    # detector's own flood mask, because a random draw across the then-tight
+    # reservoir-edge bbox found almost no flooding. That is fine for a
+    # showcase portfolio and WRONG for anything feeding validation: selecting
+    # properties where the detector already fires, then asking whether the
+    # claims agree, cannot measure accuracy — it measures the selection.
+    #
+    # The real fix was the study area, not the sampling. The widened bbox
+    # (see config.HARVEY) spans zips that flooded badly and zips that barely
+    # did, so a plain random draw now lands on both and gives the per-zip
+    # correlation actual contrast to work with. Targeting is gone.
+    for event_cfg, name in ((HARVEY, 'harvey'), (BRAZOS, 'brazos')):
+        if name not in events:
+            continue
+        df = build_property_list(event_cfg, target=args.target)
+        path = os.path.join(OUTPUT_DIR, f'{name}_properties.csv')
+        df.to_csv(path, index=False)
+        print(f"\n✓ {event_cfg['event_name']} properties saved → {path}")
+        print(df.head(3).to_string(index=False))
 
-    if 'ian' in events:
-        ian_df = build_property_list(IAN, target=1000)
-        ian_path = os.path.join(OUTPUT_DIR, 'ian_properties.csv')
-        ian_df.to_csv(ian_path, index=False)
-        print(f"\n✓ Ian properties saved → {ian_path}")
-        print(ian_df.head(3).to_string(index=False))
-
-    print("\n✓ Day 1 Step 6 complete. Check your outputs/ folder.")
+    print("\n✓ Property lists rebuilt. Check your outputs/ folder.")

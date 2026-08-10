@@ -71,6 +71,11 @@ NSI_FIELDS = [
     'fd_id', 'occtype', 'st_damcat', 'found_ht', 'found_type', 'num_story',
     'sqft', 'ftprntsqft', 'val_struct', 'val_cont', 'ground_elv',
     'med_yr_blt', 'firmzone', 'bldheight', 'usastrucid',
+    # Census block FIPS. Its first 5 digits are the state+county code, which
+    # is the only exact way to label a structure's county — a bounding box can
+    # straddle a county line, so inferring it from coordinates would be a
+    # guess.
+    'cbfips',
 ]
 
 # A match further than this from the geocoded point is not trustworthy as
