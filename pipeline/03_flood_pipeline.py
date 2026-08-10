@@ -216,7 +216,7 @@ def run_flood_pipeline(event_config):
     result_df = result_df.merge(
         flood_df[['property_id', 'pct_flooded', 'max_depth_ft', 'urban_flag',
                   'optical_available', 'optical_water_pct', 'wse_spread_ft',
-                  'rel_elev_ft', 'hand_ft']].assign(
+                  'rel_elev_ft', 'hand_ft', 'water_fraction']].assign(
             property_id=lambda d: d['property_id'].astype(str)),
         on='property_id', how='left'
     )
@@ -227,6 +227,9 @@ def run_flood_pipeline(event_config):
     result_df['optical_water_pct']   = result_df['optical_water_pct'].fillna(0.0)
     result_df['wse_spread_ft']       = result_df['wse_spread_ft'].fillna(0.0)
     result_df['rel_elev_ft']         = result_df['rel_elev_ft'].fillna(0.0)
+    # Phase 4a: graded sub-pixel exposure. 0.0 is a real answer here (no water),
+    # unlike hand_ft where 0 would mean "at the drainage line".
+    result_df['water_fraction']      = result_df['water_fraction'].fillna(0.0)
     # hand_ft is deliberately NOT filled: None means "MERIT Hydro has no value
     # here", and the ensemble must abstain rather than read a filled 0 as
     # "at the drainage line", which is the most flood-prone value there is.

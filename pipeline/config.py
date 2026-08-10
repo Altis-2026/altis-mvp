@@ -282,6 +282,55 @@ BASELINE = {
     'require_absolute': True,
 }
 
+# ─── SUB-PIXEL WATER FRACTION (Phase 4a) ─────────────────────────────────────
+# The single change with the most leverage on RECALL, which measurement showed
+# is the binding constraint — not correctness.
+#
+# THE PROBLEM: the flood mask is binary per pixel. A property's exposure is the
+# mean of that mask over its sampling buffer, so at 30m a ~50m buffer covers
+# roughly nine pixels, and if none of them individually clears the open-water
+# threshold the property scores EXACTLY zero. Measured on the validation runs:
+# 3,978 of 4,000 Brazos properties and 3,948 of 4,000 Harvey properties scored
+# exactly 0.0. A calibrator handed a column that is 99.4% one identical value
+# has nothing to discriminate on, which is precisely why the Brier skill score
+# came out negative in both study areas despite honest zip-level agreement.
+#
+# THE PHYSICS: SAR backscatter in LINEAR POWER (not dB) mixes linearly by area
+# fraction within a resolution cell. For a pixel that is fraction f water and
+# (1-f) its normal dry self:
+#
+#     sigma_obs = f * sigma_water + (1 - f) * sigma_dry
+#     =>      f = (sigma_dry - sigma_obs) / (sigma_dry - sigma_water)
+#
+# We already have a per-pixel sigma_dry for free: the multi-temporal baseline
+# mean built in Phase 1. So this is a genuine physical unmixing against that
+# pixel's own measured normal state, not a tuned heuristic — a half-flooded
+# suburban lot that never reads as "open water" still returns a real, graded
+# ~0.5 instead of a zero.
+#
+# WHY THIS DOES NOT JUST INVENT SIGNAL: the fraction is only computed where the
+# darkening is statistically significant against that pixel's own baseline
+# variability. The gate is looser than the binary detector's (that is the
+# point — it is what recovers the partial cases) but it is still a gate, so
+# ordinary speckle does not produce spurious fractions everywhere.
+SUBPIXEL = {
+    'enabled': True,
+    # Open-water VV endmember. Physically motivated rather than tuned: calm
+    # open water at Sentinel-1's incidence angles sits near -20 dB, well below
+    # the -12 dB upper bound the Otsu range guard uses for "could be water".
+    'water_endmember_db': -20.0,
+    # Significance gate, in standard deviations below the pixel's own baseline
+    # mean. Deliberately looser than BASELINE['z_threshold'] (2.0) used by the
+    # binary mask — partial inundation produces a partial darkening, which is
+    # exactly the signal the strict gate was discarding.
+    'z_min': 1.0,
+    # Fractions below this are treated as zero. Guards against a long tail of
+    # physically meaningless 1-2% values driven by residual speckle.
+    'min_fraction': 0.05,
+    # A pixel darker than the water endmember is fully water, not >100% water.
+    'clamp_to_one': True,
+}
+
 # ─── HAND — HEIGHT ABOVE NEAREST DRAINAGE (Phase 1) ──────────────────────────
 # Replaces `rel_elev_ft` (elevation minus the minimum within a 300-600m circle)
 # as the DEM-hydrology ensemble vote.

@@ -26,10 +26,10 @@ import pandas as pd
 
 try:
     from config import (SAR, OPTICAL, SAR_VH, DURATION, RAIN,
-                        BASELINE, HAND, CROSS_ORBIT)
+                        BASELINE, HAND, CROSS_ORBIT, SUBPIXEL)
 except ImportError:  # pragma: no cover - import path guard
     from pipeline.config import (SAR, OPTICAL, SAR_VH, DURATION, RAIN,
-                                 BASELINE, HAND, CROSS_ORBIT)
+                                 BASELINE, HAND, CROSS_ORBIT, SUBPIXEL)
 
 
 def load_dem(bbox_coords):
@@ -495,6 +495,64 @@ def orbit_flood_mask(post_img, threshold, slope_mask, permanent_water,
     return mask.And(slope_mask).And(permanent_water.Not())
 
 
+def _db_to_power(img):
+    """dB -> linear power. Backscatter mixes linearly in power, not in dB."""
+    return ee.Image(10.0).pow(img.divide(10.0))
+
+
+def water_fraction(post_img, dry_reference, baseline_std=None,
+                   slope_mask=None, permanent_water=None, cfg=SUBPIXEL):
+    """
+    Sub-pixel water fraction in [0, 1] by linear unmixing against each pixel's
+    own dry reference.
+
+        sigma_obs = f * sigma_water + (1 - f) * sigma_dry
+        f = (sigma_dry - sigma_obs) / (sigma_dry - sigma_water)
+
+    all evaluated in LINEAR POWER, because that is the domain in which
+    backscatter contributions from sub-areas of a resolution cell actually add.
+    Doing this in dB — which is tempting since S1_GRD ships in dB — would be
+    unmixing a logarithm and is simply wrong.
+
+    `dry_reference` should be the multi-temporal baseline mean (that pixel's
+    measured normal state). The pre-event composite is an acceptable but
+    weaker substitute, for the same reason the baseline replaced it in Phase 1:
+    one scene can be unrepresentative.
+
+    Returns a float band 'water_frac'. Pixels whose darkening is not
+    significant against their own baseline variability are set to 0, so this
+    grades genuine partial inundation rather than manufacturing signal from
+    speckle.
+    """
+    water_power = _db_to_power(ee.Image.constant(cfg['water_endmember_db']))
+    dry_power = _db_to_power(dry_reference)
+    obs_power = _db_to_power(post_img)
+
+    # Denominator is negative-safe: where dry <= water (already water-like
+    # before the event) the fraction is meaningless, so it is masked to 0.
+    denom = dry_power.subtract(water_power)
+    frac = dry_power.subtract(obs_power).divide(denom)
+    frac = frac.where(denom.lte(0), 0)
+
+    frac = frac.clamp(0.0, 1.0) if cfg.get('clamp_to_one') else frac.max(0.0)
+
+    # Significance gate against the pixel's own variability.
+    if baseline_std is not None:
+        std = baseline_std.max(BASELINE['min_std_db'])
+        z = post_img.subtract(dry_reference).divide(std)
+        frac = frac.where(z.gt(-cfg['z_min']), 0)
+
+    # Drop a physically meaningless speckle tail.
+    frac = frac.where(frac.lt(cfg['min_fraction']), 0)
+
+    if slope_mask is not None:
+        frac = frac.where(slope_mask.Not(), 0)
+    if permanent_water is not None:
+        frac = frac.where(permanent_water, 0)
+
+    return frac.rename('water_frac').float()
+
+
 def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_m,
                             optical_water=None, optical_valid=None,
                             pre_vh=None, post_vh=None, rain=None,
@@ -620,6 +678,32 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
         combined = combined.addBands(hand.float().unmask(-1).rename('hand_ft'))
     else:
         combined = combined.addBands(ee.Image(-1).rename('hand_ft').float())
+
+    # ── Phase 4a: sub-pixel water fraction. The binary mask above answers
+    #    "is this whole pixel water?"; this answers "what share of it is?",
+    #    which is what a partially-inundated suburban lot actually looks like.
+    if SUBPIXEL.get('enabled', True):
+        dry_ref = baseline_mean if baseline_mean is not None else pre_image
+        frac = water_fraction(post_image, dry_ref, baseline_std=baseline_std,
+                              slope_mask=slope_mask,
+                              permanent_water=permanent_water)
+        # Cross-orbit: take the WETTEST observation per pixel. A flood seen by
+        # one pass is still a flood; the union semantics already applied to the
+        # binary masks, applied to a continuous quantity.
+        for spec in (orbit_stack or {}).values():
+            post_o = spec.get('post')
+            if post_o is None:
+                continue
+            dry_o = (spec.get('baseline_mean')
+                     if spec.get('baseline_mean') is not None else spec.get('pre'))
+            if dry_o is None:
+                continue
+            frac = frac.max(water_fraction(
+                post_o, dry_o, baseline_std=spec.get('baseline_std'),
+                slope_mask=slope_mask, permanent_water=permanent_water))
+        combined = combined.addBands(frac.unmask(0))
+    else:
+        combined = combined.addBands(ee.Image(0).rename('water_frac').float())
 
     if optical_water is not None:
         combined = combined.addBands(optical_water.float().unmask(0))
@@ -813,6 +897,9 @@ def _row_from_sample(property_id, address, p):
         # as None so the ensemble abstains instead of reading it as "at the
         # drainage line", which is what a 0 would mean.
         'hand_ft':       _hand_or_none(p.get('hand_ft_mean')),
+        # Phase 4a: mean sub-pixel water fraction over the sampled region —
+        # a graded exposure measure where pct_flooded is all-or-nothing.
+        'water_fraction': round(max(0.0, float(p.get('water_frac_mean') or 0)), 4),
         # Round-7 bands — all default to "absent/abstain" when not sampled.
         'vh_available':  int(round(float(p.get('vh_valid_mean') or 0))),
         'vh_water_pct':  round(max(0.0, float(p.get('vh_flood_mean') or 0)), 4),

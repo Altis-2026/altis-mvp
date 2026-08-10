@@ -481,8 +481,27 @@ def derive_property_labels(altis_df: pd.DataFrame, zip_agg: pd.DataFrame,
     # pct_flooded in the final CSV is a 0-100 percentage; convert back to 0-1.
     pct_frac = pd.to_numeric(df['pct_flooded'], errors='coerce').fillna(0.0) / 100.0
     depth = pd.to_numeric(df['max_depth_ft'], errors='coerce').fillna(0.0)
+
+    # COVERAGE TERM: prefer the sub-pixel water fraction over the binary mask.
+    #
+    # `pct_flooded` is the mean of an all-or-nothing per-pixel mask, and on real
+    # runs it is EXACTLY 0.0 for ~99.4% of properties (3,978/4,000 Brazos,
+    # 3,948/4,000 Harvey). A score built on it is nearly constant, which is why
+    # calibration kept coming out well-calibrated but with negative Brier skill
+    # — there was almost nothing to discriminate on. `water_fraction` grades
+    # partial inundation instead of discarding it. Falls back to the binary
+    # column for outputs produced before Phase 4a.
+    if 'water_fraction' in df.columns:
+        frac = pd.to_numeric(df['water_fraction'], errors='coerce').fillna(0.0)
+        # Take the larger of the two: the sub-pixel estimate should dominate,
+        # but a property the strict mask called flooded must never score lower
+        # for it.
+        coverage = pd.concat([pct_frac, frac], axis=1).max(axis=1)
+    else:
+        coverage = pct_frac
+
     df['raw_flood_score'] = [
-        calib.raw_flood_score(p, d) for p, d in zip(pct_frac, depth)]
+        calib.raw_flood_score(p, d) for p, d in zip(coverage, depth)]
     return df
 
 

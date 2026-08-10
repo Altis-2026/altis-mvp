@@ -258,7 +258,10 @@ def run_triage_pipeline(event_config):
         'impact_class', 'confidence_score', 'recommended_action',
         'adjuster_note', 'urban_flag', 'optical_available', 'optical_water_pct',
         'confidence_factors', 'ensemble_disagreement', 'ensemble_note',
-        'ensemble_votes'
+        'ensemble_votes',
+        # Phase 4a: graded sub-pixel water fraction, carried through so
+        # validation can score on it instead of the all-or-nothing mask.
+        'water_fraction',
     ]
     final_df = df[[c for c in final_cols if c in df.columns]].copy()
 
