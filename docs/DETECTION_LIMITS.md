@@ -399,3 +399,102 @@ Brazos numbers, and state the urban-canopy limit before a carrier's engineer
 finds it. The zero-dispatch result in Harvey is a feature worth showing
 deliberately — a system that declines to guess is worth more to a claims
 manager than one that confidently sends adjusters to dry houses.
+
+---
+
+## 9. Sub-pixel water fraction: implemented, measured, and switched off
+
+Section 7 ranked sub-pixel water detection as the **highest-expected-value**
+change for recall. It was built, run end to end, and measured. It does not
+work, and this section exists so nobody spends that money twice.
+
+### The reasoning going in was sound
+
+Recall was the binding constraint, and the mechanism was blunt: the flood mask
+is binary per pixel, so a property's exposure is the mean of an all-or-nothing
+mask over ~9 pixels at 30m. If no single pixel clears the open-water
+threshold, the property scores **exactly zero** — which is what happened to
+3,978 of 4,000 Brazos properties and 3,948 of 4,000 Harvey ones. A calibrator
+handed a column that is 99.4% one identical value has nothing to work with,
+which is why calibration came out well-calibrated but with negative skill.
+
+Sub-pixel unmixing addresses that directly. Backscatter mixes linearly in
+POWER by area fraction, and the Phase 1 baseline already gives a per-pixel dry
+endmember, so `f = (σ_dry − σ_obs) / (σ_dry − σ_water)` inverts a genuinely
+half-flooded pixel back to ~0.5 instead of discarding it as "not water".
+
+### Mechanically it did exactly what it was supposed to
+
+| | Binary | Sub-pixel |
+|---|---|---|
+| Properties with nonzero signal | 22 (0.55%) | **1,441 (36%)** |
+| Distinct score values | 23 | **602** |
+
+A 65× increase in graded properties. The consistency check also passed: on the
+22 properties the strict mask flagged, mean water fraction was 0.517 — the
+confident cases do read as strongly wet.
+
+### And it bought nothing
+
+| Metric | Binary | Sub-pixel |
+|---|---|---|
+| Depth correlation vs claims | +0.366 | **+0.366** |
+| Brier | 0.1714 | **0.1712** |
+| Brier skill score | −0.0366 | **−0.0354** |
+
+The direct test settles it. As a standalone predictor of whether a property's
+zip actually flooded, the water fraction scores:
+
+- **AUC 0.4862** — where 0.5 is *no information whatsoever*
+- **Mann-Whitney p = 0.92**
+- Nonzero on **36.9%** of dry-truth properties versus **33.5%** of
+  flooded-truth ones — marginally *more* common where there was no flood
+
+### Why — the part worth keeping
+
+Harvey dropped on the order of 50 inches of rain across the basin. **Saturated
+soil darkens C-band SAR in the same direction, and at a similar magnitude, as
+shallow standing water.** The loose significance gate required to recover
+partial inundation is necessarily loose enough to admit soil moisture — and
+after an event of this scale, soil moisture is everywhere, in flooded and
+unflooded zips alike. That is exactly the flat, uninformative 36% we measured.
+
+Tightening the gate back toward the binary detector's threshold just recreates
+the binary detector. There is no setting in between that separates the two,
+because **single-polarisation amplitude at 30m does not carry the information
+needed to distinguish wet ground from standing water.** This is a property of
+the measurement, not of the tuning.
+
+### What was done about it
+
+`SUBPIXEL['enabled']` is **False**. The code and its tests are kept, not
+deleted — the physics is correct (the unmixing recovers known fractions
+exactly, and a test proves the tempting dB-domain shortcut would be wrong), and
+the method is sound wherever the confound is absent: dual-pol or polarimetric
+data, finer resolution, or events without basin-wide antecedent rainfall.
+Re-enabling is one line plus a re-validation.
+
+Shipping it enabled would have multiplied apparent sensitivity by 65 while
+adding zero accuracy. That is the most dangerous kind of change — it looks
+like progress in every dashboard.
+
+### What this implies for the remaining recall ideas
+
+Section 7's list needs reordering now that its top item is eliminated:
+
+1. **Dual-polarisation (VV+VH) partial-water detection.** VH responds
+   differently to soil moisture than to specular water surfaces, which is
+   precisely the confound that killed the single-pol attempt. The pipeline
+   already loads VH for the dual-pol cross-check, so the data is in hand.
+2. **A learned fourth vote (Phase 4).** With NFIP claims as labels, a model
+   over depth, HAND, foundation type, occupancy and *both* polarisations can
+   learn the wet-soil/standing-water boundary empirically rather than by a
+   hand-set threshold. This is now the most promising path.
+3. **More post-event scenes.** Harvey had two on the primary orbit; a median
+   over a 14-day window actively averages away transient flooding.
+   Sentinel-1C/D have since restored 6-day revisit.
+4. Commercial SAR at 6-24h revisit for events where Sentinel misses the peak.
+
+Note that 1 and 2 both attack the *same* confound this section identified.
+That is the useful thing a negative result buys: the next attempt is aimed at
+a known obstacle instead of a guess.

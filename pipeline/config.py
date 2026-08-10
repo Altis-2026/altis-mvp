@@ -313,8 +313,48 @@ BASELINE = {
 # variability. The gate is looser than the binary detector's (that is the
 # point — it is what recovers the partial cases) but it is still a gate, so
 # ordinary speckle does not produce spurious fractions everywhere.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# MEASURED RESULT: THIS DOES NOT WORK, AND IS DISABLED BY DEFAULT.
+#
+# It was implemented, run end to end on Brazos (4,000 properties, 15 zips,
+# 3,135 real NFIP claims), and measured against the same ground truth as
+# everything else. It did exactly what it was designed to do mechanically, and
+# that turned out to be worthless:
+#
+#   signal density   22 -> 1,441 properties nonzero (0.55% -> 36%)
+#   distinct scores  23 -> 602
+#   depth correlation      +0.366 -> +0.366   (unchanged)
+#   Brier                  0.1714 -> 0.1712   (unchanged)
+#   Brier skill score     -0.0366 -> -0.0354  (still negative)
+#
+# The direct test is damning: as a standalone predictor of whether a property's
+# zip actually flooded, the water fraction scores **AUC 0.4862** (0.5 is no
+# information at all) with Mann-Whitney p=0.92. It is fractionally MORE common
+# on dry-truth properties (36.9% nonzero) than on flooded-truth ones (33.5%).
+#
+# WHY, which is the part worth keeping: after a rain event of Harvey's scale
+# the whole region has saturated soil, and wet ground darkens C-band SAR in
+# the same direction and a similar magnitude as shallow standing water. The
+# loose z gate that is required to recover partial inundation is also loose
+# enough to admit soil moisture everywhere. Tightening it back to the binary
+# detector's threshold just reproduces the binary detector. Single-polarisation
+# amplitude at 30m simply does not separate "wet ground" from "standing water",
+# and no amount of tuning inside this method will change that — the information
+# is not in the measurement.
+#
+# The code and its tests are retained deliberately, not deleted: the physics is
+# correct (the unmixing recovers known fractions exactly), and the method is
+# sound where the confound is absent — dual-pol or polarimetric data, finer
+# resolution, or events without basin-wide antecedent rainfall. Turning it on
+# is a one-line change plus a re-validation. Shipping it enabled would inflate
+# apparent sensitivity 65x while adding zero accuracy, which is precisely the
+# kind of plausible-looking number this codebase refuses everywhere else.
+#
+# See docs/DETECTION_LIMITS.md section 9.
+# ─────────────────────────────────────────────────────────────────────────────
 SUBPIXEL = {
-    'enabled': True,
+    'enabled': False,
     # Open-water VV endmember. Physically motivated rather than tuned: calm
     # open water at Sentinel-1's incidence angles sits near -20 dB, well below
     # the -12 dB upper bound the Otsu range guard uses for "could be water".
