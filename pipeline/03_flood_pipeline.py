@@ -192,6 +192,15 @@ def run_flood_pipeline(event_config):
 
     sample_df = properties_df.copy()
     sample_df['property_id'] = sample_df['property_id'].astype(str)
+
+    # Read from config BEFORE the match check, not inside it. This is an event
+    # setting, not a property of whether NSI happened to return anything — and
+    # when it read from inside the block it was simply unbound on the no-match
+    # path, crashing the manifest write after the sampling had already been
+    # paid for. That path is not an edge case: NSI is CONUS-only, so every
+    # analysis outside the US takes it.
+    exposure_radius = event_config.get('exposure_radius_m')
+
     if n_matched:
         sample_df = sample_df.merge(
             nsi_match[['property_id', 'nsi_lat', 'nsi_lon', 'ftprntsqft',
@@ -221,7 +230,6 @@ def run_flood_pipeline(event_config):
         # pre-Phase-2 default this codebase used throughout; this parameter
         # makes choosing it an explicit, documented, per-event decision
         # instead of reverting the Phase 2 default silently.
-        exposure_radius = event_config.get('exposure_radius_m')
         if exposure_radius:
             sample_df['sample_radius_m'] = [
                 exposure_radius if m else None for m in matched_mask]
@@ -257,13 +265,34 @@ def run_flood_pipeline(event_config):
 
     result_df = properties_df.copy()
     result_df['property_id'] = result_df['property_id'].astype(str)
-    result_df = result_df.merge(
-        flood_df[['property_id', 'pct_flooded', 'max_depth_ft', 'urban_flag',
+    # Columns carried from the sampler into the output CSV. This list is
+    # deliberately a subset — the batch pipeline does not compute the rain,
+    # NDVI or duration bands, and merging those would ship a column of zeros
+    # that reads as a measurement.
+    #
+    # It is also the single easiest place to lose a whole phase of work: the
+    # sampler can compute a band perfectly, and omitting one string here drops
+    # it before it reaches disk, with no error and no missing-data warning.
+    # Phase 4b was measured, sampled, and then silently discarded exactly this
+    # way, costing a full 4,000-property run. The guard below turns that into
+    # an immediate failure instead of a plausible-looking CSV.
+    carry_cols = ['property_id', 'pct_flooded', 'max_depth_ft', 'urban_flag',
                   'optical_available', 'optical_water_pct', 'wse_spread_ft',
-                  'rel_elev_ft', 'hand_ft', 'water_fraction']].assign(
+                  'rel_elev_ft', 'hand_ft', 'water_fraction',
+                  'dpol_water', 'dpol_available']
+    missing = [c for c in carry_cols if c not in flood_df.columns]
+    if missing:
+        raise RuntimeError(
+            f"sample_properties() did not return {missing}. The detector and "
+            f"the output schema have diverged — fix rather than dropping the "
+            f"column, or the CSV will look complete while missing a signal.")
+    result_df = result_df.merge(
+        flood_df[carry_cols].assign(
             property_id=lambda d: d['property_id'].astype(str)),
         on='property_id', how='left'
     )
+    result_df['dpol_water']      = result_df['dpol_water'].fillna(0.0)
+    result_df['dpol_available']  = result_df['dpol_available'].fillna(0).astype(int)
     result_df['pct_flooded']         = result_df['pct_flooded'].fillna(0.0)
     result_df['max_depth_ft']        = result_df['max_depth_ft'].fillna(0.0)
     result_df['urban_flag']          = result_df['urban_flag'].fillna(0).astype(int)
