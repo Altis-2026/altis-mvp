@@ -169,21 +169,39 @@ def match_properties_to_structures(properties: pd.DataFrame, nsi: pd.DataFrame,
     nsi_lat = pd.to_numeric(nsi['latitude'], errors='coerce').to_numpy()
     nsi_lon = pd.to_numeric(nsi['longitude'], errors='coerce').to_numpy()
 
-    # Equirectangular approximation on a local tangent plane. Over the tens of
-    # metres that matter here it is accurate to well under a metre, and it
-    # vectorises cleanly over the whole portfolio at once.
+    # Equirectangular projection onto a local tangent plane. Over the tens of
+    # metres that decide a match it is accurate to well under a metre.
     lat0 = float(np.nanmean(prop_lat))
     m_per_deg_lat = 111_320.0
     m_per_deg_lon = 111_320.0 * math.cos(math.radians(lat0))
 
-    px = prop_lon[:, None] * m_per_deg_lon
-    py = prop_lat[:, None] * m_per_deg_lat
-    sx = nsi_lon[None, :] * m_per_deg_lon
-    sy = nsi_lat[None, :] * m_per_deg_lat
+    prop_xy = np.column_stack([prop_lon * m_per_deg_lon,
+                               prop_lat * m_per_deg_lat])
+    nsi_xy = np.column_stack([nsi_lon * m_per_deg_lon,
+                              nsi_lat * m_per_deg_lat])
 
-    d2 = (px - sx) ** 2 + (py - sy) ** 2
-    nearest = np.nanargmin(d2, axis=1)
-    dist_m = np.sqrt(d2[np.arange(len(nearest)), nearest])
+    # Nearest neighbour via a KD-tree, NOT a full pairwise distance matrix.
+    # The naive (n_properties x n_structures) matrix is fine at demo scale and
+    # explodes past it: a 4,000-property portfolio against the 594,767 NSI
+    # structures in the widened Harvey bbox needs 17.7 GiB and dies. The tree
+    # is O(n log m) in time and linear in memory, and returns identical
+    # nearest-neighbour results.
+    try:
+        from scipy.spatial import cKDTree
+        dist_m, nearest = cKDTree(nsi_xy).query(prop_xy, k=1)
+    except ImportError:  # pragma: no cover - scipy is in requirements.txt
+        # Chunked brute force: same answer, bounded memory, no new dependency.
+        nearest = np.empty(len(prop_xy), dtype=int)
+        dist_m = np.empty(len(prop_xy), dtype=float)
+        chunk = max(1, int(2e7 // max(len(nsi_xy), 1)))
+        for start in range(0, len(prop_xy), chunk):
+            block = prop_xy[start:start + chunk]
+            d2 = ((block[:, None, 0] - nsi_xy[None, :, 0]) ** 2 +
+                  (block[:, None, 1] - nsi_xy[None, :, 1]) ** 2)
+            idx = np.nanargmin(d2, axis=1)
+            nearest[start:start + len(block)] = idx
+            dist_m[start:start + len(block)] = np.sqrt(
+                d2[np.arange(len(block)), idx])
 
     matched = nsi.iloc[nearest].reset_index(drop=True)
     for c in NSI_FIELDS:

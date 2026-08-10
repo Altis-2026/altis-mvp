@@ -101,17 +101,17 @@
       "generated_at": "2026-08-09T19:27:30.971570+00:00"
     },
     "properties": {
-      "study_name": "Addicks/Barker Reservoir area, Houston TX",
+      "study_name": "West & Northwest Houston (Addicks/Barker corridor), TX",
       "bbox": [
-        -95.72,
-        29.75,
-        -95.6,
-        29.85
+        -95.88,
+        29.66,
+        -95.46,
+        30.0
       ],
-      "target_count": 1000,
-      "property_count": 1000,
+      "target_count": 4000,
+      "property_count": 4000,
       "source": "USACE National Structure Inventory (no OSM access; addresses are NSI structure IDs, not street addresses)",
-      "generated_at": "2026-08-09T19:15:33.634321+00:00"
+      "generated_at": "2026-08-10T03:27:19.489988+00:00"
     }
   }
 }

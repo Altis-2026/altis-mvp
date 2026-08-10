@@ -1,0 +1,19 @@
+{
+  "event_id": "brazos",
+  "pipeline_version": "1.0.0",
+  "stages": {
+    "properties": {
+      "study_name": "Brazos River floodplain: Richmond, Rosenberg, Simonton TX",
+      "bbox": [
+        -95.9,
+        29.45,
+        -95.6,
+        29.72
+      ],
+      "target_count": 4000,
+      "property_count": 4000,
+      "source": "USACE National Structure Inventory (no OSM access; addresses are NSI structure IDs, not street addresses)",
+      "generated_at": "2026-08-10T03:27:27.095742+00:00"
+    }
+  }
+}
