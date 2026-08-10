@@ -398,11 +398,15 @@ VEGETATION = {
     'loss_flag_delta': 0.15,   # ndvi_delta above this flags notable vegetation loss
 }
 
-# ─── CLAIM SEVERITY (Round 7) ────────────────────────────────────────────────
+# ─── CLAIM SEVERITY (Round 7, extended by Phase 3) ───────────────────────────
 # USACE/FEMA-style generic one-story residential depth-damage curve:
 # (depth_ft, % of structure value damaged). Piecewise-linear interpolation.
 # This produces a defensible reserving RANGE, not an adjuster's estimate —
 # the range endpoints come from the depth uncertainty interval.
+#
+# `depth_damage_curve` remains the GENERIC fallback, used whenever the
+# structure attributes needed to pick a specific curve are unknown (outside
+# CONUS, or no NSI match). SEVERITY_CURVES below supersedes it when they are.
 SEVERITY = {
     'depth_damage_curve': [
         (0.0, 0.0), (0.5, 8.0), (1.0, 14.0), (2.0, 22.0), (3.0, 29.0),
@@ -410,6 +414,153 @@ SEVERITY = {
         (15.0, 70.0), (20.0, 80.0),
     ],
     'min_depth_ft': 0.1,      # below this, no loss estimate is produced
+}
+
+# ─── PHASE 3: MULTI-CURVE DEPTH-DAMAGE LIBRARY ───────────────────────────────
+# One generic curve was the weakest scientific claim in the product. A
+# two-storey home loses a far smaller FRACTION of its value to two feet of
+# water than a one-storey home does — the water reaches the same rooms, but
+# those rooms are a smaller share of the structure. A home with a basement
+# starts taking damage BELOW grade, i.e. at negative depth relative to the
+# first floor. A generic curve gets all of that wrong in a signed, predictable
+# direction.
+#
+# DEPTH CONVENTION: these curves are indexed on depth above the FIRST FLOOR,
+# which is what published depth-damage functions actually take, and what
+# Phase 2 (NSI foundation height) lets us compute. Feeding them depth above
+# ground — the detector's raw output — overstates damage by roughly the
+# foundation height, worst on pier and crawlspace construction.
+#
+# STRUCTURE curves: % of structure replacement value.
+# Shape and anchor points follow the FEMA/USACE residential functions used in
+# HAZUS (FEMA Flood Model Technical Manual) — one-storey vs two-storey vs
+# manufactured housing, with and without basement. They are TYPICAL published
+# values, not a licensed copy of the HAZUS tables, and the basement variants
+# extend below zero because a basement floods before water reaches grade.
+#
+# HONEST LIMIT: these remain generic published curves, not curves fitted to
+# this book's own claims. Phase 4 (fitting on NFIP claim outcomes) is what
+# replaces borrowed shapes with empirical ones. Until then this is a better
+# structural prior, not a calibrated loss model.
+SEVERITY_CURVES = {
+    # occupancy / stories / basement -> [(depth_above_first_floor_ft, pct)]
+    'RES1-1S-NB': [   # single family, 1 storey, no basement
+        (0.0, 0.0), (0.5, 9.0), (1.0, 16.0), (2.0, 25.0), (3.0, 33.0),
+        (4.0, 40.0), (5.0, 45.0), (6.0, 50.0), (8.0, 58.0), (10.0, 64.0),
+        (15.0, 76.0), (20.0, 85.0),
+    ],
+    'RES1-2S-NB': [   # single family, 2+ storeys, no basement — same water,
+                      # smaller share of total structure value
+        (0.0, 0.0), (0.5, 5.0), (1.0, 9.0), (2.0, 15.0), (3.0, 20.0),
+        (4.0, 25.0), (5.0, 29.0), (6.0, 33.0), (8.0, 40.0), (10.0, 46.0),
+        (15.0, 58.0), (20.0, 68.0),
+    ],
+    'RES1-1S-B': [    # single family, 1 storey, WITH basement — damage starts
+                      # below grade, before water reaches the first floor
+        (-4.0, 3.0), (-2.0, 6.0), (0.0, 11.0), (0.5, 17.0), (1.0, 23.0),
+        (2.0, 31.0), (3.0, 38.0), (4.0, 44.0), (5.0, 49.0), (6.0, 54.0),
+        (8.0, 61.0), (10.0, 67.0), (15.0, 78.0), (20.0, 87.0),
+    ],
+    'RES1-2S-B': [    # single family, 2+ storeys, WITH basement
+        (-4.0, 2.0), (-2.0, 4.0), (0.0, 7.0), (0.5, 11.0), (1.0, 15.0),
+        (2.0, 20.0), (3.0, 25.0), (4.0, 30.0), (5.0, 34.0), (6.0, 38.0),
+        (8.0, 45.0), (10.0, 51.0), (15.0, 63.0), (20.0, 72.0),
+    ],
+    'RES2': [         # manufactured / mobile home — far more vulnerable, and
+                      # effectively a total loss at shallow depths
+        (0.0, 0.0), (0.5, 15.0), (1.0, 27.0), (2.0, 45.0), (3.0, 62.0),
+        (4.0, 75.0), (5.0, 85.0), (6.0, 92.0), (8.0, 100.0), (10.0, 100.0),
+        (15.0, 100.0), (20.0, 100.0),
+    ],
+    'RES3': [         # multi-family residential
+        (0.0, 0.0), (0.5, 6.0), (1.0, 11.0), (2.0, 18.0), (3.0, 24.0),
+        (4.0, 30.0), (5.0, 35.0), (6.0, 39.0), (8.0, 47.0), (10.0, 53.0),
+        (15.0, 65.0), (20.0, 74.0),
+    ],
+    'COM': [          # commercial
+        (0.0, 0.0), (0.5, 6.0), (1.0, 11.0), (2.0, 19.0), (3.0, 26.0),
+        (4.0, 32.0), (5.0, 37.0), (6.0, 42.0), (8.0, 50.0), (10.0, 56.0),
+        (15.0, 68.0), (20.0, 78.0),
+    ],
+}
+
+# CONTENTS curves: % of CONTENTS value, reported separately from structure.
+# NFIP settles building and contents as separate coverages, and a carrier
+# reserves them separately, so blending them into one number — as the previous
+# single-curve estimate did — is not the shape of the answer a claims manager
+# needs. Contents damage rises FASTER than structure damage at shallow depths
+# (a few inches ruins flooring and furniture while the structure is largely
+# intact) and saturates earlier.
+SEVERITY_CONTENTS_CURVES = {
+    'RES1-1S-NB': [
+        (0.0, 0.0), (0.5, 12.0), (1.0, 22.0), (2.0, 37.0), (3.0, 50.0),
+        (4.0, 60.0), (5.0, 68.0), (6.0, 75.0), (8.0, 85.0), (10.0, 92.0),
+        (15.0, 98.0), (20.0, 100.0),
+    ],
+    'RES1-2S-NB': [
+        (0.0, 0.0), (0.5, 7.0), (1.0, 13.0), (2.0, 22.0), (3.0, 30.0),
+        (4.0, 37.0), (5.0, 43.0), (6.0, 49.0), (8.0, 59.0), (10.0, 67.0),
+        (15.0, 82.0), (20.0, 90.0),
+    ],
+    'RES1-1S-B': [
+        (-4.0, 5.0), (-2.0, 10.0), (0.0, 17.0), (0.5, 25.0), (1.0, 33.0),
+        (2.0, 46.0), (3.0, 57.0), (4.0, 66.0), (5.0, 73.0), (6.0, 79.0),
+        (8.0, 88.0), (10.0, 94.0), (15.0, 99.0), (20.0, 100.0),
+    ],
+    'RES1-2S-B': [
+        (-4.0, 3.0), (-2.0, 6.0), (0.0, 11.0), (0.5, 16.0), (1.0, 22.0),
+        (2.0, 31.0), (3.0, 39.0), (4.0, 46.0), (5.0, 52.0), (6.0, 58.0),
+        (8.0, 68.0), (10.0, 76.0), (15.0, 88.0), (20.0, 94.0),
+    ],
+    'RES2': [
+        (0.0, 0.0), (0.5, 20.0), (1.0, 35.0), (2.0, 57.0), (3.0, 74.0),
+        (4.0, 86.0), (5.0, 94.0), (6.0, 98.0), (8.0, 100.0), (10.0, 100.0),
+        (15.0, 100.0), (20.0, 100.0),
+    ],
+    'RES3': [
+        (0.0, 0.0), (0.5, 8.0), (1.0, 15.0), (2.0, 26.0), (3.0, 35.0),
+        (4.0, 43.0), (5.0, 50.0), (6.0, 56.0), (8.0, 67.0), (10.0, 75.0),
+        (15.0, 88.0), (20.0, 94.0),
+    ],
+    'COM': [
+        (0.0, 0.0), (0.5, 9.0), (1.0, 17.0), (2.0, 29.0), (3.0, 39.0),
+        (4.0, 48.0), (5.0, 55.0), (6.0, 61.0), (8.0, 72.0), (10.0, 80.0),
+        (15.0, 91.0), (20.0, 96.0),
+    ],
+}
+
+# ─── PHASE 3: DURATION-DEPENDENT DAMAGE ADJUSTMENT ───────────────────────────
+# Prolonged submersion does more damage than the same depth draining quickly —
+# drywall wicks, framing saturates, mould sets in. The pipeline already
+# computes inundation duration from the post-window slices, so this is nearly
+# free and is a genuinely differentiated signal: most competitors report peak
+# extent only.
+#
+# SOURCING CAVEAT — READ BEFORE QUOTING THIS EXTERNALLY. The roadmap cites a
+# ~2.6x multiplier at equal depth from a duration-dependent depth-damage study
+# calibrated on NFIP claims from three US hurricanes. That figure came from a
+# search-result summary; the paper itself is paywalled and unreachable from
+# this environment, so it has NOT been read in full and its exact conditions
+# (which depths, which duration cut, structure types) are unverified.
+#
+# Applying an unverified 2.6x to a customer's reserve number would be exactly
+# the kind of plausible-looking fabrication this codebase refuses elsewhere. So
+# the default here is DELIBERATELY CONSERVATIVE and explicitly a placeholder:
+# a modest ramp, capped well below the cited figure, applied only where
+# duration is actually MEASURED (never assumed), and reported as a labelled
+# adjustment rather than folded silently into the headline number. Replace
+# these values once the source is read, or once Phase 4 fits duration from
+# claims directly.
+SEVERITY_DURATION = {
+    'enabled':          True,
+    # Days of measured inundation -> multiplier on the structure damage pct.
+    # 1.0 below the first threshold means "no adjustment" is the default.
+    'multipliers':      [(0.0, 1.00), (2.0, 1.00), (4.0, 1.10), (7.0, 1.20),
+                         (14.0, 1.30)],
+    'max_multiplier':   1.30,
+    # Never adjust on an assumed duration. The pipeline reports duration as
+    # None when fewer than 2 post-window slices had a usable scene.
+    'require_measured': True,
 }
 
 # ─── PRE-EVENT FLOOD RISK SCORE (Round 7) ────────────────────────────────────

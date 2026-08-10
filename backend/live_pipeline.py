@@ -471,8 +471,22 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         # relative-error component (≈25% of depth, floor 0.5ft) rather than
         # letting a coarse global DEM push every low estimate to $0.
         sev_ci = min(ci, max(0.5, 0.25 * row['max_depth_ft']))
-        sev = estimate_claim_range(row['max_depth_ft'], sev_ci,
-                                   prop.get('coverage_amount'))
+        # Phase 3: select the depth-damage curve from the structure's own NSI
+        # attributes and index it on depth above the FIRST FLOOR, which is what
+        # published curves take. All of these degrade to None outside CONUS or
+        # without an NSI match, in which case estimate_claim_range falls back
+        # to the generic curve on depth above ground exactly as before.
+        _nsi = nsi_by_pid.get(pid) or {}
+        sev = estimate_claim_range(
+            row['max_depth_ft'], sev_ci, prop.get('coverage_amount'),
+            contents_coverage=prop.get('contents_coverage_amount')
+                              or _nsi.get('val_cont'),
+            occupancy_type=_nsi.get('occtype'),
+            num_stories=_nsi.get('num_story'),
+            basement_type=_nsi.get('basement_type'),
+            depth_above_first_floor_ft=_depth_ffe(_nsi or None,
+                                                  row['max_depth_ft']),
+            duration_days=duration_days)
 
         # Subrogation candidate: flooded AND adjacent to permanent water /
         # drainage — worth checking whether third-party infrastructure
@@ -550,6 +564,18 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'severity_mid_usd':  sev['mid'] if sev else None,
             'severity_high_usd': sev['high'] if sev else None,
             'severity_damage_pct': sev['damage_pct'] if sev else None,
+            # ── Phase 3: which curve produced the number, what depth it was
+            #    indexed on, and contents kept SEPARATE from structure because
+            #    NFIP settles them as separate coverages and carriers reserve
+            #    them separately.
+            'severity_curve':        sev.get('curve') if sev else None,
+            'severity_depth_basis':  sev.get('depth_basis') if sev else None,
+            'severity_duration_mult': sev.get('duration_multiplier') if sev else None,
+            'contents_low_usd':      sev.get('contents_low') if sev else None,
+            'contents_mid_usd':      sev.get('contents_mid') if sev else None,
+            'contents_high_usd':     sev.get('contents_high') if sev else None,
+            'contents_damage_pct':   sev.get('contents_damage_pct') if sev else None,
+            'total_mid_usd':         sev.get('total_mid') if sev else None,
             'adjuster_note':     _note(prop.get('address', ''), row, impact_class),
             'color':             COLOR_MAP.get(impact_class, '#6B8FA3'),
         })
