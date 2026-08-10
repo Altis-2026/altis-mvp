@@ -13,7 +13,9 @@
       "target_count": 4000,
       "property_count": 4000,
       "source": "USACE National Structure Inventory (no OSM access; addresses are NSI structure IDs, not street addresses)",
-      "generated_at": "2026-08-10T03:27:27.095742+00:00"
+      "residential_structures_in_bbox": 170484,
+      "structures_in_bbox": 184604,
+      "generated_at": "2026-08-10T04:31:38.939423+00:00"
     },
     "flood_detection": {
       "dem_resolution_m": 1,

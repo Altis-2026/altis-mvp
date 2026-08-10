@@ -339,10 +339,11 @@ def fetch_policies_in_force(zips: Iterable[str], as_of: str,
     return pd.DataFrame(rows)
 
 
-def structure_counts_by_zip(properties: pd.DataFrame) -> pd.DataFrame:
+def structure_counts_by_zip(properties: pd.DataFrame,
+                            total_structures_in_bbox: Optional[int] = None,
+                            min_sampled: int = 30) -> pd.DataFrame:
     """
-    Fallback denominator: residential structures per zip, from the study area's
-    own NSI structure list.
+    Fallback denominator: estimated residential structures per zip.
 
     WHY THIS IS A REAL FALLBACK AND NOT A FUDGE: the point of a denominator is
     to turn "this zip filed a lot of claims" into a RATE, so a big zip doesn't
@@ -352,17 +353,42 @@ def structure_counts_by_zip(properties: pd.DataFrame) -> pd.DataFrame:
     base — claims per building rather than claims per policy. It understates
     the true rate wherever insurance take-up is below 100%, but take-up varies
     far less between neighbouring zips in one metro than claim counts do, so it
-    preserves the between-zip ORDERING that the correlation and the label
-    actually depend on.
+    preserves the between-zip ORDERING the correlation and the label depend on.
 
-    It is strictly better than the depth-share fallback it replaces, which had
-    no denominator at all and collapsed to a single class on real data.
-    `properties` needs columns: zip.
+    SCALING IS ESSENTIAL, and getting it wrong is not a cosmetic error. The
+    portfolio is a SAMPLE of the study area's structures, not a census of them
+    — 4,000 drawn from 184,604 for Brazos. Dividing claims by the sampled count
+    inflates every rate by the sampling factor (~46x there), which put zip
+    77450 at "1481%" and pushed every zip over any sane threshold, collapsing
+    the label to a single class exactly like the depth-share fallback it was
+    meant to replace.
+
+    Because the draw is uniform at random, sampled_in_zip is proportional to
+    the true structures_in_zip, so scaling by (total_in_bbox / n_sampled) is an
+    unbiased estimator of the per-zip population. Pass
+    `total_structures_in_bbox` to get calibrated rates; omit it and the counts
+    stay raw sample counts (ordering still correct, scale meaningless).
+
+    Zips with fewer than `min_sampled` sampled properties get a NaN rate rather
+    than a noisy one — a 20-property sample gives far too shaky a population
+    estimate to threshold a label on.
     """
     if properties.empty or 'zip' not in properties.columns:
         return pd.DataFrame()
+
     counts = (properties.dropna(subset=['zip'])
-              .groupby('zip').size().reset_index(name='structures_in_zip'))
+              .groupby('zip').size().reset_index(name='sampled_in_zip'))
+
+    n_sampled = int(counts['sampled_in_zip'].sum())
+    if total_structures_in_bbox and n_sampled:
+        scale = float(total_structures_in_bbox) / float(n_sampled)
+    else:
+        scale = 1.0
+
+    counts['structures_in_zip'] = (counts['sampled_in_zip'] * scale).round()
+    counts['structure_scale_factor'] = round(scale, 2)
+    # Too few sampled properties to estimate that zip's population reliably.
+    counts.loc[counts['sampled_in_zip'] < min_sampled, 'structures_in_zip'] = float('nan')
     return counts
 
 

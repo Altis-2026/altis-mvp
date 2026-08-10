@@ -111,7 +111,9 @@
       "target_count": 4000,
       "property_count": 4000,
       "source": "USACE National Structure Inventory (no OSM access; addresses are NSI structure IDs, not street addresses)",
-      "generated_at": "2026-08-10T03:27:19.489988+00:00"
+      "residential_structures_in_bbox": 523639,
+      "structures_in_bbox": 594767,
+      "generated_at": "2026-08-10T04:31:30.731998+00:00"
     }
   }
 }

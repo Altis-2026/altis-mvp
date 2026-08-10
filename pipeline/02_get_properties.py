@@ -13,7 +13,7 @@ from provenance import write_manifest
 random.seed(42)
 
 
-def query_nsi_addresses(bbox, target=1000, seed=42):
+def query_nsi_addresses(bbox, target=1000, seed=42, stats=None):
     """
     Fallback property source: USACE National Structure Inventory.
 
@@ -42,9 +42,23 @@ def query_nsi_addresses(bbox, target=1000, seed=42):
     nsi = struct.fetch_nsi_structures(bbox)
     if nsi.empty:
         return []
-    res = nsi[nsi['st_damcat'] == 'RES'].reset_index(drop=True)
+    res = nsi[nsi['st_damcat'] == 'RES']
     if res.empty:
-        res = nsi.reset_index(drop=True)
+        res = nsi
+
+    # SORT BEFORE SAMPLING. The NSI API does not guarantee row order, so the
+    # same seed against the same bbox drew a DIFFERENT sample on a repeat fetch
+    # — the property lists changed underneath an already-computed detection
+    # run. Sorting on the stable structure id makes the draw reproducible:
+    # same bbox + same seed + same target now always yields the same portfolio.
+    res = res.sort_values('fd_id').reset_index(drop=True)
+
+    # Record the POPULATION size the sample is drawn from. Validation needs it
+    # to scale per-zip sample counts back up to a population denominator; using
+    # raw sample counts inflates every claim rate by the sampling factor.
+    if stats is not None:
+        stats['residential_structures_in_bbox'] = int(len(res))
+        stats['structures_in_bbox'] = int(len(nsi))
 
     rng = np.random.default_rng(seed)
     n = min(target, len(res))
@@ -228,6 +242,7 @@ def build_property_list(event_config, target=1000):
     bbox      = event_config['bbox']
     event_name = event_config['event_name']
     source = 'OpenStreetMap Overpass API'
+    nsi_stats = {}
 
     print(f"\nBuilding property list for {event_name}...")
     print(f"  Study area: {event_config['study_name']}")
@@ -256,7 +271,7 @@ def build_property_list(event_config, target=1000):
               "labeled 'NSI Structure <id>, <county>' rather than a street "
               "address, since NSI does not publish one and this pipeline "
               "never fabricates one.")
-        props = query_nsi_addresses(bbox, target=target)
+        props = query_nsi_addresses(bbox, target=target, stats=nsi_stats)
         source = 'USACE National Structure Inventory (no OSM access; ' \
                  'addresses are NSI structure IDs, not street addresses)'
 
@@ -282,6 +297,9 @@ def build_property_list(event_config, target=1000):
         'target_count':     target,
         'property_count':   len(df),
         'source':           source,
+        # Population the sample was drawn from — validation scales per-zip
+        # sample counts by (population / sample) to get a real denominator.
+        **nsi_stats,
     })
 
     return df

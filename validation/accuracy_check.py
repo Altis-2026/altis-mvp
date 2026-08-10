@@ -208,6 +208,41 @@ def load_altis_data(event_id: str, use_coordinates: bool = True) -> pd.DataFrame
 # GROUND TRUTH ASSEMBLY
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _population_from_manifest(event_id: str) -> Optional[int]:
+    """
+    Residential structures in the study area, from the properties manifest.
+
+    Validation needs the POPULATION the portfolio was sampled from, not the
+    sample size, to turn per-zip claim counts into a real rate. Returns None
+    when the manifest predates this field, in which case the caller falls back
+    to raw sample counts — correct ordering, meaningless scale, and the report
+    says the denominator is unavailable.
+    """
+    path = OUTPUT_DIR / f"{event_id}_manifest.json"
+    if not path.exists():
+        return None
+    try:
+        blob = json.loads(path.read_text())
+    except Exception:  # noqa: BLE001 - a malformed manifest is not fatal here
+        return None
+    # write_manifest nests stage payloads under blob['stages'][stage_name],
+    # and each stage payload may itself wrap the values under a 'data' key.
+    def find(node):
+        if isinstance(node, dict):
+            if 'residential_structures_in_bbox' in node:
+                try:
+                    return int(node['residential_structures_in_bbox'])
+                except (TypeError, ValueError):
+                    return None
+            for child in node.values():
+                found = find(child)
+                if found:
+                    return found
+        return None
+
+    return find(blob)
+
+
 def build_ground_truth(event_id: str, zips, use_policy_denominator: bool = True,
                        structures: Optional[pd.DataFrame] = None) -> tuple:
     """
@@ -937,7 +972,8 @@ def run_validation(event_id: str, use_policy_denominator: bool = True):
     zips = sorted(altis_df['zip'].unique())
     zip_agg, claims, diagnostics = build_ground_truth(
         event_id, zips, use_policy_denominator=use_policy_denominator,
-        structures=nfip.structure_counts_by_zip(altis_df))
+        structures=nfip.structure_counts_by_zip(
+            altis_df, total_structures_in_bbox=_population_from_manifest(event_id)))
     if zip_agg.empty:
         print(f"  Skipping {event_id} — no NFIP ground truth retrieved.")
         return
