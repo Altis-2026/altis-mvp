@@ -303,12 +303,43 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         signal_status['baseline'] = f'error: {e}'
         print(f"  [signal] multi-temporal baseline failed: {e}")
 
+    # ── Phase 4b: VH's own multi-temporal baseline, which is what makes the
+    #    dual-pol water score possible. `post_vh` was already loaded above for
+    #    the binary VH cross-check; this adds the history to compare it against.
+    #    Abstains loudly rather than degrading silently — a VH baseline too
+    #    short to estimate σ from produces arbitrarily large z-scores.
+    vh_base_mean = vh_base_std = None
+    try:
+        from pipeline.flood_detect import load_sar_baseline
+        from pipeline.config import DUALPOL
+        if not DUALPOL.get('enabled', True):
+            signal_status['dual_pol_score'] = 'disabled in config'
+        elif post_vh is None:
+            signal_status['dual_pol_score'] = 'unavailable: no VH post-event scene'
+        elif not base_start:
+            signal_status['dual_pol_score'] = 'unavailable: no baseline window'
+        else:
+            vh_base_mean, vh_base_std, vh_base_n = load_sar_baseline(
+                bbox, base_start, base_end, orbit, band='VH')
+            if vh_base_n < DUALPOL['min_vh_baseline_scenes']:
+                vh_base_mean = vh_base_std = None
+                signal_status['dual_pol_score'] = (
+                    f'unavailable: only {vh_base_n} VH baseline scenes on orbit '
+                    f'{orbit} (need {DUALPOL["min_vh_baseline_scenes"]})')
+            else:
+                signal_status['dual_pol_score'] = f'ok: {vh_base_n} VH baseline scenes'
+    except Exception as e:
+        vh_base_mean = vh_base_std = None
+        signal_status['dual_pol_score'] = f'error: {e}'
+        print(f"  [signal] dual-pol baseline failed: {e}")
+
     # ── Phase 1c: cross-orbit stacking — every other orbit with post-event
     #    coverage contributes an independently-thresholded mask.
     orbit_stack = {}
     try:
-        from pipeline.flood_detect import load_sar_orbits, load_sar_baseline
-        from pipeline.config import CROSS_ORBIT, BASELINE
+        from pipeline.flood_detect import (load_sar_orbits, load_sar_baseline,
+                                           load_sar_vh_composite)
+        from pipeline.config import CROSS_ORBIT, BASELINE, DUALPOL
         if CROSS_ORBIT['enabled']:
             for other, (composite, n_sc) in load_sar_orbits(
                     bbox, windows['post_start'], windows['post_end']).items():
@@ -320,8 +351,25 @@ def analyze_portfolio_live(props: list, event_date: str = None,
                         bbox, base_start, base_end, other)
                     if o_n < BASELINE['min_scenes']:
                         o_mean = o_std = None
-                orbit_stack[other] = {'post': composite, 'pre': None,
-                                      'baseline_mean': o_mean, 'baseline_std': o_std}
+                spec = {'post': composite, 'pre': None,
+                        'baseline_mean': o_mean, 'baseline_std': o_std}
+                # Phase 4b for this orbit, all-or-nothing: a partial set is
+                # omitted so the cross-orbit max() never sees a zero that
+                # merely means "not measured here".
+                if vh_base_mean is not None:
+                    try:
+                        o_vh, _ = load_sar_vh_composite(
+                            bbox, windows['post_start'], windows['post_end'], other)
+                        if o_vh is not None:
+                            m, s, n_vh = load_sar_baseline(
+                                bbox, base_start, base_end, other, band='VH')
+                            if n_vh >= DUALPOL['min_vh_baseline_scenes']:
+                                spec.update({'post_vh': o_vh,
+                                             'vh_baseline_mean': m,
+                                             'vh_baseline_std': s})
+                    except Exception:
+                        pass
+                orbit_stack[other] = spec
             signal_status['cross_orbit'] = (
                 f'ok: {len(orbit_stack) + 1} orbits' if orbit_stack
                 else 'unavailable: only one orbit covers this window')
@@ -347,7 +395,8 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         pre_vh=pre_vh, post_vh=post_vh, rain=rain_img,
         ndvi_pre=ndvi_pre, ndvi_post=ndvi_post, post_slices=post_slices,
         hand=hand_img, baseline_mean=baseline_mean, baseline_std=baseline_std,
-        orbit_stack=orbit_stack)
+        orbit_stack=orbit_stack,
+        vh_baseline_mean=vh_base_mean, vh_baseline_std=vh_base_std)
 
     # ── Phase 2: structure attributes (CONUS only). When a property matches an
     #    NSI structure we sample its footprint at Sentinel-1's native 10m
@@ -422,6 +471,11 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'wse_spread_ft':     float(s.get('wse_spread_ft', 0.0)),
             'vh_available':      int(s.get('vh_available', 0) or 0),
             'vh_water_pct':      float(s.get('vh_water_pct', 0.0) or 0.0),
+            # Phase 4b: graded dual-pol water score, with the flag saying
+            # whether a VH baseline existed. A 0 score with the flag clear
+            # means "not measured", never "dry".
+            'dpol_available':    int(s.get('dpol_available', 0) or 0),
+            'dpol_water':        float(s.get('dpol_water', 0.0) or 0.0),
             # Phase 1: HAND drives the DEM-hydrology vote when present. Passed
             # through as-is (including None) — ensemble_votes must be able to
             # tell "no HAND here" from "HAND is 0", which means at the drainage
@@ -526,6 +580,8 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'rain_mm':           float(s.get('rain_mm', 0.0) or 0.0),
             'vh_available':      row['vh_available'],
             'vh_water_pct':      round(row['vh_water_pct'], 4),
+            'dpol_available':    row['dpol_available'],
+            'dpol_water':        round(row['dpol_water'], 4),
             'duration_days':     duration_days,
             # Per-slice flooded fraction across the post window (None where no
             # scene covered the slice) — powers the drawer's inundation

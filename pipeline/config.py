@@ -371,6 +371,92 @@ SUBPIXEL = {
     'clamp_to_one': True,
 }
 
+# ─── PHASE 4b: DUAL-POLARISATION WATER DISCRIMINATION ────────────────────────
+# The direct answer to what killed Phase 4a.
+#
+# Phase 4a failed for one specific, diagnosable reason: VV amplitude alone
+# cannot separate saturated soil from shallow standing water. Both darken
+# C-band in the same direction. That is a limit of the MEASUREMENT, not of the
+# unmixing maths — so the fix has to add a measurement, not tune a threshold.
+#
+# Sentinel-1 IW already transmits the second measurement and we were throwing
+# it away: every scene carries VH as well as VV, at no extra acquisition cost
+# and no extra download (the existing VH cross-check reads it, but only as a
+# second independent binary detector, which inherits the same confound).
+#
+# THE PHYSICS THAT SEPARATES THEM. Radar backscatter has three regimes here:
+#   - Open/standing water: specular. The surface reflects energy away from the
+#     sensor. VV drops hard AND VH collapses toward the noise floor, because a
+#     smooth surface also destroys the depolarisation that produces cross-pol
+#     return. Both channels fall; VH falls proportionally further.
+#   - Saturated bare soil: the surface stays rough, only its dielectric
+#     constant changes. This does NOT suppress depolarisation — VH holds
+#     roughly steady, or moves far less than VV does.
+#   - Flooded vegetation: double-bounce off trunks/walls. VV RISES sharply.
+#     Not what we are gating on here, but it is why VV alone is unreliable in
+#     both directions.
+#
+# So the discriminating question is not "did this pixel darken?" (Phase 4a's
+# question, which soil moisture answers yes to) but "did BOTH channels darken
+# together, cross-pol at least as hard as co-pol?" — which is true for water
+# and false for wet ground.
+#
+# THE RULE. Per pixel, against each channel's OWN multi-temporal baseline:
+#     z_vv = (post_vv - base_vv_mean) / base_vv_std      (negative = darker)
+#     z_vh = (post_vh - base_vh_mean) / base_vh_std
+# Evidence is the WEAKER of the two normalised drops, not their average or
+# their sum. Taking the minimum is the whole design: a channel that fails to
+# corroborate CAPS the score rather than being outvoted. Wet soil produces a
+# large VV drop and a small VH drop, so min() returns the small number and the
+# pixel scores near zero. Standing water drops both, so min() stays large.
+# Averaging would let the VV drop carry the pixel and reproduce Phase 4a.
+#
+# `ratio_gate` adds the second-order check. The co/cross ratio (VV-VH in dB)
+# RISES over water — VH collapses further than VV — and stays flat or falls
+# over wet soil. Requiring a rise is nearly free and rejects the case where
+# both channels drop simply because the whole scene got darker.
+#
+# HOW THE TWO GATES INTERACT, since it is not obvious and was only noticed by
+# writing the test: requiring (VV-VH) to rise is algebraically the same as
+# requiring VH to fall by MORE dB than VV. When the two channels happen to
+# share a baseline sigma, that already forces evidence_vh >= evidence_vv, so
+# min() would always return the VV term and the ratio gate alone would be
+# doing all the work. They separate as soon as the sigmas differ — which is
+# the normal case, because VH sits closer to the noise floor and is the
+# noisier channel. A 5 dB VH drop at sigma=3 is LESS significant than a 4 dB
+# VV drop at sigma=1, and min() catches that while the dB-domain ratio gate
+# cannot see it at all. Both are kept because each covers what the other
+# misses; neither is redundant on real data. See tests/test_dualpol.py.
+#
+# HONEST STATUS: enabled here so it can be MEASURED, not because it is known
+# to work. Phase 4a was equally well motivated and failed. The acceptance test
+# is the same one it failed: standalone AUC against NFIP claim truth at Brazos,
+# plus Brier and Brier skill score. If it does not beat AUC 0.5 by a margin
+# that survives its p-value, it gets set to False with the numbers recorded
+# right here, exactly as SUBPIXEL was.
+DUALPOL = {
+    'enabled': True,
+    # Standard deviations below each channel's own baseline mean required
+    # before that channel contributes any evidence. Deliberately the same
+    # loose gate Phase 4a used (1.0) — the point of this phase is that a
+    # second channel, not a stricter threshold, is what rejects soil moisture.
+    'z_min': 1.0,
+    # Drop, in standard deviations, that counts as full confidence for a
+    # channel. Evidence per channel ramps linearly from z_min to z_full.
+    'z_full': 4.0,
+    # Require the co/cross ratio (VV-VH, dB) to rise by at least this much
+    # versus baseline. Water raises it; uniform scene darkening does not.
+    # Set to None to disable the second-order check.
+    'ratio_gate': True,
+    'ratio_rise_db': 0.5,
+    # Minimum VH baseline scenes before the VH channel is trusted at all.
+    # Below this the score abstains (returns 0) rather than guessing from a
+    # noisy std estimate — a bad std makes z_vh arbitrarily large.
+    'min_vh_baseline_scenes': 8,
+    # Scores below this are treated as zero (residual speckle tail).
+    'min_score': 0.05,
+}
+
 # ─── HAND — HEIGHT ABOVE NEAREST DRAINAGE (Phase 1) ──────────────────────────
 # Replaces `rel_elev_ft` (elevation minus the minimum within a 300-600m circle)
 # as the DEM-hydrology ensemble vote.

@@ -26,10 +26,11 @@ import pandas as pd
 
 try:
     from config import (SAR, OPTICAL, SAR_VH, DURATION, RAIN,
-                        BASELINE, HAND, CROSS_ORBIT, SUBPIXEL)
+                        BASELINE, HAND, CROSS_ORBIT, SUBPIXEL, DUALPOL)
 except ImportError:  # pragma: no cover - import path guard
     from pipeline.config import (SAR, OPTICAL, SAR_VH, DURATION, RAIN,
-                                 BASELINE, HAND, CROSS_ORBIT, SUBPIXEL)
+                                 BASELINE, HAND, CROSS_ORBIT, SUBPIXEL,
+                                 DUALPOL)
 
 
 def load_dem(bbox_coords):
@@ -199,7 +200,7 @@ def baseline_window(post_start, months=None, gap_days=None):
 
 
 def load_sar_baseline(bbox_coords, baseline_start, baseline_end, orbit_pass,
-                      speckle_radius_m=None):
+                      speckle_radius_m=None, band='VV'):
     """
     Per-pixel statistical baseline (mean + standard deviation, dB) from a long
     run of pre-event Sentinel-1 scenes on ONE orbit.
@@ -213,6 +214,11 @@ def load_sar_baseline(bbox_coords, baseline_start, baseline_end, orbit_pass,
     Same orbit only: ascending and descending passes see different backscatter
     for the same ground, so a pooled baseline would have inflated variance and
     a meaningless mean.
+
+    `band` selects the polarisation. VV is the detector's primary channel; VH
+    is requested by Phase 4b, which needs each channel measured against its own
+    history — a VH pixel's normal level and normal variability are nothing like
+    the same pixel's in VV, so sharing a baseline would be meaningless.
     """
     if speckle_radius_m is None:
         speckle_radius_m = SAR['speckle_radius_m']
@@ -222,9 +228,9 @@ def load_sar_baseline(bbox_coords, baseline_start, baseline_end, orbit_pass,
                   .filterBounds(bbox)
                   .filterDate(baseline_start, baseline_end)
                   .filter(ee.Filter.eq('instrumentMode', 'IW'))
-                  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+                  .filter(ee.Filter.listContains('transmitterReceiverPolarisation', band))
                   .filter(ee.Filter.eq('orbitProperties_pass', orbit_pass))
-                  .select('VV'))
+                  .select(band))
 
     count = collection.size().getInfo()
     if count < 1:
@@ -236,7 +242,7 @@ def load_sar_baseline(bbox_coords, baseline_start, baseline_end, orbit_pass,
         collection = collection.map(
             lambda img: img.focal_mean(radius=speckle_radius_m,
                                        kernelType='circle', units='meters')
-                           .rename('VV').copyProperties(img, ['system:time_start']))
+                           .rename(band).copyProperties(img, ['system:time_start']))
 
     mean = collection.mean().rename('baseline_mean')
     std = collection.reduce(ee.Reducer.stdDev()).rename('baseline_std')
@@ -553,12 +559,86 @@ def water_fraction(post_img, dry_reference, baseline_std=None,
     return frac.rename('water_frac').float()
 
 
+def _channel_evidence(post_img, base_mean, base_std, cfg):
+    """
+    One polarisation channel's normalised darkening evidence, in [0, 1].
+
+    z = (post - baseline_mean) / baseline_std, so a NEGATIVE z is darkening.
+    Evidence ramps linearly from 0 at z = -z_min to 1 at z = -z_full, which
+    keeps the score continuous — the whole point of a graded measure is that a
+    pixel one hair past the gate should not score the same as open water.
+
+    baseline_std is floored at BASELINE['min_std_db'] for the same reason it is
+    everywhere else: a pixel that happened to be quiet across the baseline
+    window would otherwise divide by ~0 and report infinite significance.
+    """
+    std = base_std.max(BASELINE['min_std_db'])
+    z = post_img.subtract(base_mean).divide(std)
+    drop = z.multiply(-1.0)                       # positive = darker than usual
+    span = float(cfg['z_full'] - cfg['z_min'])
+    if span <= 0:                                 # degenerate config -> hard gate
+        return drop.gte(cfg['z_min']).float()
+    return drop.subtract(cfg['z_min']).divide(span).clamp(0.0, 1.0)
+
+
+def dualpol_water_score(post_vv, post_vh,
+                        base_vv_mean, base_vv_std,
+                        base_vh_mean, base_vh_std,
+                        slope_mask=None, permanent_water=None, cfg=DUALPOL):
+    """
+    Graded [0, 1] water evidence requiring BOTH polarisations to corroborate.
+
+    Phase 4b. See the DUALPOL block in config.py for the physics; the short
+    version is that standing water suppresses co-pol AND cross-pol together
+    (specular reflection also destroys depolarisation), while saturated soil
+    suppresses co-pol while leaving cross-pol roughly alone. Phase 4a could
+    not tell those apart because it only ever looked at VV.
+
+    score = min(evidence_vv, evidence_vh)
+
+    The minimum is the mechanism, not a stylistic choice. It means a channel
+    that fails to corroborate CAPS the result instead of being outvoted:
+    saturated soil scores near zero however hard VV fell. An average or a sum
+    would let the VV term carry the pixel and would reproduce Phase 4a's
+    failure exactly.
+
+    Returns an image band named 'dpol_water'. Callers that lack a usable VH
+    baseline should not call this at all — there is no meaningful abstain
+    value inside a continuous score, so the decision belongs upstream where it
+    can be recorded as "no VH baseline" rather than silently read as "dry".
+    """
+    ev_vv = _channel_evidence(post_vv, base_vv_mean, base_vv_std, cfg)
+    ev_vh = _channel_evidence(post_vh, base_vh_mean, base_vh_std, cfg)
+    score = ev_vv.min(ev_vh)
+
+    # Second-order check: the co/cross ratio RISES over water, because VH
+    # collapses toward the noise floor faster than VV does. A scene that simply
+    # got darker everywhere (calibration drift, a wetter-than-usual baseline
+    # window) moves both channels together and leaves the ratio flat, so this
+    # rejects it without touching genuine water.
+    if cfg.get('ratio_gate'):
+        ratio_post = post_vv.subtract(post_vh)
+        ratio_base = base_vv_mean.subtract(base_vh_mean)
+        rose = ratio_post.subtract(ratio_base).gte(cfg['ratio_rise_db'])
+        score = score.where(rose.Not(), 0)
+
+    score = score.where(score.lt(cfg['min_score']), 0)
+
+    if slope_mask is not None:
+        score = score.where(slope_mask.Not(), 0)
+    if permanent_water is not None:
+        score = score.where(permanent_water, 0)
+
+    return score.rename('dpol_water').float()
+
+
 def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_m,
                             optical_water=None, optical_valid=None,
                             pre_vh=None, post_vh=None, rain=None,
                             ndvi_pre=None, ndvi_post=None, post_slices=None,
                             hand=None, baseline_mean=None, baseline_std=None,
-                            orbit_stack=None, precompute_thresholds=False):
+                            orbit_stack=None, precompute_thresholds=False,
+                            vh_baseline_mean=None, vh_baseline_std=None):
     """
     Build the multi-band analysis image:
     ['flood', 'depth_ft', 'urban', 'wse_spread_ft', 'rel_elev_ft', 'hand_ft',
@@ -582,6 +662,16 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
                         constant up front (one getInfo each) instead of leaving
                         it in the graph. Strongly recommended for batch runs
                         over a large bbox; see guarded_otsu().
+
+    Phase 4b additions, also optional:
+      `vh_baseline_mean` / `vh_baseline_std` — VH's own multi-temporal
+                        baseline for the primary orbit. Supplying these
+                        alongside `post_vh` enables the 'dpol_water' band;
+                        omitting any of them leaves it zero with 'dpol_valid'
+                        zero, which downstream reads as "not measured" rather
+                        than "dry". Orbit_stack entries may carry 'post_vh',
+                        'vh_baseline_mean' and 'vh_baseline_std' to extend the
+                        same score across orbits.
     """
     threshold = guarded_otsu(post_image, bbox_coords,
                              evaluate=precompute_thresholds)
@@ -704,6 +794,38 @@ def build_flood_depth_image(bbox_coords, pre_image, post_image, dem, wse_radius_
         combined = combined.addBands(frac.unmask(0))
     else:
         combined = combined.addBands(ee.Image(0).rename('water_frac').float())
+
+    # ── Phase 4b: dual-polarisation water score. Same graded ambition as 4a,
+    #    but corroborated across VV and VH so saturated soil — which darkens
+    #    co-pol without touching cross-pol — cannot carry a pixel on its own.
+    dpol_ready = (DUALPOL.get('enabled', True)
+                  and post_vh is not None
+                  and baseline_mean is not None and baseline_std is not None
+                  and vh_baseline_mean is not None and vh_baseline_std is not None)
+    if dpol_ready:
+        dpol = dualpol_water_score(
+            post_image, post_vh, baseline_mean, baseline_std,
+            vh_baseline_mean, vh_baseline_std,
+            slope_mask=slope_mask, permanent_water=permanent_water)
+        # Cross-orbit: wettest observation wins, matching the union semantics
+        # the binary masks already use. Only orbits carrying a full VH baseline
+        # participate; the rest are skipped rather than contributing a zero,
+        # which would drag the max down and read as evidence of dryness.
+        for spec in (orbit_stack or {}).values():
+            if not all(spec.get(k) is not None for k in
+                       ('post', 'post_vh', 'baseline_mean', 'baseline_std',
+                        'vh_baseline_mean', 'vh_baseline_std')):
+                continue
+            dpol = dpol.max(dualpol_water_score(
+                spec['post'], spec['post_vh'],
+                spec['baseline_mean'], spec['baseline_std'],
+                spec['vh_baseline_mean'], spec['vh_baseline_std'],
+                slope_mask=slope_mask, permanent_water=permanent_water))
+        combined = (combined.addBands(dpol.unmask(0))
+                    .addBands(ee.Image(1).rename('dpol_valid').float()))
+    else:
+        combined = (combined.addBands(ee.Image(0).rename('dpol_water').float())
+                    .addBands(ee.Image(0).rename('dpol_valid').float()))
 
     if optical_water is not None:
         combined = combined.addBands(optical_water.float().unmask(0))
@@ -900,6 +1022,11 @@ def _row_from_sample(property_id, address, p):
         # Phase 4a: mean sub-pixel water fraction over the sampled region —
         # a graded exposure measure where pct_flooded is all-or-nothing.
         'water_fraction': round(max(0.0, float(p.get('water_frac_mean') or 0)), 4),
+        # Phase 4b: dual-pol water score. `dpol_available` distinguishes "VH
+        # baseline existed and found nothing" from "never measured" — a 0 in
+        # dpol_water means different things in those two cases.
+        'dpol_available': int(round(float(p.get('dpol_valid_mean') or 0))),
+        'dpol_water':     round(max(0.0, float(p.get('dpol_water_mean') or 0)), 4),
         # Round-7 bands — all default to "absent/abstain" when not sampled.
         'vh_available':  int(round(float(p.get('vh_valid_mean') or 0))),
         'vh_water_pct':  round(max(0.0, float(p.get('vh_flood_mean') or 0)), 4),

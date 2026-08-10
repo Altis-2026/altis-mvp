@@ -262,6 +262,10 @@ def run_triage_pipeline(event_config):
         # Phase 4a: graded sub-pixel water fraction, carried through so
         # validation can score on it instead of the all-or-nothing mask.
         'water_fraction',
+        # Phase 4b: dual-pol water score plus the flag saying whether a VH
+        # baseline existed at all, so validation can tell "measured, dry" from
+        # "never measured".
+        'dpol_water', 'dpol_available',
     ]
     final_df = df[[c for c in final_cols if c in df.columns]].copy()
 

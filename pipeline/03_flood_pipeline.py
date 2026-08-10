@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import ee
 import pandas as pd
 from config import (GEE_PROJECT, HARVEY, BRAZOS, OUTPUT_DIR, SAR, OPTICAL,
-                    UNCERTAINTY, BASELINE, HAND, CROSS_ORBIT)
+                    UNCERTAINTY, BASELINE, HAND, CROSS_ORBIT, DUALPOL)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
 
@@ -23,6 +23,7 @@ from flood_detect import (
     load_dem, otsu_threshold_gee, load_sar_composite,
     load_optical_water_mask, build_flood_depth_image, sample_properties,
     load_sar_baseline, load_hand, load_sar_orbits, baseline_window,
+    load_sar_vh_composite,
 )
 import structures as struct
 
@@ -89,6 +90,31 @@ def run_flood_pipeline(event_config):
               f"composite")
         baseline_mean = baseline_std = None
 
+    # ── Phase 4b: the VH channel, with its OWN baseline. VH's normal level and
+    #    normal variability are nothing like VV's on the same pixel, so a
+    #    shared baseline would be meaningless; each channel is measured against
+    #    its own history and only the normalised evidence is compared.
+    post_vh = vh_base_mean = vh_base_std = None
+    vh_base_n = vh_post_n = 0
+    if DUALPOL.get('enabled', True):
+        print(f"\nLoading VH channel for dual-pol discrimination (orbit {orbit})...")
+        post_vh, vh_post_n = load_sar_vh_composite(
+            event_config['bbox'], event_config['post_start'],
+            event_config['post_end'], orbit)
+        if post_vh is None:
+            print("  No VH-capable post-event scene — dual-pol abstains")
+        else:
+            vh_base_mean, vh_base_std, vh_base_n = load_sar_baseline(
+                event_config['bbox'], base_start, base_end, orbit, band='VH')
+            if vh_base_n < DUALPOL['min_vh_baseline_scenes']:
+                print(f"  Only {vh_base_n} VH baseline scenes (need "
+                      f"{DUALPOL['min_vh_baseline_scenes']}) — dual-pol abstains "
+                      f"rather than trusting a noisy σ")
+                vh_base_mean = vh_base_std = None
+            else:
+                print(f"  {vh_post_n} VH post scenes, {vh_base_n} VH baseline "
+                      f"scenes — dual-pol water score active")
+
     # ── Phase 1c: cross-orbit stacking. Every other orbit with post-event
     #    coverage contributes its own independently-thresholded mask, which is
     #    what shrinks the revisit gap.
@@ -112,12 +138,28 @@ def run_flood_pipeline(event_config):
                 event_config['bbox'], base_start, base_end, other)
             if o_base_n < BASELINE['min_scenes']:
                 o_base_mean = o_base_std = None
-            orbit_stack[other] = {
+            spec = {
                 'post': composite, 'pre': o_pre,
                 'baseline_mean': o_base_mean, 'baseline_std': o_base_std,
             }
+            # This orbit's VH channel, again against its own VH baseline. Only
+            # a complete set enables dual-pol for the orbit; a partial one is
+            # left out entirely so it cannot contribute a spurious zero.
+            if DUALPOL.get('enabled', True):
+                o_post_vh, _ = load_sar_vh_composite(
+                    event_config['bbox'], event_config['post_start'],
+                    event_config['post_end'], other)
+                if o_post_vh is not None:
+                    o_vh_mean, o_vh_std, o_vh_n = load_sar_baseline(
+                        event_config['bbox'], base_start, base_end, other, band='VH')
+                    if o_vh_n >= DUALPOL['min_vh_baseline_scenes']:
+                        spec.update({'post_vh': o_post_vh,
+                                     'vh_baseline_mean': o_vh_mean,
+                                     'vh_baseline_std': o_vh_std})
+            orbit_stack[other] = spec
             print(f"  Cross-orbit: {other} contributes {n_scenes} post scenes "
-                  f"({o_base_n} baseline scenes)")
+                  f"({o_base_n} baseline scenes"
+                  f"{', dual-pol' if 'post_vh' in spec else ''})")
         if not orbit_stack:
             print("  Cross-orbit: no second orbit with coverage in this window")
 
@@ -132,6 +174,8 @@ def run_flood_pipeline(event_config):
         optical_water=optical_water, optical_valid=optical_valid,
         hand=hand_img, baseline_mean=baseline_mean, baseline_std=baseline_std,
         orbit_stack=orbit_stack,
+        post_vh=post_vh,
+        vh_baseline_mean=vh_base_mean, vh_baseline_std=vh_base_std,
         # Resolve each orbit's Otsu threshold once instead of recomputing that
         # whole-bbox histogram on every sampling batch (see guarded_otsu).
         precompute_thresholds=True)
@@ -309,6 +353,19 @@ def run_flood_pipeline(event_config):
         'cross_orbit_combine':   CROSS_ORBIT['combine'] if orbit_stack else 'n/a',
         'hand_source':           hand_source,
         'hand_thresholds_ft':    [HAND['plausible_ft'], HAND['implausible_ft']],
+        # ── Phase 4b provenance. Recorded even when it abstains, so a run with
+        #    no dual-pol score can be told apart from a run where it found
+        #    nothing — the distinction the dpol_available column carries per
+        #    property, kept at the run level too.
+        'dualpol_enabled':       bool(DUALPOL.get('enabled', True)),
+        'dualpol_active':        bool(vh_base_mean is not None),
+        'vh_post_scene_count':   vh_post_n,
+        'vh_baseline_scene_count': vh_base_n,
+        'dualpol_method': (
+            f"min(VV,VH) z-evidence over [{DUALPOL['z_min']}, {DUALPOL['z_full']}]σ"
+            + (f", co/cross ratio rise >= {DUALPOL['ratio_rise_db']} dB"
+               if DUALPOL.get('ratio_gate') else "")
+            if vh_base_mean is not None else 'abstained — no usable VH baseline'),
         # ── Phase 2 provenance
         'structure_source':      'USACE National Structure Inventory',
         'structures_matched':    int(n_matched),

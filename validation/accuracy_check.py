@@ -500,6 +500,19 @@ def derive_property_labels(altis_df: pd.DataFrame, zip_agg: pd.DataFrame,
     else:
         coverage = pct_frac
 
+    # Phase 4b: the dual-pol score is the same graded quantity, measured with a
+    # second polarisation so saturated soil cannot fake it. Only counted where
+    # `dpol_available` says a VH baseline actually existed — a 0 from an
+    # abstaining run means "not measured", and folding that in as evidence of
+    # dryness would be exactly the kind of silent fabrication this pipeline
+    # refuses.
+    if 'dpol_water' in df.columns:
+        dpol = pd.to_numeric(df['dpol_water'], errors='coerce').fillna(0.0)
+        if 'dpol_available' in df.columns:
+            avail = pd.to_numeric(df['dpol_available'], errors='coerce').fillna(0)
+            dpol = dpol.where(avail > 0, 0.0)
+        coverage = pd.concat([coverage, dpol], axis=1).max(axis=1)
+
     df['raw_flood_score'] = [
         calib.raw_flood_score(p, d) for p, d in zip(coverage, depth)]
     return df
