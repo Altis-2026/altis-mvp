@@ -310,3 +310,92 @@ In rough order of expected effect:
    could flag properties the physics-based mask misses.
 4. Commercial SAR at 6-24h revisit, for events where Sentinel misses the peak
    entirely.
+
+---
+
+## 8. Two areas, opposite results — and why that is the most useful finding here
+
+Harvey's widened box was validated the same way: 4,000 properties, uniform
+random, **55 zips**, against **24,219 real NFIP claims**. Both events, same
+code, same storm, same week.
+
+| | **Brazos** (open floodplain) | **Harvey** (west Houston) |
+|---|---|---|
+| Zips / claims | 15 / 3,135 | 55 / 24,219 |
+| Depth vs mean claimed depth | **+0.366** | **−0.011** |
+| Depth vs median claimed depth | **+0.373** | **−0.017** |
+| Depth vs mean paid claim | **+0.537** | **+0.012** |
+| Properties detected | 16 (0.4%) | 44 (1.1%) |
+| Urban-flagged properties | 79% | 86% |
+
+**The two areas disagree, and Harvey detected MORE while correlating LESS.**
+That combination is the tell, and chasing it produced the sharpest result in
+this document.
+
+### 100% of Harvey's detections are contradicted by the optical sensor
+
+| | Detections | Contradicted by Sentinel-2 | Mean optical water at detections |
+|---|---|---|---|
+| Harvey | 44 | **44 (100%)** | **0.0000** |
+| Brazos | 16 | 14 (88%) | 0.0122 |
+
+Every single Harvey detection sits where Sentinel-2 sees no water at all. In
+86%-urban terrain that is the signature of SAR artifact — radar shadow and
+double-bounce between buildings mimicking the low backscatter of open water —
+not of flooding the optical sensor happened to miss. It is the same physics as
+section 2, now measured on the detector's own output rather than on raw scenes.
+
+A −0.011 correlation is exactly what a set of false positives should produce.
+The zip-level agreement in Brazos and its absence in Harvey are the same fact
+seen twice.
+
+### What the system did about it: the part that actually matters
+
+Triage output across all 8,000 properties in both areas:
+
+| | Dispatch | Review | Remote-Deny |
+|---|---|---|---|
+| Harvey | **0** | 108 | 3,892 |
+| Brazos | **1** | 111 | 3,888 |
+
+**Harvey dispatched nobody.** The ensemble's optical cross-check and
+disagreement logic caught all 44 false positives and refused to commit to a
+single one — without anyone tuning it for this, and before any of the analysis
+above was done. That is the multi-sensor design doing exactly the job it exists
+to do.
+
+The one Dispatch in 8,000 properties is Brazos BRZ-00447:
+
+- 7.96 ft depth, 87.1% of the sampled area flooded
+- Sentinel-2 **confirms** standing water (optical 0.109, versus 0.0000 across
+  every Harvey detection)
+- Confidence 97%
+
+Deep water, near-total coverage, two independent sensors agreeing. That is the
+only property in either study area that clears the bar, and it should be.
+
+### The honest reading
+
+Stated plainly, because it cuts both ways:
+
+1. **Where SAR works, it works, and the numbers hold up.** Open riverine
+   floodplain gives +0.37 depth agreement and +0.54 against dollars paid,
+   across 15 zips and 3,135 claims.
+2. **Where it doesn't, the system knows.** It produced zero dispatches in the
+   terrain where its own detections were unreliable. It did not need to be told
+   that terrain was hard; the optical vote worked it out.
+3. **Coverage is the real limitation, not correctness.** One Dispatch and ~220
+   Reviews against 27,000 filed claims across both areas. The system is tuned
+   to near-total precision at the cost of recall.
+
+That tuning is a choice, not a law, and it is the main dial to revisit. For a
+CAT team, `Review` is a worklist, not a rejection — ~2.7% of each portfolio
+routed to human attention is a usable product. But nobody should describe the
+current configuration as finding most flooded properties. It finds a few it is
+very sure about, and correctly declines everywhere else.
+
+**For the pitch:** lead with riverine and open-terrain events, show the
+Brazos numbers, and state the urban-canopy limit before a carrier's engineer
+finds it. The zero-dispatch result in Harvey is a feature worth showing
+deliberately — a system that declines to guess is worth more to a claims
+manager than one that confidently sends adjusters to dry houses.
