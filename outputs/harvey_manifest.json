@@ -22,9 +22,10 @@
         49.0
       ],
       "structure_source": "USACE National Structure Inventory",
-      "structures_matched": 1000,
+      "structures_matched": 4000,
       "structure_match_max_m": 60.0,
-      "sample_geometry": "structure footprint equal-area circle",
+      "sample_geometry": "fixed 50m buffer on real structure point",
+      "exposure_radius_m_override": 50,
       "sample_scale_m": 30,
       "pre_event_scene_count": 3,
       "post_event_scene_count": 2,
@@ -50,18 +51,18 @@
       "permanent_water_dataset": "JRC/GSW1_4/GlobalSurfaceWater (seasonality >= 8mo)",
       "building_mask_dataset": "GOOGLE/Research/open-buildings/v3",
       "urban_density_dataset": "JRC/GHSL/P2023A/GHS_BUILT_S/2020",
-      "flooded_property_count": 4,
-      "urban_property_count": 904,
+      "flooded_property_count": 44,
+      "urban_property_count": 3454,
       "optical_dataset": "COPERNICUS/S2_SR_HARMONIZED (MNDWI, SCL cloud mask)",
       "optical_max_cloud_pct": 40,
-      "optical_scene_count": 3,
-      "optical_available_property_count": 1000,
-      "sar_optical_contradiction_count": 0,
+      "optical_scene_count": 10,
+      "optical_available_property_count": 4000,
+      "sar_optical_contradiction_count": 41,
       "depth_uncertainty": {
         "dem_vertical_rmse_m": 0.3,
         "interval": "\u00b11\u03c3 (~68%): quadrature of DEM vertical accuracy + measured WSE spread"
       },
-      "generated_at": "2026-08-09T19:24:39.456177+00:00"
+      "generated_at": "2026-08-10T05:15:09.326777+00:00"
     },
     "triage": {
       "pipeline_version": "1.0.0",
@@ -78,13 +79,13 @@
         "remote_approve_conf": 78
       },
       "category_counts": {
-        "Dispatch": 1,
+        "Dispatch": 0,
         "Remote-Approve": 0,
-        "Remote-Deny": 984,
-        "Review": 15
+        "Remote-Deny": 3892,
+        "Review": 108
       },
-      "estimated_savings_usd": 738000,
-      "remote_resolution_count": 984,
+      "estimated_savings_usd": 2919000,
+      "remote_resolution_count": 3892,
       "cost_per_inspection_usd": 750,
       "optical_cross_check": {
         "max_cloud_pct": 40,
@@ -97,8 +98,8 @@
         "confirm_dry_bonus": 6,
         "contradict_penalty": -12
       },
-      "optical_available_count": 1000,
-      "generated_at": "2026-08-09T19:27:30.971570+00:00"
+      "optical_available_count": 4000,
+      "generated_at": "2026-08-10T05:17:20.117818+00:00"
     },
     "properties": {
       "study_name": "West & Northwest Houston (Addicks/Barker corridor), TX",

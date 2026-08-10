@@ -101,30 +101,61 @@ def generate_notes_batch(batch_rows):
         return fallback
 
 
+# After this many consecutive LLM failures, stop trying for the rest of the
+# run and go straight to the deterministic note generator.
+#
+# WHY: the failure that matters here is the endpoint being unreachable
+# (no API key, no egress, provider down), which fails identically for every
+# batch. On a 4,000-property portfolio that is 200 doomed HTTP calls, each
+# paying a full connection timeout, to produce exactly the fallback text we
+# would have written instantly. Observed adding tens of minutes to a run whose
+# real work was already done. A transient blip still recovers, because the
+# counter resets on any success.
+LLM_GIVE_UP_AFTER = 3
+
+
+def _fallback_note(row):
+    street = row['address'].split(',')[0]
+    return (f"Satellite data at {street} indicates {row['max_depth_ft']:.1f}ft depth; "
+            f"{row['impact_class'].lower()} per {row['confidence_score']}% confidence.")
+
+
 def add_adjuster_notes(df):
     BATCH_SIZE = 20
     all_notes  = []
     rows       = df.to_dict('records')
     print(f"  Generating notes for {len(rows)} properties...")
 
+    consecutive_failures = 0
+    llm_available = client is not None
+    if not llm_available:
+        print("  No OPENROUTER_API_KEY configured — using deterministic notes.")
+
     for i in range(0, len(rows), BATCH_SIZE):
         batch = rows[i : i + BATCH_SIZE]
-        try:
-            notes = generate_notes_batch(batch)
-            all_notes.extend(notes)
-        except Exception as e:
-            print(f"  Claude API batch error: {e}. Using fallback.")
-            for row in batch:
-                street = row['address'].split(',')[0]
-                all_notes.append(
-                    f"Satellite data at {street} indicates {row['max_depth_ft']:.1f}ft depth; "
-                    f"{row['impact_class'].lower()} per {row['confidence_score']}% confidence."
-                )
+
+        if llm_available:
+            try:
+                all_notes.extend(generate_notes_batch(batch))
+                consecutive_failures = 0
+            except Exception as e:
+                consecutive_failures += 1
+                print(f"  Claude API batch error: {e}. Using fallback.")
+                all_notes.extend(_fallback_note(r) for r in batch)
+                if consecutive_failures >= LLM_GIVE_UP_AFTER:
+                    llm_available = False
+                    print(f"  {consecutive_failures} consecutive API failures — "
+                          f"generating the remaining "
+                          f"{len(rows) - min(i + BATCH_SIZE, len(rows))} notes "
+                          f"deterministically without further API calls.")
+        else:
+            all_notes.extend(_fallback_note(r) for r in batch)
 
         processed = min(i + BATCH_SIZE, len(rows))
         if processed % 100 == 0 or processed == len(rows):
             print(f"  Progress: {processed}/{len(rows)}")
-        time.sleep(0.6)
+        if llm_available:
+            time.sleep(0.6)
 
     df = df.copy()
     df['adjuster_note'] = all_notes
