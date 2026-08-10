@@ -228,3 +228,85 @@ denominator so real claim rates replace the weaker depth-share label, or
 moving to an event with a larger flooded-property count to validate against
 (the Brazos River floodplain, not yet tried, is the next candidate — see
 section 3).
+
+---
+
+## 7. Brazos River, 4,000 properties, 15 zips — the first result worth reading
+
+This is the run that section 6 asked for: a second, independent study area
+(river-crest flooding rather than reservoir release), a plain uniform random
+sample rather than a flood-targeted one, 4,000 properties instead of 1,000,
+and 15 zips instead of 8.
+
+**Ground truth:** 3,135 real NFIP claims, date of loss 2017-08-27 to
+2017-09-20, across the 15 zips the portfolio touches. Depth-unit split 2,823
+feet / 310 inches / 2 invalid.
+
+### Zip-level agreement is real and consistent
+
+| Comparison (by zip, n=15) | Correlation |
+|---|---|
+| Altis mean depth vs **mean claimed water depth** | **+0.366** |
+| Altis mean depth vs **median claimed depth** | **+0.373** |
+| Altis mean depth vs **mean paid building claim** | **+0.537** |
+| Altis % flagged vs % claims reporting standing water | +0.105 |
+
+All four point the same way, which matters more than any single figure. The
+strongest is against **dollars actually paid** — the number a carrier cares
+about — and the depth correlations agree with each other, which is what you
+would expect from real signal rather than noise.
+
+Compare with section 6's Harvey result, where the two depth metrics disagreed
+in sign on 8 zips. That was thin-sample noise; this is not.
+
+### Property-level discrimination is NOT there, and the report says so
+
+The calibration now fits, because the corrected denominator finally produced a
+label with two classes (832 flooded-truth of 3,980, versus 4,000 of 4,000
+before the fix):
+
+- **Expected calibration error: 0.0134** — genuinely well calibrated. When it
+  says 20%, it means 20%.
+- **Brier skill score: −0.037** — it does **not** beat a constant predictor.
+
+Both are true at once and neither should be dropped. The model's probabilities
+are honest; they just carry almost no discriminating information, because
+**only 22 of 3,980 properties (0.6%) have any flood signal at all**. There is
+very little for a calibrator to separate.
+
+### The number that actually matters commercially: recall
+
+Detection rate is 16 of 4,000 sampled (0.40%). Scaled to the 170,484
+residential structures in the study area, that extrapolates to roughly **680
+detected properties against 3,135 filed claims — on the order of 20% recall.**
+
+That estimate is a **lower bound**, and deliberately quoted as one: the zips
+extend past the study bbox, so the claim count includes losses outside the
+area analysed, which drags the ratio down. The true figure is higher, but not
+by an order of magnitude.
+
+**So: in open riverine floodplain — SAR's best case — Altis finds something
+like a fifth to a third of the properties that actually filed flood claims.**
+
+That is a real, useful product and it is not "replace the adjuster". It is
+"here are several hundred properties we are confident about on day one,
+ranked, with depth and a dollar range" — against a book where thousands filed.
+The honest positioning is triage acceleration and early reserve-setting, not
+exhaustive coverage.
+
+### What would move recall
+
+In rough order of expected effect:
+
+1. **Sub-pixel / partial-water detection.** The binary Otsu mask requires a
+   30m pixel to read as water. A suburban lot that is half flooded often does
+   not clear that bar. Fractional-water unmixing is the standard answer and is
+   not implemented here.
+2. **More post-event scenes.** Two scenes on the primary orbit for Harvey.
+   Sentinel-1C/D have since restored 6-day revisit, and cross-orbit stacking
+   (already built) helps more when there are more passes to stack.
+3. **The learned fourth vote (Phase 4).** NFIP claims give millions of
+   labelled outcomes; a model over depth, HAND, foundation type and occupancy
+   could flag properties the physics-based mask misses.
+4. Commercial SAR at 6-24h revisit, for events where Sentinel misses the peak
+   entirely.

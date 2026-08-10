@@ -1,0 +1,150 @@
+{
+  "n_total": 3980,
+  "n_train": 3429,
+  "n_test": 551,
+  "n_positive": 832,
+  "split_kind": "grouped_by_zip",
+  "seed": 42,
+  "test_fraction": 0.3,
+  "decision_threshold": 0.5,
+  "holdout_metrics": {
+    "brier_score": 0.1714,
+    "expected_calibration_error": 0.0134,
+    "reliability_curve": [
+      {
+        "bin_lo": 0.2,
+        "bin_hi": 0.3,
+        "mean_predicted": 0.2068,
+        "observed_frequency": 0.2172,
+        "count": 548
+      },
+      {
+        "bin_lo": 0.3,
+        "bin_hi": 0.4,
+        "mean_predicted": 0.3333,
+        "observed_frequency": 0.0,
+        "count": 2
+      },
+      {
+        "bin_lo": 0.9,
+        "bin_hi": 1.0,
+        "mean_predicted": 1.0,
+        "observed_frequency": 0.0,
+        "count": 1
+      }
+    ],
+    "classification": {
+      "true_positive": 0,
+      "false_positive": 1,
+      "false_negative": 119,
+      "true_negative": 431,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": null,
+      "accuracy": 0.7822,
+      "support": 551
+    },
+    "method": "isotonic"
+  },
+  "calibrator": {
+    "x_knots": [
+      0.0,
+      0.002,
+      0.011,
+      0.015,
+      0.0345,
+      0.0438,
+      0.0555,
+      0.0653,
+      0.0925,
+      0.1058,
+      0.1705,
+      0.2238,
+      0.2532,
+      0.2553,
+      0.2707,
+      0.311,
+      0.3932,
+      0.4293,
+      0.4948,
+      0.6155,
+      0.6687,
+      0.732,
+      0.9355
+    ],
+    "y_knots": [
+      0.20818595250127983,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.6,
+      0.6,
+      0.6,
+      0.6,
+      0.6,
+      1.0
+    ],
+    "method": "isotonic"
+  },
+  "event_id": "brazos",
+  "label_source": "OpenFEMA NFIP Redacted Claims v3 \u2014 NFIP claims per residential structure >= 2.0% (policies-in-force denominator unavailable; structure counts substituted)",
+  "label_resolution": "zip_code",
+  "score_definition": "0.5*coverage_fraction + 0.5*min(depth_ft/3, 1)",
+  "triage_precision_recall": {
+    "by_category": {
+      "Dispatch": {
+        "n": 1,
+        "pct_truly_flooded": 100.0,
+        "pct_truly_dry": 0.0
+      },
+      "Remote-Approve": {
+        "n": 0,
+        "pct_truly_flooded": null,
+        "pct_truly_dry": null
+      },
+      "Remote-Deny": {
+        "n": 3868,
+        "pct_truly_flooded": 21.2,
+        "pct_truly_dry": 78.8
+      },
+      "Review": {
+        "n": 111,
+        "pct_truly_flooded": 9.9,
+        "pct_truly_dry": 90.1
+      }
+    },
+    "overall": {
+      "true_positive": 1,
+      "false_positive": 0,
+      "false_negative": 831,
+      "true_negative": 3148,
+      "precision": 1.0,
+      "recall": 0.0012,
+      "f1": 0.0024,
+      "accuracy": 0.7912,
+      "support": 3980
+    }
+  },
+  "baseline": {
+    "base_rate": 0.209,
+    "constant_predictor_brier": 0.1653,
+    "properties_with_any_signal": 22,
+    "properties_total": 3980,
+    "brier_skill_score": -0.0366,
+    "beats_constant_predictor": false,
+    "warning": "Only 22 of 3980 properties (0.6%) have any flood signal at all. Every metric here rests on those few properties and should not be treated as a validation of the detector."
+  }
+}
