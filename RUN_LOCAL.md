@@ -35,7 +35,7 @@ You should see:
 
 ```
   Loaded 1000 properties for harvey
-  Loaded 1000 properties for ian
+  Loaded 4000 properties for brazos
 ✓ Altis backend ready at http://localhost:8000
 ```
 
@@ -105,7 +105,7 @@ Open **http://localhost:5173**. The globe should render and slowly rotate.
 
 8. **Real NFIP claims validation + calibration** (needs internet, no key):
    ```bash
-   python validation/accuracy_check.py --event harvey --event ian
+   python validation/accuracy_check.py --event harvey --event brazos
    ```
    Fetches real **NFIP Redacted Claims** (OpenFEMA v3) for each event's date-of-loss
    window, compares them against Altis's output by zip code, fits a calibrated
@@ -148,7 +148,7 @@ Open **http://localhost:5173**. The globe should render and slowly rotate.
 
    Live analysis has no FEMA disaster of its own, so it borrows a fitted
    event's calibrator and reports which one it used. Control the preference
-   order with `CALIBRATION_EVENT_ORDER` (default `harvey,ian`).
+   order with `CALIBRATION_EVENT_ORDER` (default `harvey,brazos`).
 
    Lismore is intentionally unsupported here: NFIP is US-only, and there is no
    equivalent open Australian claims dataset to validate against.
@@ -177,9 +177,14 @@ into the record of several real findings, not just the first one.
   a genuinely flooded structure) and the honest limits of the current result
   (an 8-zip correlation, both directions of sign across two metrics — treat as
   thin-sample signal, not a validated accuracy claim).
-- **Ian** still detects almost nothing (1 of 1,000) because the satellite's
-  first usable pass was four days after landfall — a revisit-timing miss, not
-  a terrain one, and not fixable by relocating the study area.
+- **Ian has been dropped** as a demo and benchmark event. Its first usable
+  Sentinel-1 pass was four days after landfall, so the satellite never observed
+  the flooding — a revisit-timing miss, not a terrain one, and not fixable by
+  relocating the study area. It is replaced by **Brazos** (Brazos River
+  floodplain, Fort Bend County): the same Harvey storm in open riverine
+  floodplain, which is SAR's strongest case and an independent second sample —
+  Addicks/Barker is reservoir-release flooding, the Brazos is river-crest
+  flooding, so agreement across both means more than either alone.
 - Every Harvey property in the *original* Meyerland run scored 0.0, so any
   calibrator fitted on it was constant, and its Brier score was the base-rate
   variance `p(1-p)` **by construction** — the previously reported **Brier
@@ -233,6 +238,41 @@ and falls back, rather than silently substituting a default.
   served from an Esri host that isn't reachable here, so NSI's per-structure
   footprint **area** drives an equal-area circle instead. That approximation is
   labelled as such in the manifest.
+
+  Note that footprint-tight sampling is the *default* but not what every event
+  uses. Measured on the Addicks/Barker area: of 32,607 residential structures,
+  exactly **one** has a detected flood pixel literally under its own footprint,
+  because homes are sited on the highest ground on their lot and water fills
+  the yard and street first. Events can therefore set `exposure_radius_m` (see
+  `config.HARVEY`) to sample a fixed buffer around the real structure point —
+  the claims-relevant "water reached the property" standard NFIP and adjusters
+  use, rather than the stricter "water under the roof".
+
+- **Severity: multiple damage curves (Phase 3).** The dollar estimate no
+  longer runs every property through one generic one-storey residential curve.
+  The curve is selected from the structure's own NSI attributes — occupancy
+  class, storeys, basement presence — and indexed on depth above the **first
+  floor**, which is what published depth-damage functions actually take. Three
+  consequences worth knowing:
+  - A two-storey home loses a smaller *fraction* of its value to the same two
+    feet of water than a one-storey home. A home with a basement starts taking
+    damage *below* grade. Crawlspaces are deliberately not treated as
+    basements — they hold no finished space.
+  - **Contents are estimated separately from structure**, on their own curve,
+    because NFIP settles them as separate coverages and carriers reserve them
+    separately. Contents damage rises faster at shallow depth and saturates
+    earlier. The API returns both plus a total; it never blends them into one
+    figure.
+  - Prolonged inundation increases the structure estimate, but **conservatively
+    and only where duration was actually measured**. The roadmap cites ~2.6× at
+    equal depth; that figure came from a search-result summary of a paywalled
+    paper that could not be read, so it is not used. The shipped cap is 1.30,
+    and a test enforces that it stays well below the cited value.
+
+  Every estimate carries its provenance (`severity_curve`,
+  `severity_depth_basis`, `severity_duration_mult`) so the number can be
+  audited. Outside CONUS, or with no NSI match, it degrades to the generic
+  curve on depth above ground exactly as before.
 
 9. **Live event detection** (needs internet, no key):
    ```bash
