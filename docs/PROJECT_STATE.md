@@ -1,7 +1,8 @@
 # Altis — Project State
 
 **Purpose of this file:** everything a new session needs to resume work without
-re-deriving it. Read this first. Written 2026-08-10.
+re-deriving it. Read this first. Written 2026-08-10, updated same day with the
+ground-truth sourcing task below.
 
 Companion documents:
 - `docs/DETECTION_LIMITS.md` — the measured record of what the detector can and
@@ -9,6 +10,17 @@ Companion documents:
 - `pipeline/config.py` — every tuning decision, each with the evidence for it
   written above the values. The `SUBPIXEL` and `DOUBLE_BOUNCE` blocks in
   particular record failed phases in full.
+
+---
+
+## 0. IF THIS IS A FRESH SANDBOX SET UP TO FIX THE NETWORK PROBLEM
+
+Skip straight to **§7 item 0** — that is the task this sandbox exists for. The
+prior sandbox's egress proxy blocked essentially every external content domain
+(FEMA, USGS, ArcGIS, HydroShare, ScienceBase all refused WebFetch), which
+blocked verifying and downloading real per-property flood ground truth. If you
+have normal outbound internet access, go execute that section now; the rest of
+this file is background for after that task lands.
 
 ---
 
@@ -206,7 +218,88 @@ chat, treat it as compromised and confirm rotation before relying on it.
 
 ## 7. What to do next, in priority order
 
-**1. Per-property ground truth. This unblocks everything else.**
+**0. Source real per-property/per-point flood ground truth. Do this FIRST,
+before writing any new detector code.** This is the task the network-capable
+sandbox exists for. A prior session's egress proxy blocked every relevant
+domain, so these are unverified leads from search-result snippets, not
+confirmed live data — the first job is verifying and downloading, not
+building.
+
+Why this matters more than anything else in this file: §2 explains that every
+accuracy number so far is capped by 14 independent zip codes. Four phases
+(4a, 4d, 4e) were built, measured, and could not be validated — not
+necessarily because they don't work, but because the ground truth has almost
+no statistical power to tell a good detector from a bad one. This task is
+what breaks that ceiling.
+
+Leads, in priority order:
+
+  a. **USGS High Water Marks, Hurricane Harvey.** ~2,123 GPS-tagged points
+     with surveyed water height above land surface, 22 TX counties + 3 LA
+     parishes. Public, free, no agreement needed. Start at the USGS Flood
+     Event Viewer (`stn.wim.usgs.gov`, event "HarveyAug2017") and the
+     ScienceBase data release (search "Data Used to Characterize Peak
+     Streamflows and Flood Inundation... Hurricane Harvey ScienceBase" if the
+     direct link has moved). This is POINT-LEVEL MEASURED DEPTH, not a binary
+     label — better than what we have, because it validates `depth_ft`
+     directly instead of a flooded/not-flooded call. Filter to points falling
+     inside the BRAZOS and HARVEY bboxes in `pipeline/config.py`. Even a few
+     hundred points landing inside our study areas would be a real upgrade
+     over 14 zips.
+     Action: download, check how many points fall inside our two bboxes,
+     write a `validation/hwm_check.py` that compares our `depth_ft` output at
+     each HWM point's coordinates against the surveyed value — direct
+     regression, no zip aggregation, no label threshold to argue about.
+
+  b. **FEMA "Building Damage for Harvey."** Search-result snippets describe a
+     FEMA ArcGIS Hub dataset with **per-building damage classification
+     (1=undamaged through 5=destroyed) covering 68,000+ structures** in
+     Harris County. If this is still live and has coordinates per record,
+     THIS IS THE PER-PROPERTY GROUND TRUTH THE PROJECT HAS BEEN MISSING —
+     stop and prioritize it over everything else in this list if it checks
+     out. Was at `gis-fema.hub.arcgis.com/datasets/building-damage-for-harvey`
+     as of this writing; FEMA links rot, so search "FEMA Building Damage
+     Harvey ArcGIS" if that 404s, and also check
+     `respond-harvey-geoplatform.opendata.arcgis.com` (HIFLD's Harvey hub,
+     130+ datasets) and `data.femadata.com/NationalDisasters/HurricaneHarvey/
+     Data/DamageAssessments/`.
+     Action: confirm it's live, confirm it has coordinates (not just county/
+     zip aggregates), download it, check overlap with our BRAZOS/HARVEY
+     bboxes, and if it holds up, this becomes the primary validation dataset
+     — replacing zip-level NFIP correlation as the headline number.
+
+  c. **FEMA flood depth grid.** A ~39GB modeled flood-depth raster covering
+     the Harvey-affected area, referenced via HydroShare
+     ("FEMA - Harvey Flood Depths Grid"). If real, this validates our depth
+     map against a continuous surface — no sparse-point or zip-aggregation
+     problem at all. Lower priority than (a) and (b) because of the size and
+     because it's a MODELED product (FEMA's own hydraulic model), not a direct
+     measurement — useful as a second opinion, not as strong as (a)'s surveyed
+     points or (b)'s inspected buildings.
+
+  d. **Non-redacted NFIP claims via FEMA data-sharing agreement.** The public
+     OpenFEMA claims are zip-redacted by the Privacy Act; the full address-
+     level version exists and FEMA does grant access through an Information
+     Sharing Access Agreement (ISAA). Contact `OpenFEMA@fema.dhs.gov`. This is
+     the slowest path (FEMA's timeline, needs a formal request from the
+     company, not something a coding session can complete) but the highest
+     ceiling long-term, since it's literally the same dataset already in use,
+     just at full precision. Start this conversation in parallel with (a)-(c)
+     rather than waiting on them.
+
+  e. **Adjuster feedback loop and FNOL photo upload** (the two items originally
+     listed here — kept as fallback/complementary, see item 1 below). These
+     require the product to be live and generating real claims first, so
+     they're slower to bear fruit than (a)-(d), which are ALREADY-COLLECTED
+     historical data sitting in a government archive right now.
+
+If (a) or (b) pan out, the very next step is re-running `dualpol_ablation.py`
+and a new point-level equivalent of `double_bounce_probe.py` against the new
+ground truth — both were shelved as "not proven," not "disproven," and this
+is what actually settles it.
+
+**1. Per-property ground truth via product usage. This unblocks everything
+else once the product has real users; item 0 is the faster path today.**
 Every accuracy number in this project is capped by the 14-zip ceiling, and four
 phases have now died against it. Two viable routes, neither requiring new data
 spend:
@@ -268,6 +361,35 @@ time-critical sub-parcel work. Not to be built; a future purchasing decision.
   the whole-bbox histogram is recomputed on every sampling batch (30+ min stall).
 - **OpenRouter failures fail identically for every batch.** `LLM_GIVE_UP_AFTER
   = 3` exists because 200 doomed calls once added ~40 min to a finished run.
+
+---
+
+## 8b. Sandbox requirements for §7 item 0 (the ground-truth sourcing task)
+
+The prior session's sandbox blocked outbound access to essentially every
+content domain outside a small allowlist (search-engine queries worked;
+fetching the actual result pages did not — FEMA, USGS, ArcGIS, HydroShare,
+ScienceBase all returned an egress-blocked error). Whoever sets up the new
+sandbox should confirm, before starting work:
+
+- **General outbound HTTPS is allowed**, not just an allowlist of a few
+  domains — the sourcing task needs to reach `.gov` sites (`usgs.gov`,
+  `femadata.com`, `fema.gov`), `.arcgis.com` / ArcGIS Hub, `hydroshare.org`,
+  `sciencebase.gov`, and whatever domains the search in §7-0 turns up next.
+  If the environment only supports an allowlist, add those domains to it
+  up front rather than discovering the block mid-task.
+- **The repo and its git remote work as normal** — this task should still
+  `git clone`/`git fetch` `Altis-2026/altis-mvp` on branch
+  `claude/altis-flood-intelligence-1qzgvq` and commit/push there, same as
+  every other session. Nothing about the ground-truth sourcing changes the
+  git workflow.
+- **Large file handling**: item (c) above is ~39GB. Confirm the sandbox has
+  disk space for that, or plan to stream/subset it (e.g., fetch only the
+  raster tiles overlapping the BRAZOS/HARVEY bboxes) rather than downloading
+  the whole thing — check size and options before pulling it in full.
+- No new GEE, GCP, or paid-API credentials are needed for this task — it's
+  pure public-data download and comparison against outputs the pipeline
+  already produces.
 
 ---
 
