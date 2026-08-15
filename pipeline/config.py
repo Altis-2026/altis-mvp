@@ -495,11 +495,55 @@ DUALPOL = {
 # flooded blocks. That argues for UNION across orbits (a flood seen by one
 # pass is still a flood), never agreement.
 #
-# HONEST STATUS: enabled to be MEASURED, same contract as 4a and 4b. It is
-# reported as its own band so its contribution can be isolated, and it will be
-# disabled with the numbers recorded here if it does not earn its place.
+# MEASURED RESULT: IT DOES NOT WORK, AND IS DISABLED. Same contract as 4a.
+#
+# Run on Brazos, 4,000 properties, against the same NFIP claim truth as
+# everything else (validation/double_bounce_probe.py, reproducible).
+#
+# It did mechanically what it was designed to do. The previously-blind urban
+# zips lit up: 77450 (92.7% urban, flooded-truth) went from 0.000% detection
+# under the darkening detector to 73.1%. All four blind flooded zips gained
+# signal. Firing rate rose from 0.53% of properties to 15.2%, and recall from
+# 0.8% to 14.5%.
+#
+# None of that was accuracy:
+#
+#   property-level AUC   0.4975 (p=0.73)   -- darkening was 0.5020 (p=0.16)
+#   precision            19.9%             -- BELOW the 20.9% base rate
+#   zip-level Spearman   +0.018 (p=0.95)
+#
+# The encouraging group means (flooded zips 23.9% vs dry 14.6%) are one zip.
+# Drop 77450 and they invert: 11.6% flooded vs 14.6% dry. The MEDIANS were
+# always inverted -- 10.1% flooded vs 14.0% dry. Mann-Whitney p=0.500, which
+# is not weak evidence, it is none.
+#
+# A threshold sweep found precision 26.4% at score>0.05 (p=0.035), but eight
+# thresholds were tested, so the Bonferroni-adjusted p is ~0.28, and
+# significance is not monotone in the threshold (0.077, 0.103, 0.472 above it).
+# That is the shape of noise, not of a signal with a cut point.
+#
+# What it is actually detecting: correlation with `urban` is +0.197, with
+# flood truth +0.018. Urban brightening has many causes -- vehicles, harvest,
+# construction, changing moisture on rough surfaces -- and firing on 15% of
+# properties when real inundation touched a few percent means the gates admit
+# most of them. The physics is right; the constraints available at 10 m
+# resolution do not isolate it.
+#
+# THE LARGER CAVEAT, which matters more than this result. Brazos ground truth
+# is 14 zips, every property in a zip sharing one label. The DARKENING detector
+# also scores AUC 0.502 on it. This test cannot distinguish a good detector
+# from a bad one, so the honest statement is not "double-bounce failed" but
+# "double-bounce cannot be validated with the ground truth we have, and the
+# evidence that exists does not support it." Shipping a band that fires on 15%
+# of properties on that basis would be exactly the plausible-looking number
+# this codebase refuses everywhere else.
+#
+# Kept, not deleted: the physics is real and standard in the literature, the
+# unit tests pin it, and it is the right method at finer resolution or with
+# per-property ground truth to tune the gates against. Re-enabling is one line
+# plus a re-validation.
 DOUBLE_BOUNCE = {
-    'enabled': True,
+    'enabled': False,
     # Standard deviations ABOVE the pixel's own baseline mean. Deliberately
     # stricter than the darkening gate (2.0): brightening has more benign
     # causes than darkening does, so it must clear a higher bar.
