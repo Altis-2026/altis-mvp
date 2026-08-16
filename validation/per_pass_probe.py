@@ -106,7 +106,7 @@ def main():
     init_ee()
     import ee
     import config
-    from config import BASELINE, SAR
+    from config import BASELINE
     from flood_detect import (load_dem, load_sar_composite, load_sar_baseline,
                               baseline_window, guarded_otsu, orbit_flood_mask)
     import hwm_check

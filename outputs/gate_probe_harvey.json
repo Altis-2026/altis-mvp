@@ -1,0 +1,31 @@
+{
+  "event": "harvey",
+  "orbit": "ASCENDING",
+  "otsu_db": -16.0,
+  "otsu_raw_db": -9.241918262702423,
+  "otsu_range_guard_fired": true,
+  "z_threshold": 2.0,
+  "baseline_scenes": 49,
+  "post_scenes": 2,
+  "scenes": [
+    "2017-08-29"
+  ],
+  "hand_source": "MERIT/Hydro/v1_0_1",
+  "radius_m": 50,
+  "marks": 63,
+  "sites": 48,
+  "gate_pass_counts": {
+    "pass_absolute": 4,
+    "pass_change": 5,
+    "pass_slope": 63,
+    "pass_not_perm": 63,
+    "pass_all": 1
+  },
+  "failure_combinations": {
+    "absolute": 4,
+    "absolute+change": 55,
+    "change": 3
+  },
+  "excluded_by_terrain_gate": 0,
+  "rejected_by_radiometry_on_valid_terrain": 62
+}

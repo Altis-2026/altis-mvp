@@ -1,0 +1,71 @@
+{
+  "event": "brazos",
+  "bbox": [
+    -95.9,
+    29.45,
+    -95.6,
+    29.72
+  ],
+  "post_window": [
+    "2017-08-29",
+    "2017-09-12"
+  ],
+  "scenes": [
+    {
+      "date": "2017-08-29",
+      "orbit": "ASCENDING"
+    },
+    {
+      "date": "2017-08-30",
+      "orbit": "DESCENDING"
+    },
+    {
+      "date": "2017-09-05",
+      "orbit": "DESCENDING"
+    },
+    {
+      "date": "2017-09-10",
+      "orbit": "ASCENDING"
+    },
+    {
+      "date": "2017-09-11",
+      "orbit": "DESCENDING"
+    }
+  ],
+  "radius_m": 50,
+  "marks": 28,
+  "sites": 18,
+  "median": {
+    "marks": 0,
+    "sites": 0,
+    "bbox_fraction": 0.0034782597599498674
+  },
+  "per_pass": {
+    "marks": 0,
+    "sites": 0,
+    "bbox_fraction": 0.030624335823377702
+  },
+  "per_scene": {
+    "f_20170829_asce": {
+      "marks": 0,
+      "sites": 0
+    },
+    "f_20170830_desc": {
+      "marks": 0,
+      "sites": 0
+    },
+    "f_20170905_desc": {
+      "marks": 0,
+      "sites": 0
+    },
+    "f_20170910_asce": {
+      "marks": 0,
+      "sites": 0
+    },
+    "f_20170911_desc": {
+      "marks": 0,
+      "sites": 0
+    }
+  },
+  "caveat": "Per-pass union is strictly more permissive than a median and can only add detections. Read recall together with the bbox_fraction dry-land control \u2014 HWMs contain no negative class, so recall alone cannot show a variant is better."
+}
