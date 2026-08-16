@@ -42,8 +42,15 @@ Lead status, so nobody re-runs a dead search:
   USGS HWM data and stream gage heights** — the same marks (a) already gives
   us, smoothed into a surface. It is not a second opinion, and validating
   against it would largely re-measure (a) with extra modelling error.
-- **(d) Non-redacted NFIP via FEMA ISAA — still the long-term ceiling,** still
-  requires a formal company request to OpenFEMA@fema.dhs.gov. Unstarted.
+- **(d) Non-redacted NFIP via FEMA ISAA — RESEARCHED, and the earlier plan was
+  wrong.** ISAAs are not processed by OpenFEMA; they run through the Regional
+  Flood Insurance Liaison. Eligibility is NFIP-participating communities and
+  their third-party contractors, for floodplain management / CRS / mitigation
+  purposes — **Altis cannot apply as a vendor on its own behalf**, and FEMA
+  states a policyholder address is Privacy Act PII. The realistic fastest route
+  to address-level truth is a **design-partner carrier's own claims file**,
+  which also uniquely supplies the insured-but-did-not-file negative class.
+  Full write-up and a draft letter: `docs/FEMA_DATA_REQUEST.md`.
 
 ---
 
@@ -310,36 +317,69 @@ surveyed flood sites at Brazos (95% CI [0%, 18.5%]) and depth bias is −2.64 ft
 worsening to −5.64 ft at surveyed depths of 4 ft and above. The binding
 constraint is base SAR detection recall, not the votes layered on top of it.
 
-**0b. NEW TOP PRIORITY: move base recall off zero, gated by `hwm_check.py`.**
-This replaces "add another vote and check the zip correlation," which is the
-treadmill §2 warns about. There are now 66 independent survey sites with
-measured depths and a check that runs in ~6 minutes, so candidate changes can
-finally be adjudicated. In rough order of expected effect:
+**0b. ROOT CAUSE FOUND: the detector tests for the wrong sign.** Full evidence
+in `docs/DETECTION_LIMITS.md` §11.
 
-  - **The median composite may be averaging the flood away.** `load_sar_composite`
-    returns `collection.median()` over the whole post window. Brazos has 3
-    DESCENDING scenes in that window (30 Aug, 5 Sep, 11 Sep) against a crest of
-    ~1 Sep; Harvey has 2. A pixel flooded on only one of three passes has a DRY
-    median, so the detector never sees it. Detecting per-pass and taking the
-    union — instead of detecting on a median — is the most likely single cause
-    of near-zero recall and the cheapest thing to test. (DETECTION_LIMITS §9
-    already flagged this mechanism; §10 is the evidence that promotes it to
-    first place.)
-  - **Re-measure Phases 4a, 4b and 4e against HWMs.** All three were shelved
-    as "not proven" against labels with no power. Dual-pol (4b) cleared chance
-    on the old labels and deserves the first re-run; sub-pixel (4a) was killed
-    by a wet-soil confound that a *depth* regression can see differently from a
-    binary label; double-bounce (4e) targets exactly the urban case where
-    Harvey's marks sit.
-  - **Otsu on a whole-bbox histogram may never see a water mode.** At 0.55%
-    flooded pixels, the bimodality Otsu assumes is not there, and the range
-    guard then decides the threshold. Worth measuring directly against the
-    marks.
+The median-composite hypothesis this file previously listed first was TESTED
+AND FALSIFIED. `validation/per_pass_probe.py` scores every individual pass and
+unions them: it flags **8.8× more of the Brazos bbox (3.06% vs 0.35%) and finds
+zero additional marks.** Not one pass sees these floods. Do not re-run this.
 
-**0c. Get a negative class.** HWMs prove where water WAS and can never measure
-precision (§2b). Without it, "improve recall" has an obvious degenerate
-solution. The cheapest honest sources are the adjuster feedback loop and FNOL
-photos in item 1 below, which is why item 1 did not drop in priority.
+`validation/gate_probe.py` then found the real cause. The terrain gates are
+innocent — 28/28 Brazos and 63/63 Harvey marks pass both slope and
+permanent-water, on ground averaging under 2° — which also settles a worry
+about §10: the recall figure is NOT an artifact of USGS surveying at bridges
+and channel banks. The radiometry rejects them, because:
+
+    mean VV z-score at surveyed flood points:  Brazos +0.39σ   Harvey +2.83σ
+
+The return at places that demonstrably flooded is **brighter** than that
+pixel's own 12-month baseline. An open-water detector tests for darkening.
+Water standing among buildings, fences and vegetation forms corner reflectors
+and returns MORE energy — which is the physics §1–§3 of DETECTION_LIMITS
+already described for Meyerland, now measured at surveyed points.
+
+**Re-tested against the marks, the shelved phases rank completely differently
+than they did against zip labels** (`validation/phase4_probe.py`, reporting
+recall alongside the share of the bbox each signal fires on, since HWMs have no
+negative class):
+
+  - **Double-bounce (Phase 4e), currently DISABLED, is the best SAR signal in
+    dense urban by a wide margin: 28/63 marks and 20/48 sites at Harvey against
+    3/63 for the detector that ships** — nine times the recall for six times the
+    bbox coverage. It is inert at rural Brazos (0.02% of bbox) by design, since
+    its urban-built gate excludes floodplain. This is the answer to the
+    "confident calls in dense city blocks" problem, and it was switched off on
+    a measurement that could not have detected it.
+  - **Sub-pixel (Phase 4a), also disabled, has the best lift at Brazos** (6/28
+    marks, 5.71% of bbox, lift 3.75) where the shipped detector scores zero.
+  - **Sentinel-2 optical has the highest lift on BOTH events** (6.50 Brazos,
+    4.59 Harvey) while being used only as a veto. It is the one signal that
+    cannot share SAR's blind spot.
+
+**Do not enable any of these on that evidence alone.** Every mark is a place
+that flooded, so none of it is a precision measurement. That is what 0c fixed.
+
+**0c. A REAL NEGATIVE CLASS NOW EXISTS — this was the missing half.**
+USGS SIR 2018-5070 (doi:10.5066/F7VH5N3N) publishes, per mapped Harvey reach,
+both the flood inundation extent AND the **mapped area boundary** — the domain
+within which USGS delineated it. Inside the boundary and outside the extent is
+not unlabelled ground; it is mapped-dry ground.
+
+Clipped to the Brazos bbox that is **194.4 km² flooded against 194.7 km² dry**,
+which labels **68,624 real NSI structures: 25,062 flooded, 43,562 dry.** Per
+property, both classes, inside the study area we already analyse.
+
+Committed as `outputs/usgs_brazos_extent.geojson`; scored by
+`validation/extent_check.py`, which reports precision, recall, specificity and
+AUC — and drops structures OUTSIDE the mapped boundary rather than calling them
+dry, because absence of mapping is not evidence of dryness.
+
+Caveat to carry: the extent is interpolated from water-surface elevations at
+high water marks, not directly observed, so it is modelled truth and least
+certain near the flood edge. `--edge-buffer` exists to re-report without that
+band. The adjuster feedback loop and FNOL photos in item 1 remain the route to
+truth that is observed rather than modelled.
 
 
 **1. Per-property ground truth via product usage. This unblocks everything
@@ -450,10 +490,20 @@ python validation/fit_ensemble.py brazos --repeats 300
 python validation/double_bounce_probe.py brazos
 
 # POINT-LEVEL validation against surveyed USGS high water marks (~6 min each).
-# This is the gate any detector change now has to pass — see §2b. Runs offline;
-# the USGS response is cached in outputs/usgs_hwm_event180.json.
+# Measures recall and depth error. Cannot measure precision — no negative class.
 python validation/hwm_check.py brazos --sweep
 python validation/hwm_check.py harvey --sweep
+
+# PER-PROPERTY precision AND recall against the USGS mapped flood extent.
+# This is the gate a detector change now has to pass: 68,624 labelled
+# structures, both classes. Runs offline from the committed GeoJSON.
+python validation/extent_check.py --max-structures 3000
+python validation/extent_check.py --edge-buffer 100    # drop the uncertain band
+
+# Diagnostics behind DETECTION_LIMITS §11 (a few minutes each)
+python validation/per_pass_probe.py brazos   # median vs per-pass — FALSIFIED
+python validation/gate_probe.py brazos       # which gate closes, and why
+python validation/phase4_probe.py harvey     # re-rank the shelved detectors
 
 pytest tests/ -q      # 274 passing, 1 skipped
 ```
