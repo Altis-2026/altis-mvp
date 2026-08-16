@@ -222,14 +222,17 @@ def main():
     # Stratified subsample: keep the class balance the truth actually has,
     # rather than letting whichever class is denser dominate the run cost.
     if len(lab) > args.max_structures:
+        # Concat explicit per-class samples rather than groupby().apply():
+        # on pandas 2.x the latter consumes the grouping column, and the
+        # label silently disappears from the frame it is meant to label.
         frac = args.max_structures / len(lab)
-        lab = (lab.groupby('truth_flooded', group_keys=False)
-               .apply(lambda g: g.sample(max(1, int(len(g) * frac)),
-                                         random_state=0))
-               .reset_index(drop=True))
+        lab = pd.concat(
+            [g.sample(max(1, int(len(g) * frac)), random_state=0)
+             for _, g in lab.groupby('truth_flooded')]
+        ).sample(frac=1, random_state=0).reset_index(drop=True)
         print(f"  subsampled to {len(lab):,} "
-              f"({int(lab.truth_flooded.sum()):,} flooded, "
-              f"{int((lab.truth_flooded == 0).sum()):,} dry)")
+              f"({int(lab['truth_flooded'].sum()):,} flooded, "
+              f"{int((lab['truth_flooded'] == 0).sum()):,} dry)")
 
     lab['property_id'] = [f"s{i}" for i in range(len(lab))]
     lab['address'] = lab['property_id']
