@@ -653,3 +653,135 @@ detector columns so a zero can be explained rather than only reported) and
 `outputs/hwm_check_<event>.json` (summaries, the detector's provenance, and the
 caveats above). The raw USGS response is cached in
 `outputs/usgs_hwm_event180.json`, so the check runs with no network.
+
+---
+
+## 11. Why the detector sees nothing: it is looking for the wrong sign
+
+§10 established near-zero point-level recall. This section is the diagnosis,
+and it changes what to build next.
+
+### First, the obvious explanation was tested and is wrong
+
+The leading hypothesis was temporal: `load_sar_composite` returns
+`collection.median()` over the whole post-event window, so a pixel flooded on
+one of Brazos's three DESCENDING passes (30 Aug, 5 Sep, 11 Sep, against a ~1 Sep
+crest) would have a DRY median and be invisible.
+
+`validation/per_pass_probe.py` holds everything else identical — same baseline,
+slope mask, permanent water, range-guarded Otsu, z-threshold — and changes only
+whether the mask is computed on the median or on each scene separately, unioned.
+
+| | flagged share of bbox | marks detected | sites |
+|---|---|---|---|
+| Brazos median (current) | 0.348% | 0/28 | 0/18 |
+| Brazos per-pass union | **3.062%** | **0/28** | **0/18** |
+| Harvey median (current) | 2.039% | 1/63 | 1/48 |
+| Harvey per-pass union | 2.470% | 1/63 | 1/48 |
+
+Per-pass union flags **8.8× more of the Brazos bbox and finds nothing extra.**
+Not one individual pass detects any of the 28 surveyed flood points. The median
+was never the problem, and switching to per-pass would have bought a large
+precision loss for zero recall — which is exactly what a dry-land control is
+for, and why one is built into the probe.
+
+### The gate that actually closes
+
+`validation/gate_probe.py` decomposes the zero into the specific gate
+responsible. `orbit_flood_mask` requires a pixel to pass all four.
+
+| gate | Brazos (28 marks) | Harvey (63 marks) |
+|---|---|---|
+| SLOPE < 5° | **28/28 pass** | **63/63 pass** |
+| not JRC permanent water | **28/28 pass** | **63/63 pass** |
+| ABSOLUTE: VV < Otsu | 0/28 pass | 4/63 pass |
+| CHANGE: z ≤ −2.0σ | 1/28 pass | 6/63 pass |
+
+**The terrain gates are innocent, and that matters for how §10 should be read.**
+USGS surveys high water marks where a mark survives and can be reached — bridge
+abutments, channel banks, walls — so slope exclusion and permanent-water
+exclusion were plausible reasons §10's recall figure might describe *where USGS
+surveys* rather than the detector. Neither fires on a single mark. Mean slope
+is 1.96° (Brazos) and 1.75° (Harvey). Every mark sits on flat, floodable,
+non-permanent-water ground. **§10's recall figure stands as written.**
+
+The radiometry rejects them, and the direction is the whole finding:
+
+| | Brazos | Harvey |
+|---|---|---|
+| mean VV at marks | −10.19 dB | −7.56 dB |
+| mean VV baseline at marks | −10.57 dB | −10.11 dB |
+| **mean VV z-score at marks** | **+0.39σ** | **+2.83σ** |
+| Otsu threshold VV must fall below | −16.00 dB | −16.00 dB |
+
+At places that demonstrably flooded, the C-band return is **brighter** than
+that pixel's own 12-month baseline — at Harvey by nearly three sigma. An
+open-water detector tests for darkening. It is looking for the wrong sign.
+
+Worth recording alongside: the Otsu range guard fires on both events (raw Otsu
+−10.75 dB at Brazos, outside the open-water range, so the −16.00 dB fallback is
+used). A histogram whose natural split sits at −10.75 dB has no water mode in
+it at all. The guard is doing its job; there is simply nothing dark to find.
+
+### The physics this points at
+
+Open water darkens C-band because a smooth surface reflects specularly away
+from the sensor. That is real, and it is why the detector works at Lismore.
+But it requires water that is **open, calm, and unobstructed**. Where water
+stands among buildings, fences, trees and vegetation — i.e. anywhere people
+live — it instead forms dihedral corner reflectors with vertical surfaces and
+returns MORE energy. The wetter ground beneath a canopy also raises volume
+scattering rather than lowering it.
+
+Harvey's +2.83σ is that effect at full strength in dense suburb. Brazos's
++0.39σ is the same effect roughly cancelling the darkening in mixed terrain.
+
+### Re-testing the shelved phases, now that the test has power
+
+Phases 4a, 4b and 4e were shelved against zip labels carrying 14 bits.
+`validation/phase4_probe.py` re-measures them at the marks, reporting each
+signal's recall **and** the fraction of the whole bbox it fires on, because
+HWMs have no negative class and recall alone would rank a detector that fires
+everywhere first. `lift = recall / bbox-fired-fraction`; 1.0 means no
+information.
+
+**Brazos — open riverine (28 marks, 18 sites):**
+
+| signal | marks | sites | bbox fired | lift |
+|---|---|---|---|---|
+| open water (ships today) | 0/28 | 0/18 | 0.24% | 0.00 |
+| sub-pixel, Phase 4a (disabled) | 6/28 | 3/18 | 5.71% | **3.75** |
+| dual-pol, Phase 4b | 0/28 | 0/18 | 0.40% | 0.00 |
+| double-bounce, Phase 4e (disabled) | 0/28 | 0/18 | 0.02% | 0.00 |
+| Sentinel-2 optical (cross-check only) | 7/28 | 3/18 | 3.84% | **6.50** |
+
+**Harvey — dense urban, the product's weakest zone (63 marks, 48 sites):**
+
+| signal | marks | sites | bbox fired | lift |
+|---|---|---|---|---|
+| open water (ships today) | 3/63 | 3/48 | 1.69% | 2.82 |
+| sub-pixel, Phase 4a (disabled) | 12/63 | 11/48 | 8.28% | 2.30 |
+| dual-pol, Phase 4b | 6/63 | 6/48 | 3.94% | 2.41 |
+| **double-bounce, Phase 4e (DISABLED)** | **28/63** | **20/48** | 10.27% | **4.33** |
+| Sentinel-2 optical (cross-check only) | 6/63 | 6/48 | 2.08% | 4.59 |
+
+**Double-bounce finds 28 of 63 surveyed urban flood marks against 3 for the
+detector that ships — nine times the recall for six times the bbox coverage —
+and it is currently switched off.** It was disabled on a zip-label measurement
+(§ config.py DOUBLE_BOUNCE) that could not have detected it.
+
+Its near-zero firing at Brazos (0.02% of bbox) is correct behaviour, not a
+failure: its urban-built gate excludes rural floodplain by design.
+
+Sentinel-2 optical has the best lift on both events despite being used only as
+a veto today. That is worth noting precisely because it is not a SAR variant —
+it is the one signal here that cannot share SAR's blind spot.
+
+### What this does and does not license
+
+It does **not** license enabling anything. Every mark is a place that flooded,
+so none of these numbers is a precision measurement, and `lift` uses the study
+bbox as a dry-land proxy rather than real dry ground truth. A signal can raise
+recall purely by firing more often, and three of these do fire much more often.
+
+That is what §12 is for.
