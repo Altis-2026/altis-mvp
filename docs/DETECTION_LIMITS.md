@@ -785,3 +785,116 @@ bbox as a dry-land proxy rather than real dry ground truth. A signal can raise
 recall purely by firing more often, and three of these do fire much more often.
 
 That is what §12 is for.
+
+---
+
+## 12. Per-property precision, at last — and nothing discriminates
+
+§10 measured recall against surveyed points. §11 explained the zero. This
+section is the first measurement in the project with **both classes**, and it
+is the one to quote.
+
+### The ground truth
+
+USGS SIR 2018-5070 (doi:10.5066/F7VH5N3N) publishes, per mapped Harvey river
+reach, the flood inundation extent **and the mapped area boundary** — the domain
+within which USGS delineated it. Inside the boundary and outside the extent is
+not unlabelled ground; it is ground USGS mapped and found dry.
+
+Labelling USACE National Structure Inventory structures by which polygon
+contains them gives, inside our own study bboxes:
+
+| | structures labelled | flooded | dry |
+|---|---|---|---|
+| Brazos (upper Brazos reach) | 68,624 | 25,062 | 43,562 |
+| Harvey (San Jacinto reach) | 42,739 | 16,389 | 26,350 |
+
+Structures OUTSIDE the mapped boundary are dropped, never called dry —
+absence of mapping is not evidence of dryness, and counting it as such would
+manufacture negatives and inflate both specificity and precision.
+
+**Coverage caveat that must travel with any Harvey number from this section:**
+the San Jacinto reach covers only the northern part of the HARVEY bbox (≈29.88°N
+and up), *not* the Addicks/Barker reservoir pools that study area was chosen
+for. Harvey numbers here describe riverine floodplain in north Harris County.
+
+### Brazos: 2,999 structures, 36.5% base rate
+
+| signal | precision | recall | specificity | AUC | precision lift |
+|---|---|---|---|---|---|
+| shipped detector (`max_depth_ft > 0.1`) | 0.0% | 0.0% | 99.9% | 0.499 | 0.00× |
+| sub-pixel, Phase 4a | never fires | 0.0% | 100% | 0.500 | — |
+| dual-pol, Phase 4b | 44.0% | 2.0% | 98.5% | 0.503 | 1.21× |
+| double-bounce, Phase 4e | never fires | 0.0% | 100% | 0.500 | — |
+| Sentinel-2 optical | 37.9% | 4.6% | 95.7% | 0.502 | 1.04× |
+| HAND terrain only, ≤10 ft | 38.4% | 91.2% | 15.8% | 0.552 | 1.05× |
+
+**Every AUC lands between 0.499 and 0.552. Nothing achieves per-property
+discrimination.**
+
+### The HAND row is a trap, and it is worth spelling out
+
+At a glance the HAND row reads as a discovery: a static terrain layer that
+never observes the storm beats every SAR signal on recall and AUC, which sounds
+like an argument for making it the primary signal.
+
+It is not. `validation/hand_arch_probe.py` was written to test exactly that
+proposal, and it fails on its own terms:
+
+| rule | flags | precision | recall | lift |
+|---|---|---|---|---|
+| label EVERY structure flooded | 100.0% | 36.5% | 100% | 1.00× |
+| HAND ≤ 10 ft | 86.8% | 38.4% | 91.2% | 1.05× |
+
+HAND ≤ 10 ft says "yes" to 86.8% of structures. Its 91.2% recall is a property
+of that permissiveness, not of skill, and its precision sits **1.9 points above
+labelling every structure flooded.**
+
+No threshold rescues it. The whole sweep, not its best point:
+
+| threshold | flags | precision | recall | lift |
+|---|---|---|---|---|
+| ≤1 ft | 13.6% | 39.5% | 14.7% | 1.08× |
+| ≤2 ft | 29.6% | 38.7% | 31.4% | 1.06× |
+| ≤3 ft | 43.1% | 39.0% | 46.0% | 1.07× |
+| **≤5 ft** | 64.0% | **40.8%** | 71.5% | **1.12×** |
+| ≤7.5 ft | 79.2% | 39.4% | 85.5% | 1.08× |
+| ≤10 ft | 86.8% | 38.4% | 91.2% | 1.05× |
+| ≤15 ft | 94.1% | 37.4% | 96.4% | 1.03× |
+| ≤20 ft | 97.4% | 37.0% | 98.6% | 1.01× |
+| ≤30 ft | 99.8% | 36.6% | 100% | 1.00× |
+
+Best lift anywhere: 1.12×.
+
+### And SAR confirmation makes the candidate set worse
+
+The proposed architecture — HAND selects candidates, SAR confirms or downgrades
+within them — was measured directly:
+
+| rule | precision | recall |
+|---|---|---|
+| HAND ≤ 10 ft alone | 38.4% | 91.2% |
+| HAND ≤ 10 ft **AND** any SAR/optical fires | **34.7%** | **4.7%** |
+
+Intersecting with SAR costs **3.7 points of precision and 86 points of recall.**
+A confirm-or-downgrade stage cannot help when the confirming signal is not
+merely uninformative but slightly anti-correlated inside the candidate set.
+**The architecture change is not justified, and this is why — measured, before
+anything was restructured.**
+
+### What this means for the product
+
+The commercial claim this was meant to support — *"this specific house at 123
+Main St definitely flooded, skip the inspection"* — **is not supportable today,
+at either study area, by any signal in the pipeline.** That is now a
+measurement against 68,624 and 42,739 labelled structures, not an inference
+from 14 zip codes.
+
+What survives is the zip-level severity ranking (§7: +0.366 depth, +0.537 paid
+claim). Altis can say which areas were hit harder. It cannot yet say which
+house.
+
+The binding constraint is unchanged from §11 and is physical, not a tuning
+problem: at surveyed flood points the C-band return is *brighter* than
+baseline, and the detector tests for darkening. Threshold work cannot fix a
+sign error.
