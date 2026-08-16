@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import ee
 import pandas as pd
 from config import (GEE_PROJECT, HARVEY, BRAZOS, OUTPUT_DIR, SAR, OPTICAL,
-                    UNCERTAINTY, BASELINE, HAND, CROSS_ORBIT, DUALPOL,
+                    UNCERTAINTY, BASELINE, HAND, DUALPOL,
                     DOUBLE_BOUNCE)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
@@ -20,12 +20,12 @@ from uncertainty import depth_interval_ft
 # Detection science lives in a shared, importable module so the live backend
 # pipeline runs the identical algorithm. This script just orchestrates it over
 # the pre-defined demo events and writes the CSVs.
-from flood_detect import (
-    load_dem, otsu_threshold_gee, load_sar_composite,
-    load_optical_water_mask, build_flood_depth_image, sample_properties,
-    load_sar_baseline, load_hand, load_sar_orbits, baseline_window,
-    load_sar_vh_composite,
-)
+from flood_detect import sample_properties
+
+# ...and the per-event ASSEMBLY of that science (DEM + orbit choice + baseline +
+# VH + cross-orbit stack + HAND + optical) lives in event_image, so validation
+# tooling measures the same detector this script ships rather than a copy of it.
+from event_image import build_event_image
 import structures as struct
 
 # Prefer service-account credentials when available (GEE_SERVICE_ACCOUNT_KEY_JSON
@@ -51,135 +51,17 @@ def run_flood_pipeline(event_config):
     properties_df = pd.read_csv(os.path.join(OUTPUT_DIR, f"{event_id}_properties.csv"))
     print(f"Loaded {len(properties_df)} properties")
 
-    print("\nLoading DEM (3DEP with building mask)...")
-    dem, dem_res = load_dem(event_config['bbox'])
+    combined, meta = build_event_image(event_config)
 
-    print("Loading pre-event Sentinel-1...")
-    pre_image, pre_count, orbit = load_sar_composite(
-        event_config['bbox'], event_config['pre_start'], event_config['pre_end'])
-    print(f"  {pre_count} scenes, orbit: {orbit}")
-
-    print("Loading post-event Sentinel-1...")
-    post_image, post_count, _ = load_sar_composite(
-        event_config['bbox'], event_config['post_start'], event_config['post_end'],
-        orbit_pass=orbit)
-    print(f"  {post_count} scenes")
-
-    print("Loading Sentinel-2 optical cross-check (post-event window)...")
-    optical_water, optical_valid, optical_count = load_optical_water_mask(
-        event_config['bbox'], event_config['post_start'], event_config['post_end'])
-    if optical_count > 0:
-        print(f"  {optical_count} cloud-filtered S2 scenes available for cross-check")
-    else:
-        print("  No cloud-free S2 scenes in window — optical cross-check unavailable "
-              "(expected immediately after a storm; SAR-only result is unaffected)")
-
-    # ── Phase 1a: multi-temporal baseline. A year of same-orbit pre-event
-    #    scenes gives a per-pixel mean and variance, so "is this anomalous?"
-    #    replaces "is this darker than one earlier picture?".
-    base_start, base_end = baseline_window(event_config['post_start'])
-    print(f"\nBuilding multi-temporal baseline ({base_start} → {base_end}, "
-          f"orbit {orbit})...")
-    baseline_mean, baseline_std, baseline_n = load_sar_baseline(
-        event_config['bbox'], base_start, base_end, orbit)
-    if baseline_n >= BASELINE['min_scenes']:
-        print(f"  {baseline_n} baseline scenes — z-score change detection active "
-              f"(threshold {BASELINE['z_threshold']}σ)")
-    else:
-        print(f"  Only {baseline_n} baseline scenes (need "
-              f"{BASELINE['min_scenes']}) — falling back to single pre-event "
-              f"composite")
-        baseline_mean = baseline_std = None
-
-    # ── Phase 4b: the VH channel, with its OWN baseline. VH's normal level and
-    #    normal variability are nothing like VV's on the same pixel, so a
-    #    shared baseline would be meaningless; each channel is measured against
-    #    its own history and only the normalised evidence is compared.
-    post_vh = vh_base_mean = vh_base_std = None
-    vh_base_n = vh_post_n = 0
-    if DUALPOL.get('enabled', True):
-        print(f"\nLoading VH channel for dual-pol discrimination (orbit {orbit})...")
-        post_vh, vh_post_n = load_sar_vh_composite(
-            event_config['bbox'], event_config['post_start'],
-            event_config['post_end'], orbit)
-        if post_vh is None:
-            print("  No VH-capable post-event scene — dual-pol abstains")
-        else:
-            vh_base_mean, vh_base_std, vh_base_n = load_sar_baseline(
-                event_config['bbox'], base_start, base_end, orbit, band='VH')
-            if vh_base_n < DUALPOL['min_vh_baseline_scenes']:
-                print(f"  Only {vh_base_n} VH baseline scenes (need "
-                      f"{DUALPOL['min_vh_baseline_scenes']}) — dual-pol abstains "
-                      f"rather than trusting a noisy σ")
-                vh_base_mean = vh_base_std = None
-            else:
-                print(f"  {vh_post_n} VH post scenes, {vh_base_n} VH baseline "
-                      f"scenes — dual-pol water score active")
-
-    # ── Phase 1c: cross-orbit stacking. Every other orbit with post-event
-    #    coverage contributes its own independently-thresholded mask, which is
-    #    what shrinks the revisit gap.
-    orbit_stack = {}
-    if CROSS_ORBIT['enabled']:
-        all_orbits = load_sar_orbits(
-            event_config['bbox'], event_config['post_start'], event_config['post_end'])
-        for other, (composite, n_scenes) in all_orbits.items():
-            if other == orbit:
-                continue
-            try:
-                o_pre, _, _ = load_sar_composite(
-                    event_config['bbox'], event_config['pre_start'],
-                    event_config['pre_end'], orbit_pass=other)
-            except ValueError:
-                # No pre-event scene on this orbit. Harmless: the baseline
-                # below is the primary reference, and orbit_flood_mask falls
-                # back to the absolute threshold if neither exists.
-                o_pre = None
-            o_base_mean, o_base_std, o_base_n = load_sar_baseline(
-                event_config['bbox'], base_start, base_end, other)
-            if o_base_n < BASELINE['min_scenes']:
-                o_base_mean = o_base_std = None
-            spec = {
-                'post': composite, 'pre': o_pre,
-                'baseline_mean': o_base_mean, 'baseline_std': o_base_std,
-            }
-            # This orbit's VH channel, again against its own VH baseline. Only
-            # a complete set enables dual-pol for the orbit; a partial one is
-            # left out entirely so it cannot contribute a spurious zero.
-            if DUALPOL.get('enabled', True):
-                o_post_vh, _ = load_sar_vh_composite(
-                    event_config['bbox'], event_config['post_start'],
-                    event_config['post_end'], other)
-                if o_post_vh is not None:
-                    o_vh_mean, o_vh_std, o_vh_n = load_sar_baseline(
-                        event_config['bbox'], base_start, base_end, other, band='VH')
-                    if o_vh_n >= DUALPOL['min_vh_baseline_scenes']:
-                        spec.update({'post_vh': o_post_vh,
-                                     'vh_baseline_mean': o_vh_mean,
-                                     'vh_baseline_std': o_vh_std})
-            orbit_stack[other] = spec
-            print(f"  Cross-orbit: {other} contributes {n_scenes} post scenes "
-                  f"({o_base_n} baseline scenes"
-                  f"{', dual-pol' if 'post_vh' in spec else ''})")
-        if not orbit_stack:
-            print("  Cross-orbit: no second orbit with coverage in this window")
-
-    # ── Phase 1b: HAND replaces the neighbourhood-minimum elevation heuristic
-    #    as the DEM-hydrology plausibility vote.
-    hand_img, hand_source = load_hand(event_config['bbox'])
-    print(f"  HAND source: {hand_source}")
-
-    print("\nBuilding flood map (Otsu threshold + slope mask)...")
-    combined = build_flood_depth_image(
-        event_config['bbox'], pre_image, post_image, dem, event_config['wse_radius_m'],
-        optical_water=optical_water, optical_valid=optical_valid,
-        hand=hand_img, baseline_mean=baseline_mean, baseline_std=baseline_std,
-        orbit_stack=orbit_stack,
-        post_vh=post_vh,
-        vh_baseline_mean=vh_base_mean, vh_baseline_std=vh_base_std,
-        # Resolve each orbit's Otsu threshold once instead of recomputing that
-        # whole-bbox histogram on every sampling batch (see guarded_otsu).
-        precompute_thresholds=True)
+    dem_res     = meta['dem_resolution_m']
+    orbit       = meta['sar_orbit_pass']
+    pre_count   = meta['pre_event_scene_count']
+    post_count  = meta['post_event_scene_count']
+    base_start, base_end = meta['baseline_window']
+    baseline_n  = meta['baseline_scene_count']
+    hand_source = meta['hand_source']
+    vh_post_n   = meta['vh_post_scene_count']
+    vh_base_n   = meta['vh_baseline_scene_count']
 
     # ── Phase 2: structure attributes. Snapping the sample to the structure's
     #    own footprint replaces a 50m circle that averaged ~33x the building's
@@ -381,9 +263,9 @@ def run_flood_pipeline(event_config):
         'baseline_scene_count':  baseline_n,
         'baseline_method': (
             f"per-pixel mean/stdDev z-score, threshold {BASELINE['z_threshold']}σ"
-            if baseline_mean is not None else 'unavailable — single pre-event composite'),
-        'cross_orbit_passes':    sorted([orbit] + list(orbit_stack.keys())),
-        'cross_orbit_combine':   CROSS_ORBIT['combine'] if orbit_stack else 'n/a',
+            if meta['baseline_active'] else 'unavailable — single pre-event composite'),
+        'cross_orbit_passes':    meta['cross_orbit_passes'],
+        'cross_orbit_combine':   meta['cross_orbit_combine'],
         'hand_source':           hand_source,
         'hand_thresholds_ft':    [HAND['plausible_ft'], HAND['implausible_ft']],
         # ── Phase 4b provenance. Recorded even when it abstains, so a run with
@@ -391,20 +273,20 @@ def run_flood_pipeline(event_config):
         #    nothing — the distinction the dpol_available column carries per
         #    property, kept at the run level too.
         'dualpol_enabled':       bool(DUALPOL.get('enabled', True)),
-        'dualpol_active':        bool(vh_base_mean is not None),
+        'dualpol_active':        bool(meta['dualpol_active']),
         'vh_post_scene_count':   vh_post_n,
         'vh_baseline_scene_count': vh_base_n,
         'double_bounce_enabled': bool(DOUBLE_BOUNCE.get('enabled', True)),
-        'double_bounce_active':  bool(baseline_mean is not None),
+        'double_bounce_active':  bool(meta['baseline_active']),
         'double_bounce_method': (
             f"urban brightening, z >= {DOUBLE_BOUNCE['z_threshold']}σ, "
             f"HAND <= {DOUBLE_BOUNCE.get('max_hand_ft') or HAND['plausible_ft']} ft"
-            if baseline_mean is not None else 'inactive — no multi-temporal baseline'),
+            if meta['baseline_active'] else 'inactive — no multi-temporal baseline'),
         'dualpol_method': (
             f"min(VV,VH) z-evidence over [{DUALPOL['z_min']}, {DUALPOL['z_full']}]σ"
             + (f", co/cross ratio rise >= {DUALPOL['ratio_rise_db']} dB"
                if DUALPOL.get('ratio_gate') else "")
-            if vh_base_mean is not None else 'abstained — no usable VH baseline'),
+            if meta['dualpol_active'] else 'abstained — no usable VH baseline'),
         # ── Phase 2 provenance
         'structure_source':      'USACE National Structure Inventory',
         'structures_matched':    int(n_matched),
@@ -431,7 +313,7 @@ def run_flood_pipeline(event_config):
         'urban_property_count':  int(urban),
         'optical_dataset':       'COPERNICUS/S2_SR_HARMONIZED (MNDWI, SCL cloud mask)',
         'optical_max_cloud_pct': OPTICAL['max_cloud_pct'],
-        'optical_scene_count':   optical_count,
+        'optical_scene_count':   meta['optical_scene_count'],
         'optical_available_property_count': int(optical_avail),
         'sar_optical_contradiction_count':  int(contradicted),
         'depth_uncertainty':     {
