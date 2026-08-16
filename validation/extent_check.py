@@ -55,10 +55,18 @@ HONEST LIMITS — read before quoting anything from this
    but it is not fully independent either, and a shared DEM bias would push
    both the same way.
 
+4. COVERAGE DIFFERS BY EVENT. Brazos is scored on the upper Brazos reach,
+   which covers most of its bbox. Harvey is scored on the San Jacinto reach,
+   which covers only the NORTHERN part of its bbox (≈29.88°N and up) and NOT
+   the Addicks/Barker reservoir pools the Harvey study area was chosen for.
+   Both come from the same USGS release, so the comparison is apples-to-apples
+   in method — but not in terrain. See the EXTENTS table below.
+
 Usage:
-    python validation/extent_check.py                    # default detector
-    python validation/extent_check.py --edge-buffer 100  # drop uncertain band
-    python validation/extent_check.py --max-structures 4000
+    python validation/extent_check.py brazos
+    python validation/extent_check.py harvey
+    python validation/extent_check.py harvey --edge-buffer 100  # drop the band
+    python validation/extent_check.py brazos --max-structures 4000
 """
 import argparse
 import json
@@ -73,22 +81,38 @@ sys.path.insert(0, str(BASE))
 sys.path.insert(0, str(BASE / "pipeline"))
 
 OUT = BASE / "outputs"
-EXTENT_GEOJSON = OUT / "usgs_brazos_extent.geojson"
 
-# Only Brazos has a USGS mapped-boundary product overlapping a study area.
-# Harvey's box (Addicks/Barker) sits in the San Jacinto mapping, which is a
-# separate download; see PROJECT_STATE for the reach list.
-EVENT = 'brazos'
-EVENT_CFG = 'BRAZOS'
+# Both study areas are covered by the SAME USGS data release (SIR 2018-5070,
+# doi:10.5066/F7VH5N3N) — Brazos by the upper Brazos reach, Harvey by the San
+# Jacinto reach. Using one source for both is what keeps the two events'
+# numbers comparable; a different vendor's extent for Harvey would have made
+# any Brazos-vs-Harvey difference unattributable.
+#
+# READ THIS BEFORE COMPARING THE TWO EVENTS: the San Jacinto mapped area covers
+# the NORTHERN part of the HARVEY bbox (the Cypress/Spring Creek and San
+# Jacinto corridor, roughly 29.88°N and up). It does NOT cover the
+# Addicks/Barker reservoir pools around 29.75-29.83°N, which is the terrain the
+# HARVEY study area was originally chosen for. Harvey numbers from this module
+# therefore describe mapped riverine floodplain in north Harris County, not
+# reservoir-release flooding. That is still real, authoritative, in-bbox ground
+# truth — it is simply not the whole Harvey story, and must not be quoted as
+# though it were.
+EXTENTS = {
+    'brazos': {'cfg': 'BRAZOS', 'geojson': 'usgs_brazos_extent.geojson',
+               'reach': 'upper Brazos'},
+    'harvey': {'cfg': 'HARVEY', 'geojson': 'usgs_harvey_extent.geojson',
+               'reach': 'San Jacinto (northern part of the bbox only)'},
+}
 
 
-def load_extent():
+def load_extent(event='brazos'):
     """The USGS mapped boundary and inundation extent, as shapely geometry."""
     from shapely.geometry import shape
-    if not EXTENT_GEOJSON.exists():
-        sys.exit(f"Missing {EXTENT_GEOJSON}. It is committed to the repo; "
-                 f"restore it or regenerate from doi:10.5066/F7VH5N3N.")
-    gj = json.loads(EXTENT_GEOJSON.read_text())
+    path = OUT / EXTENTS[event]['geojson']
+    if not path.exists():
+        sys.exit(f"Missing {path}. It is committed to the repo; restore it or "
+                 f"regenerate from doi:10.5066/F7VH5N3N.")
+    gj = json.loads(path.read_text())
     layers = {f['properties']['layer']: shape(f['geometry'])
               for f in gj['features']}
     return layers['mapped_boundary'].buffer(0), layers['inundation'].buffer(0)
@@ -178,7 +202,12 @@ def report(name, truth, pred, score=None):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('event', nargs='?', default='brazos', choices=sorted(EXTENTS),
+                    help='Study area. Both use USGS SIR 2018-5070, but via '
+                         'different river reaches — see EXTENTS.')
     ap.add_argument('--edge-buffer', type=float, default=0.0,
                     help='Drop structures within N metres of the flood edge, '
                          'where the interpolated extent is least certain.')
@@ -193,12 +222,15 @@ def main():
     from flood_detect import sample_properties
     import structures as struct
 
-    cfg = getattr(config, EVENT_CFG)
+    spec = EXTENTS[args.event]
+    cfg = getattr(config, spec['cfg'])
     radius = args.radius or cfg.get('exposure_radius_m') or 50
 
-    print("=== Brazos: per-property accuracy vs USGS mapped flood extent ===")
-    boundary, inundation = load_extent()
-    print("  ground truth: USGS SIR 2018-5070 mapped boundary + inundation")
+    print(f"=== {args.event}: per-property accuracy vs USGS mapped flood "
+          f"extent ===")
+    boundary, inundation = load_extent(args.event)
+    print(f"  ground truth: USGS SIR 2018-5070 mapped boundary + inundation, "
+          f"{spec['reach']} reach")
 
     print("\n  Fetching National Structure Inventory...", flush=True)
     nsi = struct.fetch_nsi_structures(cfg['bbox'])
@@ -292,12 +324,13 @@ def main():
     print("  looks at this storm. Any SAR signal that cannot beat it is not")
     print("  earning its place in the product.")
 
-    csv = OUT / "extent_check_brazos.csv"
+    csv = OUT / f"extent_check_{args.event}.csv"
     df.to_csv(csv, index=False)
-    (OUT / "extent_check_brazos.json").write_text(json.dumps({
-        'event': EVENT,
-        'ground_truth': 'USGS SIR 2018-5070 (doi:10.5066/F7VH5N3N) mapped '
-                        'boundary + flood inundation extent, upper Brazos',
+    (OUT / f"extent_check_{args.event}.json").write_text(json.dumps({
+        'event': args.event,
+        'ground_truth': f"USGS SIR 2018-5070 (doi:10.5066/F7VH5N3N) mapped "
+                        f"boundary + flood inundation extent, "
+                        f"{spec['reach']} reach",
         'edge_buffer_m': args.edge_buffer,
         'radius_m': radius,
         'n_structures': int(len(df)),
@@ -310,6 +343,8 @@ def main():
             'Covers the mapped riverine corridor only, not the whole bbox.',
             'Structures outside the mapped boundary are dropped, never '
             'labelled dry.',
+            'harvey: the San Jacinto reach covers the NORTHERN part of the '
+            'HARVEY bbox only, not the Addicks/Barker reservoir pools.',
         ],
     }, indent=2, default=str))
     print(f"\n✓ {csv.relative_to(BASE)}")

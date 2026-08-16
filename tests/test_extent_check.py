@@ -150,3 +150,41 @@ class TestGroundTruthAsset:
         import config
         boundary, _ = ec.load_extent()
         assert boundary.intersects(box(*config.BRAZOS['bbox']))
+
+    @pytest.mark.parametrize('event', ['brazos', 'harvey'])
+    def test_every_registered_event_has_a_usable_extent(self, event):
+        """Both events must resolve, or `--event harvey` is a trap that only
+        fails after the NSI fetch and the whole image build have been paid for."""
+        boundary, inundation = ec.load_extent(event)
+        assert boundary.is_valid and not boundary.is_empty
+        assert inundation.is_valid and not inundation.is_empty
+        assert boundary.difference(inundation).area > 0, (
+            f"{event} has no mapped-dry margin — no negative class")
+
+    @pytest.mark.parametrize('event', ['brazos', 'harvey'])
+    def test_extent_overlaps_its_own_event_bbox(self, event):
+        import config
+        boundary, _ = ec.load_extent(event)
+        cfg = getattr(config, ec.EXTENTS[event]['cfg'])
+        assert boundary.intersects(box(*cfg['bbox']))
+
+    def test_harvey_coverage_limit_is_recorded_not_hidden(self):
+        """
+        The San Jacinto reach covers only the northern part of the HARVEY bbox,
+        so Harvey numbers describe riverine floodplain in north Harris County
+        rather than the Addicks/Barker reservoir release. That limitation has
+        to travel with the code, because the number will outlive this session.
+        """
+        assert 'northern' in ec.EXTENTS['harvey']['reach'].lower()
+        src = (BASE / "validation" / "extent_check.py").read_text()
+        assert 'Addicks/Barker' in src
+
+    def test_events_share_one_ground_truth_source(self):
+        """Different vendors for the two events would make any Brazos-vs-Harvey
+        difference unattributable to the detector."""
+        import json
+        srcs = []
+        for e in ('brazos', 'harvey'):
+            gj = json.loads((ec.OUT / ec.EXTENTS[e]['geojson']).read_text())
+            srcs.append(gj.get('properties', {}).get('source', ''))
+        assert all('2018-5070' in s for s in srcs), srcs
