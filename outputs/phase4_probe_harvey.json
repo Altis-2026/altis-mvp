@@ -1,0 +1,59 @@
+{
+  "event": "harvey",
+  "orbit": "ASCENDING",
+  "radius_m": 50,
+  "post_scenes": 2,
+  "baseline_scenes": 49,
+  "s2_scenes": 10,
+  "marks": 63,
+  "sites": 48,
+  "mean_vv_z_at_marks": 2.635432536944334,
+  "signals": {
+    "open_water": {
+      "marks": 3,
+      "n_marks": 63,
+      "sites": 3,
+      "n_sites": 48,
+      "bbox_fraction": 0.016885378772804917,
+      "recall": 0.047619047619047616,
+      "lift": 2.8201349972522634
+    },
+    "subpixel": {
+      "marks": 12,
+      "n_marks": 63,
+      "sites": 11,
+      "n_sites": 48,
+      "bbox_fraction": 0.08275136905878018,
+      "recall": 0.19047619047619047,
+      "lift": 2.301788993253887
+    },
+    "dualpol": {
+      "marks": 6,
+      "n_marks": 63,
+      "sites": 6,
+      "n_sites": 48,
+      "bbox_fraction": 0.03943792030800543,
+      "recall": 0.09523809523809523,
+      "lift": 2.4148863452813214
+    },
+    "double_bounce": {
+      "marks": 28,
+      "n_marks": 63,
+      "sites": 20,
+      "n_sites": 48,
+      "bbox_fraction": 0.10272431540919864,
+      "recall": 0.4444444444444444,
+      "lift": 4.32657489781281
+    },
+    "optical": {
+      "marks": 6,
+      "n_marks": 63,
+      "sites": 6,
+      "n_sites": 48,
+      "bbox_fraction": 0.020752506282033702,
+      "recall": 0.09523809523809523,
+      "lift": 4.589233413245453
+    }
+  },
+  "caveat": "HWMs define no negative class, so recall alone cannot rank these. bbox_fraction is a dry-land false-positive proxy and lift = recall / bbox_fraction is the comparable number."
+}
