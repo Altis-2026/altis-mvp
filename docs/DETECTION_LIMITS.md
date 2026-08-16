@@ -898,3 +898,53 @@ The binding constraint is unchanged from §11 and is physical, not a tuning
 problem: at surveyed flood points the C-band return is *brighter* than
 baseline, and the detector tests for darkening. Threshold work cannot fix a
 sign error.
+
+---
+
+## 13. Harvey per-property result — double-bounce could not be judged, and here's why
+
+`validation/extent_check.py harvey`, 2,999 USGS-labelled structures (San
+Jacinto reach, 38.3% base rate — see §12's coverage caveat: northern part of
+the bbox only, not Addicks/Barker):
+
+| signal | precision | recall | AUC | lift |
+|---|---|---|---|---|
+| shipped detector | 68.8% (n=16, 95% CI [41%, 89%]) | 1.0% | 0.504 | 1.79× |
+| sub-pixel, Phase 4a | never fires | 0.0% | 0.500 | — |
+| dual-pol, Phase 4b | 54.9% | 4.3% | 0.511 | 1.43× |
+| **double-bounce, Phase 4e** | **never fires** | **0.0%** | 0.500 | — |
+| Sentinel-2 optical | 30.4% | 3.0% | 0.493 | 0.79× |
+| HAND ≤10 ft | 35.8% | 78.6% | **0.458** | 0.93× |
+
+**Double-bounce fired on zero of 2,999 structures. The verdict rule ("ships
+only if precision clearly beats the shipped detector") cannot be applied —
+there is nothing to compute a precision from.** This is exactly the coverage
+gap flagged when the Harvey extent was built: the San Jacinto reach is
+riverine floodplain in north Harris County, not the dense urban blocks
+(Addicks/Barker corridor) where double-bounce found signal against high water
+marks in §11. **Double-bounce stays disabled — not because it lost here, but
+because this test structurally cannot see the terrain it targets.** Judging it
+requires urban ground truth, which this release does not provide for our bbox.
+
+Two things worth flagging on their own:
+
+- **HAND is actively anti-correlated at Harvey** (AUC 0.458, lift 0.93× —
+  *worse* than labelling everything flooded). Combined with §12's Brazos AUC
+  of 0.552, HAND's apparent skill is not a stable property of the signal; it
+  swings by terrain. Nothing here supports treating HAND as a reliable
+  candidate-set generator anywhere.
+- **The shipped detector's precision (68.8%) is the best number on this page**,
+  but it is built on 11 true positives out of 1,150 flooded structures — 1.0%
+  recall, 95% CI on precision is [41%, 89%]. It is not a product; a signal that
+  fires on 16 of 2,999 structures cannot carry a triage workflow. It is a
+  genuinely promising thread for future work: on the rare pixel where this
+  detector fires, it may be worth real confidence — but n=16 is nowhere near
+  enough to act on.
+
+### What would actually let double-bounce be judged
+
+Nothing in the FEMA/USGS Harvey release maps the Addicks/Barker corridor as
+inundation extent + boundary the way it does the Brazos and San Jacinto
+reaches (checked — not available). Judging double-bounce needs either a
+different authoritative source for that specific area, or the adjuster
+feedback loop (PROJECT_STATE §7 item 1) once the product has real usage there.

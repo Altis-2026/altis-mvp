@@ -1,0 +1,124 @@
+{
+  "event": "harvey",
+  "ground_truth": "USGS SIR 2018-5070 (doi:10.5066/F7VH5N3N) mapped boundary + flood inundation extent, San Jacinto (northern part of the bbox only) reach",
+  "edge_buffer_m": 0.0,
+  "radius_m": 50,
+  "n_structures": 2999,
+  "n_flooded": 1150,
+  "n_dry": 1849,
+  "detector": {
+    "dem_resolution_m": 1,
+    "sar_orbit_pass": "DESCENDING",
+    "pre_event_scene_count": 3,
+    "post_event_scene_count": 2,
+    "optical_scene_count": 10,
+    "baseline_window": [
+      "2016-08-25",
+      "2017-08-25"
+    ],
+    "baseline_scene_count": 58,
+    "baseline_active": true,
+    "cross_orbit_passes": [
+      "ASCENDING",
+      "DESCENDING"
+    ],
+    "cross_orbit_combine": "union",
+    "hand_source": "MERIT/Hydro/v1_0_1",
+    "dualpol_enabled": true,
+    "dualpol_active": true,
+    "vh_post_scene_count": 2,
+    "vh_baseline_scene_count": 58
+  },
+  "results": [
+    {
+      "tp": 11,
+      "fp": 5,
+      "fn": 1139,
+      "tn": 1844,
+      "precision": 0.6875,
+      "recall": 0.009565217391304347,
+      "specificity": 0.9972958355868037,
+      "f1": 0.018867924528301886,
+      "base_rate": 0.38346115371790596,
+      "auc": 0.5043022080090296,
+      "precision_lift": 1.7928804347826088,
+      "name": "shipped detector (max_depth_ft > 0.1)"
+    },
+    {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1150,
+      "tn": 1849,
+      "precision": NaN,
+      "recall": 0.0,
+      "specificity": 1.0,
+      "f1": NaN,
+      "base_rate": 0.38346115371790596,
+      "auc": 0.5,
+      "precision_lift": NaN,
+      "name": "sub-pixel water fraction > 0 (Phase 4a)"
+    },
+    {
+      "tp": 50,
+      "fp": 41,
+      "fn": 1100,
+      "tn": 1808,
+      "precision": 0.5494505494505495,
+      "recall": 0.043478260869565216,
+      "specificity": 0.9778258518117902,
+      "f1": 0.08058017727639001,
+      "base_rate": 0.38346115371790596,
+      "auc": 0.5106847414583676,
+      "precision_lift": 1.4328714763497374,
+      "name": "dual-pol score > 0 (Phase 4b)"
+    },
+    {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1150,
+      "tn": 1849,
+      "precision": NaN,
+      "recall": 0.0,
+      "specificity": 1.0,
+      "f1": NaN,
+      "base_rate": 0.38346115371790596,
+      "auc": 0.5,
+      "precision_lift": NaN,
+      "name": "double-bounce > 0 (Phase 4e)"
+    },
+    {
+      "tp": 35,
+      "fp": 80,
+      "fn": 1115,
+      "tn": 1769,
+      "precision": 0.30434782608695654,
+      "recall": 0.030434782608695653,
+      "specificity": 0.9567333693888589,
+      "f1": 0.05533596837944665,
+      "base_rate": 0.38346115371790596,
+      "auc": 0.49344698662026476,
+      "precision_lift": 0.7936862003780719,
+      "name": "Sentinel-2 optical water > 0"
+    },
+    {
+      "tp": 904,
+      "fp": 1619,
+      "fn": 246,
+      "tn": 230,
+      "precision": 0.358303606817281,
+      "recall": 0.7860869565217391,
+      "specificity": 0.12439156300703083,
+      "f1": 0.4922406751973863,
+      "base_rate": 0.38346115371790596,
+      "auc": 0.45792790462529687,
+      "precision_lift": 0.9343934929087181,
+      "name": "HAND terrain only, <= 10 ft (NO event observation)"
+    }
+  ],
+  "caveats": [
+    "The inundation polygon is interpolated from water-surface elevations surveyed at high water marks, not directly observed.",
+    "Covers the mapped riverine corridor only, not the whole bbox.",
+    "Structures outside the mapped boundary are dropped, never labelled dry.",
+    "harvey: the San Jacinto reach covers the NORTHERN part of the HARVEY bbox only, not the Addicks/Barker reservoir pools."
+  ]
+}
