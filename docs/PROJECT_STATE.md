@@ -21,10 +21,21 @@ sandbox with working outbound access reached USGS, FEMA and ArcGIS, and the
 result changes what this project can honestly claim. Read §2b and
 `docs/DETECTION_LIMITS.md` §10 before quoting any accuracy number from §3.
 
-In one line: **point-level ground truth now exists, and it says per-property
-recall is near zero — 0 of 18 surveyed flood sites at Brazos, 95% CI
-[0%, 18.5%].** The ZIP-level ceiling described in §2 is broken; the news it
-delivered is bad, and it is the most useful measurement in the project.
+In one line: **per-property ground truth with BOTH classes now exists, and no
+signal in the pipeline discriminates.** At Brazos, 2,999 USGS-labelled
+structures (36.5% flooded): every AUC lands between 0.499 and 0.552, and the
+shipped detector scores 0.0% precision at 0.0% recall. The ZIP-level ceiling in
+§2 is broken; the news it delivered is bad, and it is the most useful
+measurement in the project.
+
+**Do not be fooled by the HAND row** (91.2% recall, the best AUC at 0.552). It
+flags 86.8% of all structures; its precision is 38.4% against a 36.5% base
+rate — 1.9 points above labelling everything flooded. High recall there is
+permissiveness, not skill. §12 of DETECTION_LIMITS has the threshold sweep
+showing no cut does better than 1.12x lift, and the direct test showing that
+adding SAR confirmation inside a HAND candidate set makes precision WORSE
+(38.4% -> 34.7%) while collapsing recall (91.2% -> 4.7%). **The
+HAND-primary architecture was measured and is not justified.**
 
 Lead status, so nobody re-runs a dead search:
 
@@ -172,6 +183,9 @@ Measured at Brazos (Fort Bend County TX, Harvey, 4,000 properties, 15 zips,
 | Property-level AUC, best detector | **~0.50** | No property-level discrimination. |
 | **Point-level site recall vs surveyed USGS depths** | **0 of 18 sites, 95% CI [0%, 18.5%]** | **Directly measured (§2b). Not zip-aggregated.** |
 | **Point-level depth bias vs surveyed USGS depths** | **−2.64 ft** (−5.64 ft at ≥4 ft) | **Directly measured (§2b).** |
+| **Per-property precision, shipped detector** | **0.0%** (0 TP, 2 FP of 2,999) | **Real negatives. DETECTION_LIMITS §12.** |
+| **Per-property AUC, every signal tested** | **0.499 – 0.552** | **Nothing discriminates per property.** |
+| Best per-property rule found (HAND ≤5 ft) | 40.8% precision vs 36.5% base | 1.12× lift. Not a product. |
 
 **What this means in plain terms.** Altis produces a *regionally* meaningful
 flood-severity signal: it can tell you which zip codes in a portfolio were hit
