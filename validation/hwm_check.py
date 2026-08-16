@@ -232,6 +232,36 @@ def _bootstrap_ci(x, y, groups, n_boot=2000, seed=0):
     return float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5))
 
 
+def _recall_ci_by_site(df):
+    """
+    Clopper-Pearson 95% interval for recall, counted over SITES.
+
+    A bare "0 of 28" is not a finding on its own — it is compatible with a
+    detector that has 10% recall and got unlucky, and it needs to be reported
+    as the bound it actually is. Counting is done over survey sites, not marks,
+    because several marks at one site are one observation of the detector, and
+    a site counts as detected if ANY of its marks registered water (the most
+    generous reading available, so the upper bound is not flattered by a strict
+    one).
+
+    Returns (k_sites_detected, n_sites, lo, hi) with lo/hi as fractions.
+    """
+    if df.empty:
+        return 0, 0, None, None
+    per_site = df.groupby(df['site_id'].fillna(-1)).apply(
+        lambda g: bool((g['max_depth_ft'] > DETECT_FLOOR_FT).any()))
+    k, n = int(per_site.sum()), int(len(per_site))
+    if n == 0:
+        return 0, 0, None, None
+    try:
+        from scipy import stats
+    except ImportError:  # pragma: no cover - scipy ships with the pipeline
+        return k, n, None, None
+    lo = 0.0 if k == 0 else float(stats.beta.ppf(0.025, k, n - k + 1))
+    hi = 1.0 if k == n else float(stats.beta.ppf(0.975, k + 1, n - k))
+    return k, n, lo, hi
+
+
 def summarize(df, label):
     """Accuracy of detected depth against surveyed depth for one sample."""
     n = len(df)
@@ -261,6 +291,12 @@ def summarize(df, label):
         'mae_ft':           round(float(np.abs(detected - surveyed).mean()), 3),
         'rmse_ft':          round(float(np.sqrt(((detected - surveyed) ** 2).mean())), 3),
     }
+    k_sites, n_sites, lo, hi = _recall_ci_by_site(df)
+    s['site_recall'] = None if not n_sites else round(k_sites / n_sites, 4)
+    s['site_recall_detected'] = k_sites
+    s['site_recall_n_sites'] = n_sites
+    s['site_recall_ci95'] = None if lo is None else [round(lo, 4), round(hi, 4)]
+
     s.update({f'all_{k}': v for k, v in _corr(surveyed, detected).items()})
     lo, hi = _bootstrap_ci(surveyed, detected, sites)
     s['all_pearson_ci95'] = None if lo is None else [round(lo, 3), round(hi, 3)]
@@ -291,6 +327,12 @@ def print_summary(s):
     print(f"     recall @{DETECT_FLOOR_FT} ft  {s['recall_at_0.1ft'] * 100:.1f}% "
           f"({s['n_detected']}/{s['n_marks']} known-flooded points where we "
           f"found any water)")
+    if s.get('site_recall_ci95'):
+        lo, hi = s['site_recall_ci95']
+        print(f"     site recall     {s['site_recall'] * 100:.1f}% "
+              f"({s['site_recall_detected']}/{s['site_recall_n_sites']} sites), "
+              f"95% CI [{lo * 100:.1f}%, {hi * 100:.1f}%] (Clopper-Pearson) "
+              f"← the bound to quote, not the bare fraction")
     print(f"     bias {s['bias_ft']:+.2f} ft   MAE {s['mae_ft']:.2f} ft   "
           f"RMSE {s['rmse_ft']:.2f} ft")
     r, p = s.get('all_pearson_r'), s.get('all_pearson_p')

@@ -1,8 +1,9 @@
 # Altis — Project State
 
 **Purpose of this file:** everything a new session needs to resume work without
-re-deriving it. Read this first. Written 2026-08-10, updated same day with the
-ground-truth sourcing task below.
+re-deriving it. Read this first. Written 2026-08-10; updated 2026-08-16 when the
+ground-truth sourcing task in §7 item 0 was executed and its result reordered
+the priorities. **Start at §0.**
 
 Companion documents:
 - `docs/DETECTION_LIMITS.md` — the measured record of what the detector can and
@@ -13,14 +14,36 @@ Companion documents:
 
 ---
 
-## 0. IF THIS IS A FRESH SANDBOX SET UP TO FIX THE NETWORK PROBLEM
+## 0. THE NETWORK TASK IS DONE — READ THIS BEFORE §2 AND §3
 
-Skip straight to **§7 item 0** — that is the task this sandbox exists for. The
-prior sandbox's egress proxy blocked essentially every external content domain
-(FEMA, USGS, ArcGIS, HydroShare, ScienceBase all refused WebFetch), which
-blocked verifying and downloading real per-property flood ground truth. If you
-have normal outbound internet access, go execute that section now; the rest of
-this file is background for after that task lands.
+§7 item 0 (source real per-property ground truth) **has been executed.** A
+sandbox with working outbound access reached USGS, FEMA and ArcGIS, and the
+result changes what this project can honestly claim. Read §2b and
+`docs/DETECTION_LIMITS.md` §10 before quoting any accuracy number from §3.
+
+In one line: **point-level ground truth now exists, and it says per-property
+recall is near zero — 0 of 18 surveyed flood sites at Brazos, 95% CI
+[0%, 18.5%].** The ZIP-level ceiling described in §2 is broken; the news it
+delivered is bad, and it is the most useful measurement in the project.
+
+Lead status, so nobody re-runs a dead search:
+
+- **(a) USGS high water marks — LANDED.** 2,364 surveyed points for Harvey,
+  cached at `outputs/usgs_hwm_event180.json`, wired into
+  `validation/hwm_check.py`. This is now the project's primary validation.
+- **(b) FEMA per-building damage — DEAD.** Every "FEMA Building Damage
+  Assessments Harvey" service is retired; the ArcGIS item records survive but
+  all endpoints 404 (`gis.fema.gov/REST/...`, `services1.arcgis.com/...`).
+  It was a live 2017 operational service, not an archived dataset. Do not
+  spend another session searching for it.
+- **(c) FEMA/HARC flood depth grid — LIVE BUT NOT INDEPENDENT.**
+  `FF_Harvey_Flood_Inundation_Depth` is served as an ArcGIS ImageServer (no
+  39 GB download needed). But its own metadata says it was interpolated **from
+  USGS HWM data and stream gage heights** — the same marks (a) already gives
+  us, smoothed into a surface. It is not a second opinion, and validating
+  against it would largely re-measure (a) with extra modelling error.
+- **(d) Non-redacted NFIP via FEMA ISAA — still the long-term ceiling,** still
+  requires a formal company request to OpenFEMA@fema.dhs.gov. Unstarted.
 
 ---
 
@@ -75,6 +98,59 @@ The highest-value work in the project is now getting per-property ground truth
 
 ---
 
+## 2b. THE CEILING IS BROKEN — and the view from the other side is bad
+
+§2 is still true about NFIP claims, but it is no longer the whole ground-truth
+story. **USGS Short-Term Network high water marks** give 2,364 GPS-tagged
+points for Harvey where a field crew measured, in feet, how far the water rose
+above the ground. 1,171 carry a usable height. They are point-level, they are a
+measured depth rather than a binary label, and they are independent of us.
+
+`validation/hwm_check.py` samples the real detector at each mark and regresses
+detected depth against surveyed depth. Full write-up and every caveat:
+`docs/DETECTION_LIMITS.md` §10.
+
+**The measurement, in the study area chosen because it is SAR's best case:**
+
+| | Brazos (open riverine) | Harvey (dense urban) |
+|---|---|---|
+| Surveyed marks / independent sites | 28 / 18 | 63 / 48 |
+| Site recall @ 10–30 m radius | **0 of 18** | **0 of 48** |
+| Site recall @ 50 m (headline) | **0 of 18**, 95% CI [0%, 18.5%] | 3 of 48, 95% CI [1.3%, 17.2%] |
+| Depth bias | **−2.64 ft** | −2.67 ft |
+| Detected vs surveyed depth correlation | undefined (no detections) | **r = −0.072, p = 0.58** |
+
+Bias worsens with depth: −0.77 ft at surveyed 0–1 ft, **−5.64 ft at 4 ft and
+deeper.** The deeper the real flood, the more of it we miss.
+
+**This is not a bug, and the obvious explanations were checked and eliminated:**
+sampling returns real varied `hand_ft` (1.09–17.34) and `rel_elev_ft` at all 28
+Brazos marks; 20 of 28 are not near permanent water and still read exactly
+zero; the result is identical at every radius from 10 m to 100 m. It is simply
+consistent with the base rate — the full Brazos pipeline detects flooding at
+**22 of 4,000 properties (0.55%)**, so zero at 28 points is what that detector
+produces.
+
+**Three things follow, and they should govern the next session's priorities:**
+
+1. **The binding constraint is base SAR recall**, not the votes layered on it.
+   Phases 4a/4d/4e were tuned on top of a detector firing at 0.55%; there was
+   almost nothing for them to improve.
+2. **`hwm_check.py` is now the gate**, not the zip correlation. A change that
+   moves site recall off zero at Brazos is real evidence. A change that
+   improves a correlation built on 14 bits is not.
+3. **The "roughly 20% recall" figure in DETECTION_LIMITS §7 should not be
+   quoted again.** It was an extrapolation from zip claim counts, honestly
+   labelled a lower bound at the time; the direct measurement puts the 95%
+   upper bound at 18.5% with a point estimate of zero.
+
+**What HWMs still cannot do:** every mark is a place that flooded, so the
+dataset defines no negative class and **cannot measure precision or any
+false-positive rate.** A detector returning "10 ft everywhere" would score
+perfect recall against it. Precision still needs the §7 item 1 feedback loop.
+
+---
+
 ## 3. Current honest accuracy
 
 Measured at Brazos (Fort Bend County TX, Harvey, 4,000 properties, 15 zips,
@@ -87,12 +163,15 @@ Measured at Brazos (Fort Bend County TX, Harvey, 4,000 properties, 15 zips,
 | Property-level calibrated Brier (267 splits) | **0.2336 ± 0.1734** | Enormous spread; unstable. |
 | Brier skill score vs constant predictor | **−0.0039 ± 0.0096** | Does **not** beat predicting the base rate. |
 | Property-level AUC, best detector | **~0.50** | No property-level discrimination. |
+| **Point-level site recall vs surveyed USGS depths** | **0 of 18 sites, 95% CI [0%, 18.5%]** | **Directly measured (§2b). Not zip-aggregated.** |
+| **Point-level depth bias vs surveyed USGS depths** | **−2.64 ft** (−5.64 ft at ≥4 ft) | **Directly measured (§2b).** |
 
 **What this means in plain terms.** Altis produces a *regionally* meaningful
 flood-severity signal: it can tell you which zip codes in a portfolio were hit
 harder, and it correlates with what adjusters actually recorded and paid. It
-**cannot** currently make a defensible per-house flood/no-flood call, and the
-present ground truth could not prove it either way if it could.
+**cannot** currently make a defensible per-house flood/no-flood call — and as
+of §2b that is no longer an inference from weak labels, it is a direct
+measurement against surveyed depths at 66 independent flood sites.
 
 **Harvey (Addicks/Barker, urban Houston) is worse than Brazos** — near-zero
 detection, and 100% of its 44 detections were optically contradicted. Dense
@@ -218,85 +297,50 @@ chat, treat it as compromised and confirm rotation before relying on it.
 
 ## 7. What to do next, in priority order
 
-**0. Source real per-property/per-point flood ground truth. Do this FIRST,
-before writing any new detector code.** This is the task the network-capable
-sandbox exists for. A prior session's egress proxy blocked every relevant
-domain, so these are unverified leads from search-result snippets, not
-confirmed live data — the first job is verifying and downloading, not
-building.
+**0. Source real per-property/per-point flood ground truth. — DONE. See §0
+and §2b.** Kept here so the priority ordering still reads, but do not re-run
+this search: (a) USGS high water marks landed and are wired into
+`validation/hwm_check.py`; (b) FEMA per-building damage assessments are dead,
+every endpoint 404s; (c) the FEMA/HARC depth grid is live but is interpolated
+from the same USGS marks, so it is not independent; (d) the FEMA ISAA route to
+non-redacted NFIP claims is unstarted and still the long-term ceiling.
 
-Why this matters more than anything else in this file: §2 explains that every
-accuracy number so far is capped by 14 independent zip codes. Four phases
-(4a, 4d, 4e) were built, measured, and could not be validated — not
-necessarily because they don't work, but because the ground truth has almost
-no statistical power to tell a good detector from a bad one. This task is
-what breaks that ceiling.
+**The result reordered everything below it.** Point-level recall is 0 of 18
+surveyed flood sites at Brazos (95% CI [0%, 18.5%]) and depth bias is −2.64 ft,
+worsening to −5.64 ft at surveyed depths of 4 ft and above. The binding
+constraint is base SAR detection recall, not the votes layered on top of it.
 
-Leads, in priority order:
+**0b. NEW TOP PRIORITY: move base recall off zero, gated by `hwm_check.py`.**
+This replaces "add another vote and check the zip correlation," which is the
+treadmill §2 warns about. There are now 66 independent survey sites with
+measured depths and a check that runs in ~6 minutes, so candidate changes can
+finally be adjudicated. In rough order of expected effect:
 
-  a. **USGS High Water Marks, Hurricane Harvey.** ~2,123 GPS-tagged points
-     with surveyed water height above land surface, 22 TX counties + 3 LA
-     parishes. Public, free, no agreement needed. Start at the USGS Flood
-     Event Viewer (`stn.wim.usgs.gov`, event "HarveyAug2017") and the
-     ScienceBase data release (search "Data Used to Characterize Peak
-     Streamflows and Flood Inundation... Hurricane Harvey ScienceBase" if the
-     direct link has moved). This is POINT-LEVEL MEASURED DEPTH, not a binary
-     label — better than what we have, because it validates `depth_ft`
-     directly instead of a flooded/not-flooded call. Filter to points falling
-     inside the BRAZOS and HARVEY bboxes in `pipeline/config.py`. Even a few
-     hundred points landing inside our study areas would be a real upgrade
-     over 14 zips.
-     Action: download, check how many points fall inside our two bboxes,
-     write a `validation/hwm_check.py` that compares our `depth_ft` output at
-     each HWM point's coordinates against the surveyed value — direct
-     regression, no zip aggregation, no label threshold to argue about.
+  - **The median composite may be averaging the flood away.** `load_sar_composite`
+    returns `collection.median()` over the whole post window. Brazos has 3
+    DESCENDING scenes in that window (30 Aug, 5 Sep, 11 Sep) against a crest of
+    ~1 Sep; Harvey has 2. A pixel flooded on only one of three passes has a DRY
+    median, so the detector never sees it. Detecting per-pass and taking the
+    union — instead of detecting on a median — is the most likely single cause
+    of near-zero recall and the cheapest thing to test. (DETECTION_LIMITS §9
+    already flagged this mechanism; §10 is the evidence that promotes it to
+    first place.)
+  - **Re-measure Phases 4a, 4b and 4e against HWMs.** All three were shelved
+    as "not proven" against labels with no power. Dual-pol (4b) cleared chance
+    on the old labels and deserves the first re-run; sub-pixel (4a) was killed
+    by a wet-soil confound that a *depth* regression can see differently from a
+    binary label; double-bounce (4e) targets exactly the urban case where
+    Harvey's marks sit.
+  - **Otsu on a whole-bbox histogram may never see a water mode.** At 0.55%
+    flooded pixels, the bimodality Otsu assumes is not there, and the range
+    guard then decides the threshold. Worth measuring directly against the
+    marks.
 
-  b. **FEMA "Building Damage for Harvey."** Search-result snippets describe a
-     FEMA ArcGIS Hub dataset with **per-building damage classification
-     (1=undamaged through 5=destroyed) covering 68,000+ structures** in
-     Harris County. If this is still live and has coordinates per record,
-     THIS IS THE PER-PROPERTY GROUND TRUTH THE PROJECT HAS BEEN MISSING —
-     stop and prioritize it over everything else in this list if it checks
-     out. Was at `gis-fema.hub.arcgis.com/datasets/building-damage-for-harvey`
-     as of this writing; FEMA links rot, so search "FEMA Building Damage
-     Harvey ArcGIS" if that 404s, and also check
-     `respond-harvey-geoplatform.opendata.arcgis.com` (HIFLD's Harvey hub,
-     130+ datasets) and `data.femadata.com/NationalDisasters/HurricaneHarvey/
-     Data/DamageAssessments/`.
-     Action: confirm it's live, confirm it has coordinates (not just county/
-     zip aggregates), download it, check overlap with our BRAZOS/HARVEY
-     bboxes, and if it holds up, this becomes the primary validation dataset
-     — replacing zip-level NFIP correlation as the headline number.
+**0c. Get a negative class.** HWMs prove where water WAS and can never measure
+precision (§2b). Without it, "improve recall" has an obvious degenerate
+solution. The cheapest honest sources are the adjuster feedback loop and FNOL
+photos in item 1 below, which is why item 1 did not drop in priority.
 
-  c. **FEMA flood depth grid.** A ~39GB modeled flood-depth raster covering
-     the Harvey-affected area, referenced via HydroShare
-     ("FEMA - Harvey Flood Depths Grid"). If real, this validates our depth
-     map against a continuous surface — no sparse-point or zip-aggregation
-     problem at all. Lower priority than (a) and (b) because of the size and
-     because it's a MODELED product (FEMA's own hydraulic model), not a direct
-     measurement — useful as a second opinion, not as strong as (a)'s surveyed
-     points or (b)'s inspected buildings.
-
-  d. **Non-redacted NFIP claims via FEMA data-sharing agreement.** The public
-     OpenFEMA claims are zip-redacted by the Privacy Act; the full address-
-     level version exists and FEMA does grant access through an Information
-     Sharing Access Agreement (ISAA). Contact `OpenFEMA@fema.dhs.gov`. This is
-     the slowest path (FEMA's timeline, needs a formal request from the
-     company, not something a coding session can complete) but the highest
-     ceiling long-term, since it's literally the same dataset already in use,
-     just at full precision. Start this conversation in parallel with (a)-(c)
-     rather than waiting on them.
-
-  e. **Adjuster feedback loop and FNOL photo upload** (the two items originally
-     listed here — kept as fallback/complementary, see item 1 below). These
-     require the product to be live and generating real claims first, so
-     they're slower to bear fruit than (a)-(d), which are ALREADY-COLLECTED
-     historical data sitting in a government archive right now.
-
-If (a) or (b) pan out, the very next step is re-running `dualpol_ablation.py`
-and a new point-level equivalent of `double_bounce_probe.py` against the new
-ground truth — both were shelved as "not proven," not "disproven," and this
-is what actually settles it.
 
 **1. Per-property ground truth via product usage. This unblocks everything
 else once the product has real users; item 0 is the faster path today.**
@@ -364,32 +408,25 @@ time-critical sub-parcel work. Not to be built; a future purchasing decision.
 
 ---
 
-## 8b. Sandbox requirements for §7 item 0 (the ground-truth sourcing task)
+## 8b. Sandbox notes (the ground-truth sourcing task is complete)
 
-The prior session's sandbox blocked outbound access to essentially every
-content domain outside a small allowlist (search-engine queries worked;
-fetching the actual result pages did not — FEMA, USGS, ArcGIS, HydroShare,
-ScienceBase all returned an egress-blocked error). Whoever sets up the new
-sandbox should confirm, before starting work:
+The network problem this section used to describe is **resolved** — a sandbox
+with normal outbound HTTPS reached usgs.gov, arcgis.com and fema.gov without an
+allowlist, and §7 item 0 was executed there. Kept for the practical notes:
 
-- **General outbound HTTPS is allowed**, not just an allowlist of a few
-  domains — the sourcing task needs to reach `.gov` sites (`usgs.gov`,
-  `femadata.com`, `fema.gov`), `.arcgis.com` / ArcGIS Hub, `hydroshare.org`,
-  `sciencebase.gov`, and whatever domains the search in §7-0 turns up next.
-  If the environment only supports an allowlist, add those domains to it
-  up front rather than discovering the block mid-task.
-- **The repo and its git remote work as normal** — this task should still
-  `git clone`/`git fetch` `Altis-2026/altis-mvp` on branch
-  `claude/altis-flood-intelligence-1qzgvq` and commit/push there, same as
-  every other session. Nothing about the ground-truth sourcing changes the
-  git workflow.
-- **Large file handling**: item (c) above is ~39GB. Confirm the sandbox has
-  disk space for that, or plan to stream/subset it (e.g., fetch only the
-  raster tiles overlapping the BRAZOS/HARVEY bboxes) rather than downloading
-  the whole thing — check size and options before pulling it in full.
-- No new GEE, GCP, or paid-API credentials are needed for this task — it's
-  pure public-data download and comparison against outputs the pipeline
-  already produces.
+- **No large download was needed after all.** The USGS marks are a single
+  1.6 MB JSON, now cached in-repo at `outputs/usgs_hwm_event180.json`, so
+  `hwm_check.py` runs offline. The ~39 GB FEMA depth grid was never worth
+  fetching: it is served as an ArcGIS ImageServer (queryable without
+  downloading) and is interpolated from these same marks anyway.
+- **No new credentials were needed** — public data plus the existing GEE
+  service account, which this sandbox reads from
+  `GEE_SERVICE_ACCOUNT_KEY_JSON`.
+- **`ee` can fail to import on a fresh container** with a `pyo3_runtime.
+  PanicException` from `cryptography`'s Rust bindings. `pip install
+  --force-reinstall cryptography` clears it.
+- The git workflow is unchanged: clone `Altis-2026/altis-mvp`, work on the
+  designated branch, commit and push.
 
 ---
 
@@ -411,6 +448,12 @@ python validation/fit_ensemble.py brazos --repeats 300
 
 # The double-bounce measurement (Phase 4e, ~3 min)
 python validation/double_bounce_probe.py brazos
+
+# POINT-LEVEL validation against surveyed USGS high water marks (~6 min each).
+# This is the gate any detector change now has to pass — see §2b. Runs offline;
+# the USGS response is cached in outputs/usgs_hwm_event180.json.
+python validation/hwm_check.py brazos --sweep
+python validation/hwm_check.py harvey --sweep
 
 pytest tests/ -q      # 274 passing, 1 skipped
 ```

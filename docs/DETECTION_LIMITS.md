@@ -498,3 +498,158 @@ Section 7's list needs reordering now that its top item is eliminated:
 Note that 1 and 2 both attack the *same* confound this section identified.
 That is the useful thing a negative result buys: the next attempt is aimed at
 a known obstacle instead of a guess.
+
+---
+
+## 10. Point-level ground truth, at last — and it says recall is near zero
+
+Every section above this one was written against ZIP-level NFIP claims. That
+ceiling is documented in `docs/PROJECT_STATE.md` §2: the 3,980-row Brazos
+validation set carries **14 independent bits of information**, because NFIP
+redacts claims to ZIP resolution and every property in a ZIP therefore shares
+one label. Three detector improvements (Phases 4a, 4d, 4e) were built,
+measured, and shelved as "not proven" against that ceiling — never shown to
+fail, merely never shown to work.
+
+This section is the first measurement in the project that does not have that
+problem.
+
+### The data
+
+USGS Short-Term Network high water marks, event 180 ("2017 Harvey"): **2,364
+GPS-tagged points** where a field crew measured, in feet, how far the water
+rose above the ground surface. Free, public, no agreement needed. 1,171 carry
+a usable `height_above_gnd`.
+
+This is strictly better ground truth than NFIP claims for the question we care
+about, on three counts:
+
+- **Point-level.** Each mark is its own observation, at its own coordinates.
+  No ZIP aggregation, no pseudo-replication.
+- **A measured depth, not a binary label.** It validates `max_depth_ft`
+  directly. There is no flood/no-flood threshold to argue about.
+- **Independent of us.** Surveyed by USGS in 2017, published since.
+
+`height_above_gnd == 0` is treated as MISSING, not as zero depth. All 974 such
+Harvey marks carry a surveyed `elev_ft` and 670 are debris lines, which cannot
+be deposited at precisely 0.00 ft above ground — it is an unfilled optional
+field. Counting them as zeros would have manufactured ~900 fake "no flooding
+here" points out of a dataset that contains none. The drop count prints on
+every run.
+
+### What it can and cannot settle
+
+**It cannot measure precision.** Every HWM is a place that flooded. The dataset
+contains no surveyed dry points and therefore defines no negative class. A
+detector that returned "10 ft everywhere" would score perfect recall here.
+Precision still has to come from somewhere else.
+
+**It measures recall and depth accuracy at known-flooded locations**, which is
+exactly the quantity section 7 could only estimate indirectly.
+
+**An HWM is the PEAK stage; Sentinel-1 samples an instant** every 6–12 days.
+Where a pass missed the crest, a correct detector still reads low, so
+underestimate is the expected result, not automatically an error. For Brazos
+the crest at Richmond (~1 September) is bracketed by passes on 30 August and
+5 September, so the timing excuse is weakest exactly where the result is worst.
+
+**Marks cluster by survey site.** Several marks a few metres apart are one
+observation of the detector, so sites — not marks — are the independent unit.
+Recall bounds below are Clopper-Pearson over sites, and correlation CIs are
+bootstrapped by resampling sites.
+
+### The result
+
+`python validation/hwm_check.py brazos --sweep`
+
+| radius | Brazos recall (28 marks / 18 sites) | Harvey recall (63 marks / 48 sites) |
+|--------|-------------------------------------|-------------------------------------|
+| 10 m   | 0.0% (0/28) | 0.0% (0/63) |
+| 20 m   | 0.0% (0/28) | 0.0% (0/63) |
+| 30 m   | 0.0% (0/28) | 0.0% (0/63) |
+| 50 m   | 0.0% (0/28) | 4.8% (3/63) |
+| 100 m  | 0.0% (0/28) | 11.1% (7/63) |
+
+The whole sweep is shown rather than its best point, per the discipline in
+PROJECT_STATE §6.
+
+**Brazos — open riverine floodplain, SAR's best case, the study area this repo
+chose precisely because it is the most favourable setting available:**
+
+- Site-level recall **0 of 18 sites. 95% CI [0.0%, 18.5%]** (Clopper-Pearson).
+- Depth bias **−2.64 ft**, MAE 2.64 ft, RMSE 3.32 ft.
+- Bias grows with the depth that matters: −0.77 ft at surveyed 0–1 ft,
+  **−5.64 ft at surveyed 4 ft and deeper** (n=7, 4 sites). The deeper the real
+  flood, the more of it we miss — the opposite of the failure mode a triage
+  product can tolerate.
+- Not explained by permanent-water masking: 20 of the 28 marks are not near
+  permanent water and still read exactly zero.
+- Not explained by sampling geometry: identical at every radius from 10 m to
+  100 m.
+- Not a sampling bug: `hand_ft` returns real varied terrain (1.09–17.34 ft),
+  `rel_elev_ft` is populated at all 28, and dual-pol reports available at all
+  28. The image sampled correctly and contained no water at these points.
+
+**Harvey — dense urban, already known to be the weak case:**
+
+- 3 of 63 marks at the 50 m headline radius — site-level **3 of 48 sites, 95%
+  CI [1.3%, 17.2%]**. At 10–30 m it is 0 of 48 sites, 95% CI [0.0%, 7.4%].
+- Correlation between detected and surveyed depth: Pearson **r = −0.072
+  (p = 0.58)**, Spearman r = +0.078 (p = 0.54). No relationship.
+- The apparent recall gain at 100 m is not signal. Recall rises to 11.1%, but
+  among detected marks the error gets *worse* — MAE 5.62 ft, and bias flips
+  from −0.78 ft to +2.58 ft. A wider buffer is finding unrelated water
+  somewhere in a 100 m circle, not the water at the mark. This is precisely
+  what sweeping a parameter is for.
+
+### Why this is consistent with everything above, and what it changes
+
+It is not a surprise given the base rate: the full Brazos pipeline detects
+flooding at **22 of 4,000 properties (0.55%)**. If HWM points behaved like
+average properties, the expected count at 28 marks would be 0.15. Zero is what
+a 0.55% detector produces.
+
+What changes is what we can *say*. Section 7 extrapolated "roughly 20% recall"
+from ZIP claim counts and was careful to call it a lower bound. The direct
+measurement puts the 95% upper bound at **18.5% in the best-case study area**,
+and the point estimate at zero. The extrapolated figure was optimistic, and the
+route that produced it — scaling a detection rate against claims in ZIPs that
+extend beyond the study bbox — should not be quoted again now that a direct
+measurement exists.
+
+It also explains why Phases 4a, 4d and 4e could never be validated. They were
+tuned and tested on top of a detector that fires at 0.55% of properties and 0%
+of surveyed flood points. There was almost nothing there for them to improve,
+and the ZIP labels could not have revealed it.
+
+**The honest headline is unchanged in direction and sharper in size:** Altis's
+ZIP-level severity ranking correlates with what adjusters recorded and paid
+(+0.366 / +0.537, section 7), and its per-property flood call is not yet
+supportable. What is new is that the second half is now measured at point
+level against surveyed depths, not inferred from aggregate labels.
+
+### What this makes worth doing next
+
+The binding constraint is **detection recall in the base SAR mask**, not the
+votes layered on top of it. Every idea in section 9's list is still aimed at
+that, and now there is a test with enough power to adjudicate them: 66
+independent survey sites across the two areas, with measured depths, runnable
+in minutes.
+
+The immediate consequence is that `hwm_check.py` — not the ZIP correlation —
+should be the gate any future detector change has to pass. A change that moves
+site recall off zero at Brazos is real. A change that improves a ZIP
+correlation built on 14 bits is not evidence.
+
+### Reproducing this
+
+```bash
+python validation/hwm_check.py brazos --sweep    # ~6 min
+python validation/hwm_check.py harvey --sweep    # ~6 min
+```
+
+Writes `outputs/hwm_check_<event>.csv` (one row per mark, carrying the raw
+detector columns so a zero can be explained rather than only reported) and
+`outputs/hwm_check_<event>.json` (summaries, the detector's provenance, and the
+caveats above). The raw USGS response is cached in
+`outputs/usgs_hwm_event180.json`, so the check runs with no network.
