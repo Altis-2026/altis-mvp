@@ -39,8 +39,10 @@ to skip an inspection.
 
 | signal | Brazos precision / recall / AUC | Harvey precision / recall / AUC |
 |---|---|---|
-| shipped detector | 0.0% / 0.0% / **0.499** | 68.8% (n=16) / 1.0% / **0.504** |
-| dual-pol (4b) | 44.0% / 2.0% / **0.503** | 54.9% / 4.3% / **0.511** |
+| shipped detector | 0.0% / 0.0% / **0.499** | 75.0% (n=8, CI [41, 93]) / 0.5% / **0.503** |
+| double-bounce (4e) | not measurable (rural) | 38.4% / 59.7% / **0.520** — flags 60% of book, **1.00× lift** |
+| sub-pixel (4a) | not measured | 37.0% / 33.8% / **0.491** — **below** base rate |
+| **dual-pol (4b)** | 44.0% / 2.0% / **0.503** | **51.2% / 3.8% / 0.508 — 1.33× lift, the only usable signal** |
 | Sentinel-2 optical | 37.9% / 4.6% / **0.502** | 30.4% / 3.0% / **0.493** |
 | HAND terrain only | 38.4% / 91.2% / **0.552** | 35.8% / 78.6% / **0.458** |
 | learned ensemble (4d) | — / — / **0.471** (spatial CV) | — / — / **0.442** (spatial CV) |
@@ -53,10 +55,13 @@ rejects everything because the signal has the **wrong sign**.
 
 **How to close it, in order of expected effect:**
 
-1. **Enable and validate double-bounce properly.** This is the only detector
-   aimed at brightening. It scored 28/63 marks (20/48 sites) at Harvey against
-   high water marks — nine times the shipped detector — but ships disabled and
-   has never been scored against a negative class. *In progress.*
+1. ~~**Enable double-bounce.**~~ **DONE AND REJECTED (§14).** Measured against
+   the negative class it flags **60% of the book** at **38.4% precision** —
+   identical to the 38.3% base rate. Its 9× recall advantage over high water
+   marks was bought entirely by firing on most things. Stays disabled. The one
+   survivor is **dual-pol: 51.2% precision [40.8, 61.4] on 86 structures, 1.33×
+   lift** — narrow, already enabled, and the only signal an adjuster could act
+   on today.
 2. **Add a brightening branch to the primary mask.** Even with double-bounce
    enabled, `orbit_flood_mask` still requires darkening. The mask needs to be
    `darkening OR (urban AND brightening)`, not darkening alone. **Not built.**
