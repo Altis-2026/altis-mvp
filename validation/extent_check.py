@@ -180,6 +180,39 @@ def auc(truth, score):
     return float((r[truth == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
 
 
+def abstained(df, band, avail_col=None):
+    """
+    True when `band` was NOT MEASURED, rather than measured and found nothing.
+
+    This guard exists because its absence produced a wrong published result.
+    SUBPIXEL and DOUBLE_BOUNCE ship disabled, and `build_flood_depth_image`
+    then adds a CONSTANT ZERO band for each. Scored naively that reads as
+    "precision n/a, recall 0.0%, never fires" — indistinguishable from a
+    detector that ran and saw nothing, and it was written into
+    DETECTION_LIMITS §12/§13 as though it were a measurement.
+
+    PROJECT_STATE §6 has required this distinction from the start ("a 0 must
+    never conflate 'measured, none' with 'not measured'"), and the pipeline
+    already carries `db_available` for exactly this purpose. The check was
+    simply never made here. It is made now, before anything is scored.
+    """
+    if avail_col and avail_col in df.columns:
+        if pd.to_numeric(df[avail_col], errors='coerce').fillna(0).max() <= 0:
+            return True
+    if band not in df.columns:
+        return True
+    v = pd.to_numeric(df[band], errors='coerce').fillna(0)
+    return bool(v.nunique() <= 1 and v.max() == 0)
+
+
+def report_abstention(name, why):
+    print(f"\n  ── {name} ──")
+    print(f"     NOT MEASURED — {why}")
+    print("     This is an abstention, not a result. It must not be read as "
+          "'the signal fired nowhere'.")
+    return {'name': name, 'abstained': True, 'reason': why}
+
+
 def report(name, truth, pred, score=None):
     m = metrics(truth, pred)
     a = auc(truth, score) if score is not None else None
@@ -213,11 +246,26 @@ def main():
                          'where the interpolated extent is least certain.')
     ap.add_argument('--max-structures', type=int, default=6000)
     ap.add_argument('--radius', type=float, default=None)
+    ap.add_argument('--enable-candidates', action='store_true',
+                    help='Turn SUBPIXEL and DOUBLE_BOUNCE on for this run. '
+                         'They are disabled in config, which means the pipeline '
+                         'writes CONSTANT ZERO bands for them — a zero that '
+                         'means "not measured", not "measured, nothing there". '
+                         'Without this flag their rows below are abstentions '
+                         'and must not be read as results.')
     args = ap.parse_args()
 
     from backend.live_pipeline import init_ee
     init_ee()
     import config
+
+    # Mutating the dicts in place is what reaches flood_detect: it did
+    # `from config import DOUBLE_BOUNCE`, which binds the same object.
+    if args.enable_candidates:
+        config.SUBPIXEL['enabled'] = True
+        config.DOUBLE_BOUNCE['enabled'] = True
+        print("  --enable-candidates: SUBPIXEL and DOUBLE_BOUNCE forced ON "
+              "for this run (they ship disabled)")
     from event_image import build_event_image
     from flood_detect import sample_properties
     import structures as struct
@@ -294,17 +342,18 @@ def main():
     results = []
     results.append(report("shipped detector (max_depth_ft > 0.1)",
                           truth, df['max_depth_ft'] > 0.1, df['max_depth_ft']))
-    if 'water_fraction' in df:
-        results.append(report("sub-pixel water fraction > 0 (Phase 4a)",
-                              truth, df['water_fraction'] > 0,
-                              df['water_fraction']))
-    if 'dpol_water' in df:
-        results.append(report("dual-pol score > 0 (Phase 4b)",
-                              truth, df['dpol_water'] > 0, df['dpol_water']))
-    if 'double_bounce' in df:
-        results.append(report("double-bounce > 0 (Phase 4e)",
-                              truth, df['double_bounce'] > 0,
-                              df['double_bounce']))
+    # Each candidate signal is checked for abstention BEFORE it is scored.
+    for name, band, avail in (
+            ("sub-pixel water fraction > 0 (Phase 4a)", 'water_fraction', None),
+            ("dual-pol score > 0 (Phase 4b)", 'dpol_water', 'dpol_available'),
+            ("double-bounce > 0 (Phase 4e)", 'double_bounce', 'db_available')):
+        if abstained(df, band, avail):
+            results.append(report_abstention(
+                name,
+                f"'{band}' is a constant-zero band. It ships disabled in "
+                f"config; re-run with --enable-candidates to measure it."))
+            continue
+        results.append(report(name, truth, df[band] > 0, df[band]))
     if 'optical_water_pct' in df:
         results.append(report("Sentinel-2 optical water > 0",
                               truth, df['optical_water_pct'] > 0,

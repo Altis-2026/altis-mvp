@@ -823,14 +823,23 @@ for. Harvey numbers here describe riverine floodplain in north Harris County.
 | signal | precision | recall | specificity | AUC | precision lift |
 |---|---|---|---|---|---|
 | shipped detector (`max_depth_ft > 0.1`) | 0.0% | 0.0% | 99.9% | 0.499 | 0.00× |
-| sub-pixel, Phase 4a | never fires | 0.0% | 100% | 0.500 | — |
+| sub-pixel, Phase 4a | **NOT MEASURED — abstained** | — | — | — | — |
 | dual-pol, Phase 4b | 44.0% | 2.0% | 98.5% | 0.503 | 1.21× |
-| double-bounce, Phase 4e | never fires | 0.0% | 100% | 0.500 | — |
+| double-bounce, Phase 4e | **NOT MEASURED — abstained** | — | — | — | — |
 | Sentinel-2 optical | 37.9% | 4.6% | 95.7% | 0.502 | 1.04× |
 | HAND terrain only, ≤10 ft | 38.4% | 91.2% | 15.8% | 0.552 | 1.05× |
 
 **Every AUC lands between 0.499 and 0.552. Nothing achieves per-property
 discrimination.**
+
+> **CORRECTION (see §14).** The sub-pixel and double-bounce rows above
+> originally read "never fires", which is wrong and was published in error.
+> Both features ship **disabled** in `config.py`, and
+> `build_flood_depth_image` then writes a CONSTANT ZERO band for each. Scored
+> naively that is indistinguishable from a detector that ran and saw nothing.
+> They were never evaluated in this run. `extent_check.py` now refuses to
+> score an abstaining band and prints NOT MEASURED instead; the real numbers
+> are in §14.
 
 ### The HAND row is a trap, and it is worth spelling out
 
@@ -910,21 +919,19 @@ the bbox only, not Addicks/Barker):
 | signal | precision | recall | AUC | lift |
 |---|---|---|---|---|
 | shipped detector | 68.8% (n=16, 95% CI [41%, 89%]) | 1.0% | 0.504 | 1.79× |
-| sub-pixel, Phase 4a | never fires | 0.0% | 0.500 | — |
+| sub-pixel, Phase 4a | **NOT MEASURED — abstained** | — | — | — |
 | dual-pol, Phase 4b | 54.9% | 4.3% | 0.511 | 1.43× |
-| **double-bounce, Phase 4e** | **never fires** | **0.0%** | 0.500 | — |
+| **double-bounce, Phase 4e** | **NOT MEASURED — abstained** | — | — | — |
 | Sentinel-2 optical | 30.4% | 3.0% | 0.493 | 0.79× |
 | HAND ≤10 ft | 35.8% | 78.6% | **0.458** | 0.93× |
 
-**Double-bounce fired on zero of 2,999 structures. The verdict rule ("ships
-only if precision clearly beats the shipped detector") cannot be applied —
-there is nothing to compute a precision from.** This is exactly the coverage
-gap flagged when the Harvey extent was built: the San Jacinto reach is
-riverine floodplain in north Harris County, not the dense urban blocks
-(Addicks/Barker corridor) where double-bounce found signal against high water
-marks in §11. **Double-bounce stays disabled — not because it lost here, but
-because this test structurally cannot see the terrain it targets.** Judging it
-requires urban ground truth, which this release does not provide for our bbox.
+> **CORRECTION (see §14).** This section originally concluded that
+> double-bounce "fired on zero of 2,999 structures" and attributed it to the
+> San Jacinto reach being the wrong terrain. **Both halves were wrong.**
+> Double-bounce ships disabled, so the band was a constant zero and was never
+> computed. And the terrain claim does not hold either: **2,362 of the 2,999
+> structures (79%) are urban-flagged.** This reach does contain the built-up
+> terrain double-bounce targets. The real measurement is in §14.
 
 Two things worth flagging on their own:
 
