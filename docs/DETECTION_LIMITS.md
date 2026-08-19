@@ -955,3 +955,75 @@ inundation extent + boundary the way it does the Brazos and San Jacinto
 reaches (checked — not available). Judging double-bounce needs either a
 different authoritative source for that specific area, or the adjuster
 feedback loop (PROJECT_STATE §7 item 1) once the product has real usage there.
+
+---
+
+## 14. Double-bounce measured against a negative class: it does NOT ship
+
+§13 reported double-bounce as "never fires" at Harvey. That was an abstention,
+not a measurement — it ships disabled, so the pipeline wrote a constant-zero
+band (see the corrections in §12/§13). Re-run with
+`extent_check.py harvey --enable-candidates`, on the same 2,999 USGS-labelled
+structures, **2,362 of which (79%) are urban-flagged** — this reach does
+contain the built-up terrain double-bounce targets.
+
+**Harvey, 2,999 structures, 38.3% base rate:**
+
+| signal | precision (95% CI) | flags | recall | AUC | precision lift |
+|---|---|---|---|---|---|
+| shipped detector | 75.0% [40.9, 92.9] | 8 (0%) | 0.5% | 0.503 | 1.96× |
+| **dual-pol (4b)** | **51.2% [40.8, 61.4]** | 86 (3%) | 3.8% | 0.508 | **1.33×** |
+| **double-bounce (4e)** | **38.4% [36.2, 40.7]** | **1,790 (60%)** | 59.7% | 0.520 | **1.00×** |
+| sub-pixel (4a) | 37.0% [34.1, 40.0] | 1,051 (35%) | 33.8% | 0.491 | 0.97× |
+| HAND ≤10 ft | 35.5% [33.7, 37.4] | 2,520 (84%) | 77.8% | 0.451 | 0.93× |
+| Sentinel-2 optical | 27.1% [19.6, 36.2] | 107 (4%) | 2.5% | 0.492 | 0.71× |
+
+### The verdict, on the rule set before the numbers were seen
+
+The standing rule was: **double-bounce ships only if its precision clearly
+beats the shipped detector's — not merely its recall.** It does not.
+**38.4% against 75.0%, and its precision is identical to the 38.3% base rate.**
+
+**DOUBLE-BOUNCE STAYS DISABLED.**
+
+### Why this is the most important result in this document
+
+Against high water marks (§11), double-bounce looked like a decisive win: 28/63
+marks and 20/48 sites at Harvey, against 3/63 for the shipped detector — nine
+times the recall, "lift 4.33". It was the strongest positive signal in the
+whole project.
+
+With a negative class, that evaporates. It flags **1,790 of 2,999 structures —
+60% of the book** — and among those it is right 38.4% of the time, which is
+exactly what you get by labelling every structure flooded. Its recall was
+bought entirely by firing on most things.
+
+This is precisely the failure §10 warned about in advance: *"a detector that
+returned '10 ft everywhere' would score perfect recall"* on a positives-only
+dataset. Double-bounce is a mild version of that detector, and only a real
+negative class could reveal it. **HWM-derived "lift" is not a substitute for
+precision** — the bbox-fraction denominator used in §11 is not the same
+quantity as a base rate over structures, and it flattered double-bounce by
+roughly 4×.
+
+Sub-pixel (4a) fails the same way and is now measured rather than abstained:
+precision 37.0% against a 38.3% base rate — **below** it — while flagging 35%
+of the book.
+
+### What survives
+
+**Dual-pol (Phase 4b) is the only detector here with precision meaningfully
+above the base rate at a usable alert volume:** 51.2% [40.8, 61.4] on 86
+flagged structures, a 1.33× lift. It is enabled today. Its recall is 3.8%,
+so it is a *narrow, moderately-trustworthy* signal, not a portfolio answer —
+but of everything tested it is the only one an adjuster could act on, and it is
+the one Phase 4b's physics predicted (VV and VH must corroborate, which is what
+stops it from firing on 60% of the map).
+
+The shipped detector's 75.0% precision rests on 8 flagged structures — 95% CI
+[40.9, 92.9]. Directionally promising, far too small to act on.
+
+**Nothing here changes §12's conclusion.** Every AUC remains between 0.45 and
+0.52. No signal delivers per-property discrimination; dual-pol delivers a small
+number of moderately reliable positives, which is a different and much smaller
+claim.
