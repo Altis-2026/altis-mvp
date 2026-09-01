@@ -171,11 +171,27 @@ or missed it.** A confident "no flood detected" from a satellite that flew four
 days late is actively harmful — it is the failure mode most likely to produce a
 wrongly denied claim.
 
-**How to close:** cheap and already possible from data on hand — CHIRPS daily
-rainfall plus scene timestamps plus USGS gauge peak times. Emit a
-`crest_observed: yes / no / unknown` field and refuse to issue Remote-Deny when
-it is "no". **PROJECT_STATE §7 item 3. Not built. Should be built next; it
-converts a silent failure into a disclosed caveat.**
+**DONE — and it found something.** `pipeline/crest_timing.py` reads USGS
+stream gauges (15-minute stage, free) and compares each gauge's crest against
+the Sentinel-1 acquisition **instants** the detector used. Verdict is
+`observed / partial / missed / unknown`, recorded in the run manifest with
+`safe_to_remote_deny`.
+
+Measured on our own events:
+
+| event | verdict | detail |
+|---|---|---|
+| Brazos | **partial** (2/3 gauges) | Brazos at Richmond crested 55.19 ft at 2017-09-01T05:15Z; nearest pass was **−40.9 h** — we photographed the rising limb and looked away while water kept climbing |
+| Harvey | **partial** (16/21) | the five missed are the north Houston bayous, which crested 27 Aug before the first usable pass |
+
+Both correctly return `safe_to_remote_deny: False`. The Brazos result is a
+partial explanation for the −2.64 ft depth bias in Gap 2, and it was invisible
+before this existed.
+
+`unknown` is never collapsed into `observed` — most of the world has no gauge
+coverage, and network failure degrades to `unknown` too. **Remaining work:**
+the flag is recorded but `triage_core` does not yet consume it, so Remote-Deny
+is not literally blocked in the triage output.
 
 ---
 
