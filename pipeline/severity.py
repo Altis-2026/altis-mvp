@@ -44,10 +44,11 @@ Pure functions, no network/EE — unit-tested directly.
 from typing import Optional
 
 try:
-    from config import (SEVERITY, SEVERITY_CURVES, SEVERITY_CONTENTS_CURVES,
-                        SEVERITY_DURATION)
+    from config import (SEVERITY, SEVERITY_CURVES, SEVERITY_CURVES_FITTED,
+                        SEVERITY_CONTENTS_CURVES, SEVERITY_DURATION)
 except ImportError:  # pragma: no cover - import path guard
     from pipeline.config import (SEVERITY, SEVERITY_CURVES,
+                                 SEVERITY_CURVES_FITTED,
                                  SEVERITY_CONTENTS_CURVES, SEVERITY_DURATION)
 
 
@@ -155,6 +156,18 @@ def damage_pct_for(depth_ft: float, curve_key: Optional[str] = None,
     curves are selected with `contents=True`.
     """
     if curve_key:
+        # Structure curves fitted to this book's own paid claims take priority
+        # over the published national shapes, where one exists for this key.
+        # Held-out MAE falls by ~8 percentage points on single-family homes;
+        # see SEVERITY_CURVES_FITTED in config.py for the evidence and the two
+        # caveats that govern its use. Contents curves are NOT fitted — NFIP
+        # contents coverage is optional and separately capped, so paid contents
+        # is not a clean read on contents damage — and continue to use the
+        # national shapes.
+        if not contents and SEVERITY.get('use_fitted_curves'):
+            fitted = SEVERITY_CURVES_FITTED.get(curve_key)
+            if fitted:
+                return _interpolate(fitted, depth_ft)
         table = SEVERITY_CONTENTS_CURVES if contents else SEVERITY_CURVES
         curve = table.get(curve_key)
         if curve:

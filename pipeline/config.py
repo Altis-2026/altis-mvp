@@ -696,6 +696,39 @@ SEVERITY = {
         (15.0, 70.0), (20.0, 80.0),
     ],
     'min_depth_ft': 0.1,      # below this, no loss estimate is produced
+
+    # Prefer curves fitted to this book's own claims (SEVERITY_CURVES_FITTED)
+    # over the published national shapes, where a fitted curve exists.
+    #
+    # DEFAULT FALSE, AND THE REASON MATTERS MORE THAN THE FLAG.
+    #
+    # The fitted curves are better than the national shapes on held-out data —
+    # ~8 percentage points of MAE on single-family homes — but they measure a
+    # DIFFERENT QUANTITY. HAZUS curves are the fraction of structure value
+    # physically damaged. The fitted curves are the fraction of building value
+    # PAID, conditional on a claim having been filed, which is systematically
+    # higher (trivial damage never becomes a claim).
+    #
+    # Only RES1 no-basement and two coarse commercial/multi-family segments
+    # could be fitted; RES2 (manufactured homes), the basement variants and
+    # every contents curve had too few claims. Turning this on therefore mixes
+    # two calibration scales inside one curve set, and two physically true
+    # invariants invert as a direct result:
+    #
+    #   - manufactured homes stop being more vulnerable than site-built ones
+    #     (RES2 stays national at 27.0% while RES1-1S-NB is fitted at 38.1%)
+    #   - contents damage stops exceeding structure damage at shallow depth
+    #
+    # Both are caught by tests/test_severity_phase3.py, which is how this was
+    # found. Cross-segment comparisons are meaningless while the scales differ,
+    # and triage ranks properties against each other.
+    #
+    # TO TURN THIS ON SAFELY, fit RES2, the basement variants and the contents
+    # curves on the same paid-claims basis, then re-run the phase-3 invariant
+    # tests. Until then the fitted curves are retained as measured evidence
+    # that the national shapes understate shallow-water loss by roughly 2x —
+    # see validation/fit_damage_curves.py — not as the shipped pricing model.
+    'use_fitted_curves': False,
 }
 
 # ─── PHASE 3: MULTI-CURVE DEPTH-DAMAGE LIBRARY ───────────────────────────────
@@ -767,6 +800,61 @@ SEVERITY_CURVES = {
 }
 
 # CONTENTS curves: % of CONTENTS value, reported separately from structure.
+# ─── SEVERITY CURVES FITTED TO REAL CLAIMS ───────────────────────────────────
+# The SEVERITY_CURVES above are published HAZUS-style NATIONAL shapes. They had
+# never been checked against a claim this project holds. These are fitted to
+# 25,011 real Hurricane Harvey NFIP claims across the 59 study-area zips:
+# median(amountPaidOnBuildingClaim / buildingPropertyValue) by depth bin.
+#
+# WHY THEY REPLACE THE NATIONAL SHAPES. Held-out mean absolute error, with
+# train and test ZIPS DISJOINT so a curve cannot score by memorising a zip's
+# average payout (validation/fit_damage_curves.py):
+#
+#   segment       fitted    shipped   improvement
+#   RES1-1S       19.17pp   27.12pp   +7.94pp
+#   RES1-2S       16.93pp   24.45pp   +7.53pp
+#   RES3-multi    13.93pp   14.93pp   +1.01pp
+#   NONRES        12.79pp   14.64pp   +1.84pp
+#
+# The national curves are wrong in BOTH directions. At 1 ft a single-storey
+# home actually lost 38.1% of value against HAZUS's 16.0%; at 12 ft it lost
+# 51.8% against HAZUS's 68.8%. Shallow water costs far more than the tables
+# say and deep water saturates instead of climbing.
+#
+# TWO DELIBERATE DEPARTURES FROM THE RAW FIT, both recorded so they can be
+# argued with rather than discovered:
+#
+#   1. MONOTONICITY IS ENFORCED. The raw fit falls above 6 ft (RES1-1S goes
+#      61.1% -> 49.5%), which is not physical. It is right-censoring: 15.0% of
+#      usable claims sit at the $250,000 NFIP building cap, and capped claims
+#      cluster in deep water, so the deep bins measure the cap rather than the
+#      loss. The curve is therefore held at its running maximum. That makes the
+#      deep end a LOWER BOUND on true damage, which is the safe direction for a
+#      reserving figure.
+#   2. ANCHORED AT (0.0, 0.0). The fit has no data below 1 ft, because trivial
+#      damage does not generate a claim. Without an anchor, interpolation would
+#      clamp to 38.1% at ZERO detected depth. The 0-1 ft segment is therefore
+#      INTERPOLATED, NOT MEASURED, and should not be quoted as evidence.
+#
+# THE CAVEAT THAT GOVERNS USE: this is P(damage | a claim was filed), not
+# P(damage | the property flooded). Applied to every detected property in a
+# portfolio — including ones that would never file — it will OVERSTATE loss.
+# It is a reserving curve for known claims, not an exposure curve for a book.
+#
+# Set SEVERITY['use_fitted_curves'] = False to fall back to the national shapes.
+SEVERITY_CURVES_FITTED = {
+    'RES1-1S-NB': [(0.0, 0.0), (1.0, 38.1), (2.0, 51.2), (3.0, 56.4),
+                   (4.0, 59.5), (6.0, 61.1), (8.0, 61.1), (12.0, 61.1)],
+    'RES1-2S-NB': [(0.0, 0.0), (1.0, 26.5), (2.0, 38.1), (3.0, 42.6),
+                   (4.0, 46.9), (6.0, 46.9), (8.0, 46.9), (12.0, 46.9)],
+    # No basement segment was fitted: only 8,539 of 25,011 claims report a
+    # basement type at all and the basemented subset is far too thin to bin by
+    # depth. The national basement curves above remain in use for those keys,
+    # which is why this dict does not simply replace SEVERITY_CURVES wholesale.
+    'RES3': [(0.0, 0.0), (1.0, 19.7), (2.0, 32.9), (3.0, 33.1), (6.0, 33.1)],
+    'COM': [(0.0, 0.0), (1.0, 10.4), (2.0, 14.8), (3.0, 19.6), (4.0, 19.6)],
+}
+
 # NFIP settles building and contents as separate coverages, and a carrier
 # reserves them separately, so blending them into one number — as the previous
 # single-curve estimate did — is not the shape of the answer a claims manager
