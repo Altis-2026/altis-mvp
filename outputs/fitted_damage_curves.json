@@ -1,0 +1,713 @@
+{
+  "source": "FEMA OpenFEMA NfipClaims v3, 59 study-area zips, dateOfLoss 2017-08-25 to 2017-10-15",
+  "fitted_quantity": "median(amountPaidOnBuildingClaim / buildingPropertyValue) x 100, by depth bin",
+  "n_claims_fetched": 25011,
+  "n_usable": 17365,
+  "exclusions": [
+    {
+      "reason": "no usable waterDepth",
+      "dropped": 2055,
+      "remaining": 22956
+    },
+    {
+      "reason": "building property value missing or <= $10k",
+      "dropped": 3291,
+      "remaining": 19665
+    },
+    {
+      "reason": "no building payment",
+      "dropped": 442,
+      "remaining": 19223
+    },
+    {
+      "reason": "paid exceeds 150% of stated value (data error)",
+      "dropped": 1,
+      "remaining": 19222
+    },
+    {
+      "reason": "depth outside a physically plausible range",
+      "dropped": 0,
+      "remaining": 19222
+    },
+    {
+      "reason": "waterDepth == 0, which means unrecorded (median payout there is 33.5% of value)",
+      "dropped": 1857,
+      "remaining": 17365
+    }
+  ],
+  "censored_share_at_nfip_cap": 0.15,
+  "depth_unit_assumption": {
+    "feet": 22654,
+    "inches": 2342,
+    "invalid": 15
+  },
+  "include_zero_depth": false,
+  "usage_warning": "This is P(damage | a claim was filed), not P(damage | flooded). It does not start near zero because trivial damage does not generate a claim. Applying it to every detected property will OVERSTATE portfolio loss.",
+  "caveats": [
+    "waterDepth == 0 means unrecorded, not no water: median payout at depth 0 is 33.5% of building value. Those rows are dropped.",
+    "waterDepth is documented by FEMA as inches with some instances in feet; values <= 15 are read as feet. This scales the depth axis.",
+    "waterDepth is NOT documented as first-floor-relative, but SEVERITY_CURVES is indexed on depth above first floor. Swapping a fitted curve in assumes the two agree.",
+    "The depth field is heavily rounded: 47% report exactly 1 ft and 26% exactly 0 ft. Sub-foot structure is not resolvable.",
+    "Right-censoring at the $250,000 NFIP building cap affects 15.0% of usable claims; curves are reported both with and without them.",
+    "NFIP-insured properties that filed and were paid only. Not a sample of physical damage."
+  ],
+  "segments": {
+    "RES1-1S": {
+      "n": 8720,
+      "censored_share": 0.082,
+      "shipped_curve_key": "RES1-1S-NB",
+      "fitted_curve": [
+        [
+          1.0,
+          38.1
+        ],
+        [
+          2.0,
+          51.2
+        ],
+        [
+          3.0,
+          56.4
+        ],
+        [
+          4.0,
+          59.5
+        ],
+        [
+          6.0,
+          61.1
+        ],
+        [
+          8.0,
+          49.5
+        ],
+        [
+          12.0,
+          51.8
+        ]
+      ],
+      "fitted_curve_excluding_capped": [
+        [
+          1.0,
+          38.0
+        ],
+        [
+          2.0,
+          51.5
+        ],
+        [
+          3.0,
+          55.3
+        ],
+        [
+          4.0,
+          59.5
+        ],
+        [
+          6.0,
+          61.1
+        ],
+        [
+          8.0,
+          49.7
+        ],
+        [
+          12.0,
+          51.0
+        ]
+      ],
+      "knot_detail": [
+        {
+          "depth_ft": 0.5,
+          "n": 9,
+          "median_pct": null,
+          "interpolated": true
+        },
+        {
+          "depth_ft": 1.0,
+          "n": 4850,
+          "median_pct": 38.1,
+          "mean_pct": 38.3,
+          "censored_share": 0.031,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 2.0,
+          "n": 1963,
+          "median_pct": 51.2,
+          "mean_pct": 52.4,
+          "censored_share": 0.105,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 3.0,
+          "n": 890,
+          "median_pct": 56.4,
+          "mean_pct": 56.6,
+          "censored_share": 0.16,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 4.0,
+          "n": 476,
+          "median_pct": 59.5,
+          "mean_pct": 58.0,
+          "censored_share": 0.269,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 6.0,
+          "n": 344,
+          "median_pct": 61.1,
+          "mean_pct": 58.6,
+          "censored_share": 0.212,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 8.0,
+          "n": 94,
+          "median_pct": 49.5,
+          "mean_pct": 49.4,
+          "censored_share": 0.117,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 12.0,
+          "n": 65,
+          "median_pct": 51.8,
+          "mean_pct": 49.3,
+          "censored_share": 0.046,
+          "interpolated": false
+        }
+      ],
+      "holdout": {
+        "n_test": 8720,
+        "fitted_mae_pct": 19.17,
+        "shipped_mae_pct": 27.12,
+        "improvement_pct_points": 7.94,
+        "fitted_bias_pct": 1.02
+      },
+      "holdout_excluding_capped": {
+        "n_test": 8720,
+        "fitted_mae_pct": 19.22,
+        "shipped_mae_pct": 27.12,
+        "improvement_pct_points": 7.9,
+        "fitted_bias_pct": 0.94
+      }
+    },
+    "RES1-2S": {
+      "n": 7302,
+      "censored_share": 0.201,
+      "shipped_curve_key": "RES1-2S-NB",
+      "fitted_curve": [
+        [
+          1.0,
+          26.5
+        ],
+        [
+          2.0,
+          38.1
+        ],
+        [
+          3.0,
+          42.6
+        ],
+        [
+          4.0,
+          46.9
+        ],
+        [
+          6.0,
+          45.4
+        ],
+        [
+          8.0,
+          30.8
+        ],
+        [
+          12.0,
+          31.2
+        ]
+      ],
+      "fitted_curve_excluding_capped": [
+        [
+          1.0,
+          26.1
+        ],
+        [
+          2.0,
+          38.5
+        ],
+        [
+          3.0,
+          44.3
+        ],
+        [
+          4.0,
+          47.3
+        ],
+        [
+          6.0,
+          46.7
+        ],
+        [
+          8.0,
+          28.8
+        ],
+        [
+          12.0,
+          32.9
+        ]
+      ],
+      "knot_detail": [
+        {
+          "depth_ft": 0.5,
+          "n": 15,
+          "median_pct": null,
+          "interpolated": true
+        },
+        {
+          "depth_ft": 1.0,
+          "n": 3173,
+          "median_pct": 26.5,
+          "mean_pct": 28.8,
+          "censored_share": 0.083,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 2.0,
+          "n": 1682,
+          "median_pct": 38.1,
+          "mean_pct": 40.6,
+          "censored_share": 0.184,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 3.0,
+          "n": 1024,
+          "median_pct": 42.6,
+          "mean_pct": 44.7,
+          "censored_share": 0.313,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 4.0,
+          "n": 636,
+          "median_pct": 46.9,
+          "mean_pct": 48.7,
+          "censored_share": 0.434,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 6.0,
+          "n": 549,
+          "median_pct": 45.4,
+          "mean_pct": 47.0,
+          "censored_share": 0.43,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 8.0,
+          "n": 104,
+          "median_pct": 30.8,
+          "mean_pct": 33.5,
+          "censored_share": 0.279,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 12.0,
+          "n": 80,
+          "median_pct": 31.2,
+          "mean_pct": 34.4,
+          "censored_share": 0.275,
+          "interpolated": false
+        }
+      ],
+      "holdout": {
+        "n_test": 7302,
+        "fitted_mae_pct": 16.93,
+        "shipped_mae_pct": 24.45,
+        "improvement_pct_points": 7.53,
+        "fitted_bias_pct": 1.95
+      },
+      "holdout_excluding_capped": {
+        "n_test": 7302,
+        "fitted_mae_pct": 16.95,
+        "shipped_mae_pct": 24.45,
+        "improvement_pct_points": 7.51,
+        "fitted_bias_pct": 2.15
+      }
+    },
+    "RES3-multi": {
+      "n": 693,
+      "censored_share": 0.401,
+      "shipped_curve_key": "generic",
+      "fitted_curve": [
+        [
+          1.0,
+          19.7
+        ],
+        [
+          2.0,
+          32.9
+        ],
+        [
+          3.0,
+          33.1
+        ],
+        [
+          6.0,
+          29.0
+        ]
+      ],
+      "fitted_curve_excluding_capped": [
+        [
+          1.0,
+          17.9
+        ],
+        [
+          2.0,
+          30.6
+        ],
+        [
+          3.0,
+          39.5
+        ]
+      ],
+      "knot_detail": [
+        {
+          "depth_ft": 0.5,
+          "n": 4,
+          "median_pct": null,
+          "interpolated": true
+        },
+        {
+          "depth_ft": 1.0,
+          "n": 312,
+          "median_pct": 19.7,
+          "mean_pct": 22.4,
+          "censored_share": 0.311,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 2.0,
+          "n": 199,
+          "median_pct": 32.9,
+          "mean_pct": 33.9,
+          "censored_share": 0.407,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 3.0,
+          "n": 96,
+          "median_pct": 33.1,
+          "mean_pct": 36.9,
+          "censored_share": 0.531,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 4.0,
+          "n": 23,
+          "median_pct": null,
+          "interpolated": true
+        },
+        {
+          "depth_ft": 6.0,
+          "n": 49,
+          "median_pct": 29.0,
+          "mean_pct": 28.8,
+          "censored_share": 0.694,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 8.0,
+          "n": 7,
+          "median_pct": null,
+          "interpolated": true
+        },
+        {
+          "depth_ft": 12.0,
+          "n": 2,
+          "median_pct": null,
+          "interpolated": true
+        }
+      ],
+      "holdout": {
+        "n_test": 693,
+        "fitted_mae_pct": 13.93,
+        "shipped_mae_pct": 14.93,
+        "improvement_pct_points": 1.01,
+        "fitted_bias_pct": -1.66
+      },
+      "holdout_excluding_capped": {
+        "n_test": 693,
+        "fitted_mae_pct": 14.88,
+        "shipped_mae_pct": 14.93,
+        "improvement_pct_points": 0.05,
+        "fitted_bias_pct": -3.0
+      }
+    },
+    "NONRES": {
+      "n": 535,
+      "censored_share": 0.275,
+      "shipped_curve_key": "generic",
+      "fitted_curve": [
+        [
+          1.0,
+          10.4
+        ],
+        [
+          2.0,
+          14.8
+        ],
+        [
+          3.0,
+          19.6
+        ],
+        [
+          4.0,
+          19.0
+        ]
+      ],
+      "fitted_curve_excluding_capped": [
+        [
+          1.0,
+          9.9
+        ],
+        [
+          2.0,
+          13.3
+        ],
+        [
+          3.0,
+          18.5
+        ]
+      ],
+      "knot_detail": [
+        {
+          "depth_ft": 0.5,
+          "n": 6,
+          "median_pct": null,
+          "interpolated": true
+        },
+        {
+          "depth_ft": 1.0,
+          "n": 266,
+          "median_pct": 10.4,
+          "mean_pct": 14.8,
+          "censored_share": 0.199,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 2.0,
+          "n": 114,
+          "median_pct": 14.8,
+          "mean_pct": 20.7,
+          "censored_share": 0.281,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 3.0,
+          "n": 62,
+          "median_pct": 19.6,
+          "mean_pct": 26.9,
+          "censored_share": 0.306,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 4.0,
+          "n": 34,
+          "median_pct": 19.0,
+          "mean_pct": 28.0,
+          "censored_share": 0.412,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 6.0,
+          "n": 28,
+          "median_pct": null,
+          "interpolated": true
+        },
+        {
+          "depth_ft": 8.0,
+          "n": 16,
+          "median_pct": null,
+          "interpolated": true
+        },
+        {
+          "depth_ft": 12.0,
+          "n": 8,
+          "median_pct": null,
+          "interpolated": true
+        }
+      ],
+      "holdout": {
+        "n_test": 535,
+        "fitted_mae_pct": 12.79,
+        "shipped_mae_pct": 14.64,
+        "improvement_pct_points": 1.84,
+        "fitted_bias_pct": -10.69
+      },
+      "holdout_excluding_capped": {
+        "n_test": 535,
+        "fitted_mae_pct": 12.81,
+        "shipped_mae_pct": 14.64,
+        "improvement_pct_points": 1.82,
+        "fitted_bias_pct": -11.21
+      }
+    },
+    "ALL": {
+      "n": 17365,
+      "censored_share": 0.15,
+      "shipped_curve_key": "generic",
+      "fitted_curve": [
+        [
+          0.5,
+          2.8
+        ],
+        [
+          1.0,
+          31.9
+        ],
+        [
+          2.0,
+          43.6
+        ],
+        [
+          3.0,
+          47.4
+        ],
+        [
+          4.0,
+          49.8
+        ],
+        [
+          6.0,
+          48.3
+        ],
+        [
+          8.0,
+          34.5
+        ],
+        [
+          12.0,
+          35.7
+        ]
+      ],
+      "fitted_curve_excluding_capped": [
+        [
+          0.5,
+          2.5
+        ],
+        [
+          1.0,
+          32.0
+        ],
+        [
+          2.0,
+          44.5
+        ],
+        [
+          3.0,
+          49.1
+        ],
+        [
+          4.0,
+          51.0
+        ],
+        [
+          6.0,
+          50.7
+        ],
+        [
+          8.0,
+          34.5
+        ],
+        [
+          12.0,
+          39.5
+        ]
+      ],
+      "knot_detail": [
+        {
+          "depth_ft": 0.5,
+          "n": 34,
+          "median_pct": 2.8,
+          "mean_pct": 17.8,
+          "censored_share": 0.118,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 1.0,
+          "n": 8645,
+          "median_pct": 31.9,
+          "mean_pct": 33.5,
+          "censored_share": 0.065,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 2.0,
+          "n": 3995,
+          "median_pct": 43.6,
+          "mean_pct": 45.4,
+          "censored_share": 0.158,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 3.0,
+          "n": 2090,
+          "median_pct": 47.4,
+          "mean_pct": 48.7,
+          "censored_share": 0.255,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 4.0,
+          "n": 1176,
+          "median_pct": 49.8,
+          "mean_pct": 51.7,
+          "censored_share": 0.366,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 6.0,
+          "n": 979,
+          "median_pct": 48.3,
+          "mean_pct": 49.6,
+          "censored_share": 0.366,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 8.0,
+          "n": 221,
+          "median_pct": 34.5,
+          "mean_pct": 38.8,
+          "censored_share": 0.208,
+          "interpolated": false
+        },
+        {
+          "depth_ft": 12.0,
+          "n": 155,
+          "median_pct": 35.7,
+          "mean_pct": 39.4,
+          "censored_share": 0.206,
+          "interpolated": false
+        }
+      ],
+      "holdout": {
+        "n_test": 17365,
+        "fitted_mae_pct": 18.89,
+        "shipped_mae_pct": 24.35,
+        "improvement_pct_points": 5.46,
+        "fitted_bias_pct": 1.29
+      },
+      "holdout_excluding_capped": {
+        "n_test": 17365,
+        "fitted_mae_pct": 18.92,
+        "shipped_mae_pct": 24.35,
+        "improvement_pct_points": 5.44,
+        "fitted_bias_pct": 2.09
+      }
+    }
+  }
+}
