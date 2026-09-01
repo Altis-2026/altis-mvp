@@ -42,6 +42,37 @@ except ImportError:  # pragma: no cover - import path guard
     )
 
 
+def acquisition_times_utc(bbox, start_date, end_date, orbit_passes=None):
+    """
+    Every Sentinel-1 acquisition time in the window, as naive-UTC ISO strings.
+
+    Needed because "did we see the crest?" cannot be answered from a date
+    range — only from the instants the sensor actually looked. Restricted to
+    the orbit passes the detector used, so the answer describes the imagery
+    the result was built from rather than everything in the archive.
+    """
+    import datetime as dt
+    import ee
+
+    coll = (ee.ImageCollection("COPERNICUS/S1_GRD")
+            .filterBounds(ee.Geometry.Rectangle(bbox))
+            .filterDate(start_date, end_date)
+            .filter(ee.Filter.eq('instrumentMode', 'IW'))
+            .filter(ee.Filter.listContains(
+                'transmitterReceiverPolarisation', 'VV')))
+    if orbit_passes:
+        coll = coll.filter(ee.Filter.inList(
+            'orbitProperties_pass', list(orbit_passes)))
+    stamps = coll.aggregate_array('system:time_start').getInfo() or []
+    seen = []
+    for t in sorted(set(stamps)):
+        iso = dt.datetime.utcfromtimestamp(t / 1000).replace(
+            microsecond=0).isoformat()
+        if iso not in seen:
+            seen.append(iso)
+    return seen
+
+
 def build_event_image(event_config, verbose=True):
     """
     Assemble the combined flood-depth image for one event configuration.
@@ -190,8 +221,21 @@ def build_event_image(event_config, verbose=True):
         # whole-bbox histogram on every sampling batch (see guarded_otsu).
         precompute_thresholds=True)
 
+    # Acquisition instants, for the crest-timing disclosure. Restricted to the
+    # orbits actually used so the answer describes this result's imagery.
+    used_orbits = sorted({orbit} | set(orbit_stack.keys()))
+    try:
+        acq_times = acquisition_times_utc(
+            bbox, event_config['post_start'], event_config['post_end'],
+            orbit_passes=used_orbits)
+    except Exception as exc:  # pragma: no cover - provenance must not fail a run
+        say(f"  Could not read acquisition times ({exc}); crest timing will "
+            f"report 'unknown' rather than assume the crest was seen.")
+        acq_times = []
+
     meta = {
         'dem_resolution_m':        dem_res,
+        'acquisition_times_utc':   acq_times,
         'sar_orbit_pass':          orbit,
         'pre_event_scene_count':   pre_count,
         'post_event_scene_count':  post_count,

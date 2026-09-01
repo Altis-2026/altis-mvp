@@ -800,6 +800,39 @@ SEVERITY_CURVES = {
 }
 
 # CONTENTS curves: % of CONTENTS value, reported separately from structure.
+# ─── CREST TIMING ─────────────────────────────────────────────────────────────
+# Sentinel-1 revisits every 6-12 days; a flood crest lasts hours to days. When
+# they do not line up the detector correctly reports "no water" for a property
+# that was under three feet of it, and nothing in the output says so. That is
+# the failure mode that turns into a wrongly denied claim, and Hurricane Ian was
+# dropped as a demo event because of it (DETECTION_LIMITS section 4).
+#
+# pipeline/crest_timing.py reads USGS stream gauges - free, 15-minute stage -
+# and compares when each gauge crested against the acquisition times the
+# detector actually used.
+#
+# MEASURED ON OUR OWN EVENTS. Brazos at Richmond crested 55.19 ft at
+# 2017-09-01 05:15 UTC. The nearest Sentinel-1 pass was 2017-08-30 12:22 UTC,
+# about 41 hours EARLIER, and the next was 4.3 days later. We photographed the
+# rising limb and looked away while the water kept climbing. That is a partial
+# explanation for the -2.64 ft depth bias measured in DETECTION_LIMITS
+# section 10, and it was invisible before this module existed.
+CREST = {
+    # A pass within this many hours of the crest counts as having observed it.
+    # 24 h is deliberately generous: large-river flood peaks are broad, and a
+    # tighter window would report `missed` for passes that saw most of the
+    # water. Tighten it for flashy urban catchments, where a crest can pass in
+    # a few hours.
+    'tolerance_hours': 24,
+
+    # Refuse to convert "no flood detected" into a Remote-Deny unless the crest
+    # was actually observed. The asymmetry is the point: an unnecessary
+    # inspection costs a few hundred dollars, a wrongly denied claim costs a
+    # policyholder their recovery and the carrier its licence to operate that
+    # way. Set False only with a documented reason.
+    'gate_remote_deny': True,
+}
+
 # ─── SEVERITY CURVES FITTED TO REAL CLAIMS ───────────────────────────────────
 # The SEVERITY_CURVES above are published HAZUS-style NATIONAL shapes. They had
 # never been checked against a claim this project holds. These are fitted to

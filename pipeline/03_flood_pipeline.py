@@ -7,6 +7,7 @@
 #   5. Urban density layer output for confidence penalty in Step 4
 import sys
 import os
+import datetime as dt
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import ee
@@ -16,6 +17,7 @@ from config import (GEE_PROJECT, HARVEY, BRAZOS, OUTPUT_DIR, SAR, OPTICAL,
                     DOUBLE_BOUNCE)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
+import crest_timing
 
 # Detection science lives in a shared, importable module so the live backend
 # pipeline runs the identical algorithm. This script just orchestrates it over
@@ -62,6 +64,29 @@ def run_flood_pipeline(event_config):
     hand_source = meta['hand_source']
     vh_post_n   = meta['vh_post_scene_count']
     vh_base_n   = meta['vh_baseline_scene_count']
+
+    # ── Did the satellite actually see the crest? A "no flood detected" from a
+    #    pass that flew days off the peak is not evidence of a dry property,
+    #    and shipping it as though it were is what produces a wrongly denied
+    #    claim. Network failure here degrades to 'unknown', which is treated as
+    #    "not safe to deny" — never as "fine".
+    print("\nChecking whether the acquisitions caught the flood crest "
+          "(USGS stream gauges)...")
+    try:
+        gauge_peaks = crest_timing.fetch_gauge_peaks(
+            event_config['bbox'], event_config['post_start'],
+            event_config['post_end'])
+        acq = [dt.datetime.fromisoformat(t)
+               for t in meta.get('acquisition_times_utc', [])]
+        crest = crest_timing.assess(acq, gauge_peaks)
+    except Exception as exc:
+        crest = {'crest_observed': 'unknown',
+                 'reason': f'crest check failed: {exc}', 'gauges': []}
+    print(f"  crest_observed: {crest['crest_observed'].upper()} — "
+          f"{crest.get('reason', '')}")
+    if not crest_timing.safe_to_deny(crest):
+        print("  → a 'no flood detected' here is NOT safe to turn into a "
+              "Remote-Deny; the absence of signal is uninformative.")
 
     # ── Phase 2: structure attributes. Snapping the sample to the structure's
     #    own footprint replaces a 50m circle that averaged ~33x the building's
@@ -298,6 +323,15 @@ def run_flood_pipeline(event_config):
         'post_event_scene_count': post_count,
         'pre_event_window':      [event_config['pre_start'], event_config['pre_end']],
         'post_event_window':     [event_config['post_start'], event_config['post_end']],
+        'acquisition_times_utc': meta.get('acquisition_times_utc', []),
+        # Crest-timing disclosure. 'unknown' means we could not check, which is
+        # NOT the same as 'observed' and must not be read as one.
+        'crest_observed':        crest.get('crest_observed'),
+        'crest_reason':          crest.get('reason'),
+        'crest_worst_gap_hours': crest.get('worst_gap_hours'),
+        'crest_gauges_observed': crest.get('gauges_observed'),
+        'crest_gauges_total':    crest.get('gauges_total'),
+        'safe_to_remote_deny':   crest_timing.safe_to_deny(crest),
         'wse_radius_m':          event_config['wse_radius_m'],
         'threshold_method':      'Otsu adaptive + range guard',
         'otsu_water_db_range':   [SAR['water_db_min'], SAR['water_db_max']],
