@@ -163,10 +163,25 @@ def calculate_confidence(row, event_config):
     return confidence_breakdown(row, event_config)['final_score']
 
 
-def classify_triage(row, thresholds=TRIAGE):
+def classify_triage(row, thresholds=TRIAGE, crest_observed=None):
     """
     Assign property to one of four triage categories.
     Returns (impact_class, recommended_action).
+
+    `crest_observed` is the event-level verdict from `crest_timing.assess`
+    ('observed' / 'partial' / 'missed' / 'unknown'). Anything other than
+    'observed' BLOCKS Remote-Deny and downgrades it to Review.
+
+    WHY THIS GATE EXISTS. Remote-Deny is the only class that acts on the
+    ABSENCE of a signal, so it is the only one whose correctness depends on the
+    satellite having actually looked at the right moment. Sentinel-1 revisits
+    every 6-12 days and a crest lasts hours; measured on our own events, the
+    Brazos crested 40.9 hours after the nearest pass. A "no flood detected"
+    from that pass is not evidence the property stayed dry, and turning it into
+    a denial is how a genuinely flooded house gets refused.
+
+    Passing None keeps the historical behaviour, so callers that have not been
+    updated do not silently change — but the batch pipeline supplies it.
     """
     depth = row['max_depth_ft']
     pct   = row['pct_flooded']
@@ -183,6 +198,12 @@ def classify_triage(row, thresholds=TRIAGE):
     if (depth <= t['remote_deny_depth_ft'] and
             pct   <= t['remote_deny_pct'] and
             conf  >= t['remote_deny_conf']):
+        if crest_observed is not None and crest_observed != 'observed':
+            return ('Review',
+                    'Flag for manual review — no flooding detected, but the '
+                    'satellite did not observe the flood crest '
+                    f'({crest_observed}), so the absence of a signal is not '
+                    'evidence this property stayed dry')
         return 'Remote-Deny', 'Deny remotely — no significant flooding detected by satellite'
 
     if (t['remote_approve_min_depth'] <= depth <= t['remote_approve_max_depth'] and

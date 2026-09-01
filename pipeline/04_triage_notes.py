@@ -162,6 +162,35 @@ def add_adjuster_notes(df):
     return df
 
 
+def _crest_verdict(event_id):
+    """
+    The crest-timing verdict recorded by this event's detection run.
+
+    Returns 'unknown' when the manifest is missing, unreadable, or predates the
+    crest check. That is the safe direction: 'unknown' blocks Remote-Deny, so a
+    stale or absent manifest cannot silently re-enable denials on a flood the
+    satellite never observed.
+
+    write_manifest nests each stage, so the value lives at
+    stages.flood_detection.crest_observed. Reading the top level instead
+    returns None and pins every event to 'unknown', which would block
+    Remote-Deny forever — safe, but it makes the gate useless rather than
+    selective, so the path is asserted by test rather than assumed.
+    """
+    path = os.path.join(OUTPUT_DIR, f'{event_id}_manifest.json')
+    try:
+        with open(path) as fh:
+            manifest = json.load(fh)
+    except (OSError, ValueError):
+        return 'unknown'
+    stages = manifest.get('stages')
+    if isinstance(stages, dict):
+        detection = stages.get('flood_detection')
+        if isinstance(detection, dict) and detection.get('crest_observed'):
+            return detection['crest_observed']
+    return 'unknown'
+
+
 def run_triage_pipeline(event_config):
     event_id, event_name = event_config['event_id'], event_config['event_name']
 
@@ -213,8 +242,18 @@ def run_triage_pipeline(event_config):
     print(f"  Mean: {df['confidence_score'].mean():.0f}%  "
           f"Urban-penalized: {urban_penalized}")
 
+    # The detection run recorded whether the satellite actually observed the
+    # flood crest. Remote-Deny is the only class that acts on the ABSENCE of a
+    # signal, so it is the only one whose correctness depends on that. Anything
+    # other than 'observed' downgrades those to Review rather than denying on a
+    # pass that flew days off the peak.
+    crest = _crest_verdict(event_id)
     print("\nStep 2: Triage classification...")
-    results = df.apply(lambda r: classify_triage(r, TRIAGE), axis=1)
+    if crest != 'observed':
+        print(f"  crest_observed = {crest!r} → Remote-Deny is BLOCKED for this "
+              f"event; those properties become Review")
+    results = df.apply(lambda r: classify_triage(r, TRIAGE,
+                                                 crest_observed=crest), axis=1)
     df['impact_class']       = results.apply(lambda x: x[0])
     df['recommended_action'] = results.apply(lambda x: x[1])
 
