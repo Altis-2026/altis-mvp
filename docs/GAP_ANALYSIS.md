@@ -134,11 +134,30 @@ stories and basement, with structure/contents split and uncertainty intervals.
 **Gap:** the curves are **published national shapes, not fitted to any book.**
 We hold 3,135 real paid Brazos claims and have never fitted to them.
 
-**How to close:** fit depth-damage curves to actual paid amounts. The data is
-already in the repo. This is a **days-long task, not blocked by anything**, and
-converts "national tables say" into "claims like this one actually cost."
-**PROJECT_STATE §7 item 5 — still open, and probably the highest
-value-per-hour item on this whole list.**
+**DONE — and the national curves were measurably wrong.** Fitted to 25,011
+real Harvey NFIP claims (`validation/fit_damage_curves.py`). Held-out MAE, zips
+disjoint between train and test:
+
+| segment | fitted | shipped | improvement |
+|---|---|---|---|
+| RES1-1S | 19.17pp | 27.12pp | **+7.94pp** |
+| RES1-2S | 16.93pp | 24.45pp | **+7.53pp** |
+| RES3-multi | 13.93pp | 14.93pp | +1.01pp |
+| NONRES | 12.79pp | 14.64pp | +1.84pp |
+
+The national shapes are wrong in both directions: at 1 ft a single-storey home
+actually lost **38.1%** of value against HAZUS's **16.0%**; at 12 ft it lost
+51.8% against HAZUS's 68.8%.
+
+**Shipped DISABLED** (`SEVERITY['use_fitted_curves'] = False`). Enabling it
+mixes calibration scales — HAZUS measures physical damage fraction, the fit
+measures *paid* fraction conditional on a claim being filed — and only RES1
+no-basement could be fitted. That inverts two physically true invariants
+(manufactured homes stop being more vulnerable; contents stops exceeding
+structure at shallow depth), both caught by existing phase-3 tests.
+
+**Remaining work to turn it on:** fit RES2, the basement variants and the
+contents curves on the same paid-claims basis, then re-run the invariant tests.
 
 ---
 
