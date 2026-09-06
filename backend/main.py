@@ -1060,6 +1060,41 @@ def property_draft_note(body: dict = Body(...)):
     return draft_adjuster_note(row, body.get("event_label") or None)
 
 
+# ── 3D property inspect ───────────────────────────────────────────────────────
+
+@app.post("/api/buildings")
+def buildings_for_view(body: dict = Body(...)):
+    """
+    Building footprints + estimated heights for the properties in the globe's
+    current viewport, powering the 3D property-inspect view.
+
+    Body: {"properties": [{"property_id", "latitude", "longitude"}, …]}
+
+    Always returns a renderable answer. When OpenStreetMap is unreachable or
+    the viewport is too wide, `available` is false, `reason` says why, and
+    every property still comes back with an illustrative placeholder box — the
+    3D view degrades, it never goes blank. Every record carries
+    `footprint_source` and `height_source` so the UI can state plainly which
+    shapes are real and which are estimated; heights in particular are
+    inferred except where OSM tags them (see config.BUILDINGS).
+
+    Visualization only: nothing here feeds triage, severity, or calibration.
+    """
+    from backend.buildings import building_context
+
+    props = body.get("properties")
+    if not isinstance(props, list) or not props:
+        raise HTTPException(400, "properties (a non-empty list) is required.")
+
+    try:
+        return building_context(props)
+    except Exception as e:
+        # Scenery must never take down the map: report the failure and let the
+        # frontend fall back to its own placeholder boxes.
+        return {"available": False, "reason": f"Footprint lookup failed: {e}",
+                "buildings": [], "summary": {"requested": len(props), "rendered": 0}}
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/auth-check")

@@ -65,6 +65,15 @@ export const api = {
   /* Pre-event flood risk score (1–5), no event date needed */
   getRiskScore:   (id)     => get(`/portfolio/${id}/risk-score`),
 
+  /* Building footprints + estimated heights for the 3D property-inspect view.
+     Never rejects on a footprint-service failure: the backend answers with
+     `available: false` plus placeholder boxes, and the globe renders those. */
+  getBuildings: (properties, signal) =>
+    authFetch('/buildings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ properties }), signal,
+    }).then(r => r.json()),
+
   /* Fast PIF zone summary — pure bbox math, no GEE, returns instantly */
   zoneSummary: (id, bbox) =>
     authFetch(`/portfolio/${id}/zone-summary`, {
