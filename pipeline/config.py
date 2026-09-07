@@ -321,3 +321,140 @@ ENSEMBLE = {
     'dem_implausible_rel_ft':   15.0,  # >= this ft above local min: flood implausible
     'downgrade_to_review':      True,
 }
+# ─── PROPERTY-LEVEL 3D BUILDING CONTEXT (Round 10) ───────────────────────────
+# Powers the globe's "3D inspect" mode: a real building footprint under each
+# property, extruded to an estimated height, with the modeled flood depth drawn
+# as a water plane cutting through it. Purely a visualization input — nothing
+# here feeds triage, severity, or calibration.
+#
+# Footprints come from OpenStreetMap via Overpass. OSM is the only free source
+# that covers all three demo events (Houston, Port Charlotte, and Lismore all
+# have dense building coverage); Google Open Buildings v3 — already used in
+# flood_detect.load_dem() to mask roofs — deliberately excludes the US and the
+# rest of the Global North, so it cannot serve US portfolios on its own.
+#
+# HEIGHT IS AN ESTIMATE, and the per-property `height_source` says which rung
+# of this ladder produced it, so the UI can label it honestly:
+#   osm_height  — an explicit OSM `height` tag (metres). Real measurement.
+#   osm_levels  — an OSM `building:levels` tag × storey height. Real storey count.
+#   typology    — inferred from the OSM building class + footprint area.
+#   default     — no footprint matched; the fixed one-storey placeholder.
+# In the US, storey tags are effectively absent (0-4 per ~1,400 buildings in the
+# Harvey and Ian study areas), so most US properties land on `typology`. Lismore
+# tags ~33%. Never present a typology height as a surveyed structure.
+BUILDINGS = {
+    # Footprint↔property join. A geocoder lands on a rooftop or a street
+    # centroid; beyond this radius a "nearest" footprint is more likely the
+    # neighbour's house than this policy's, so the match is rejected and the
+    # property falls back to the placeholder box.
+    'match_radius_m':        40.0,
+
+    # Storey height and the class→storeys table behind the `typology` rung.
+    'storey_height_m':        3.2,
+    'default_levels':         1,
+    'levels_by_class': {
+        'house': 1, 'detached': 1, 'bungalow': 1, 'semidetached_house': 1,
+        'terrace': 2, 'residential': 2, 'apartments': 3, 'dormitory': 3,
+        'hotel': 4, 'commercial': 2, 'office': 3, 'retail': 1,
+        'supermarket': 1, 'warehouse': 1, 'industrial': 1, 'school': 2,
+        'university': 3, 'hospital': 4, 'church': 2, 'civic': 2,
+        'garage': 1, 'garages': 1, 'shed': 1, 'hut': 1, 'carport': 1,
+        'roof': 1, 'yes': 1,
+    },
+    # A large footprint on an untagged building is more likely a multi-storey
+    # block than a bungalow: (min area m², storeys) applied when the class
+    # table would otherwise say one storey. Checked largest-first.
+    'area_levels_floor': [(2500.0, 3), (900.0, 2)],
+    'max_levels':            60,
+
+    # Footprint sanity filters — reject sheds/awnings and mall-sized polygons
+    # before they can win a nearest-centroid match against a house.
+    'min_footprint_area_m2':  15.0,
+    'max_footprint_area_m2':  20000.0,
+
+    # Tier-1 placeholder box (metres, across × along) used when no footprint
+    # matches — an illustrative shape, labelled as such in the UI.
+    'placeholder_width_m':    11.0,
+    'placeholder_depth_m':    14.0,
+
+    # Overpass. Mirrors are tried in order; the main overpass-api.de endpoint
+    # rate-limits hard under demo load, so a mirror leads. One request covers a
+    # whole viewport, and results are cached in SQLite by rounded bbox.
+    'overpass_endpoints': [
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass-api.de/api/interpreter',
+        'https://overpass.private.coffee/api/interpreter',
+    ],
+    'overpass_timeout_s':     30,
+    'overpass_retries':        2,
+    # Guard against a portfolio-wide viewport pulling a whole city: a bbox
+    # larger than this is refused rather than served slowly.
+    'max_bbox_deg':           0.25,
+    'cache_ttl_hours':        720,     # OSM buildings change slowly (30 days)
+    'max_properties':        400,      # per /api/buildings request
+}
+
+# ─── GOOGLE MAPS PLATFORM (Round 10) ─────────────────────────────────────────
+# One key serves both integrations below. Set GOOGLE_MAPS_API_KEY in .env (and
+# in the backend host's environment for deploys). Without it, both features
+# report themselves unavailable and the UI hides them — nothing breaks.
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
+
+# ─── STREET-LEVEL IMAGERY (free) ─────────────────────────────────────────────
+# Street View gives a desk adjuster the two things a depth number can't: what
+# kind of structure this is, and how far the finished floor sits above grade.
+# Depth measured above GROUND is not depth above the FINISHED FLOOR — 3 ft
+# against a slab-on-grade house is an interior gut, the same 3 ft against a
+# house on 4 ft of piers is a wet crawlspace and no interior loss at all. That
+# distinction is currently invisible to severity.py, and it is readable at a
+# glance from the street.
+#
+# COST: zero, by construction. Only two Google surfaces are used here, and
+# Google's own pricing table lists both as unlimited/no-charge:
+#   - Street View Static *metadata* ("Street View Metadata" SKU: Unlimited)
+#     — availability + capture date + pano id. Consumes no quota.
+#   - Maps Embed API ("Embed" SKU: Unlimited) — the interactive panorama,
+#     rendered client-side in an iframe.
+# The Street View Static *image* API is a DIFFERENT, billable SKU (10k/month
+# free, then charged). It is deliberately not used.
+#
+# IMPORTANT — this is a PRE-EVENT BASELINE, never damage evidence. Google does
+# not re-drive a neighbourhood after a hurricane, so the panorama predates the
+# flood. The UI must label it with its capture date and never imply otherwise.
+STREETVIEW = {
+    'search_radius_m':   60,     # how far Google may look for a nearby pano
+    'timeout_s':         10,
+    'cache_ttl_hours':   720,    # coverage changes slowly (30 days)
+    'max_properties':    200,    # per /api/streetview request
+}
+
+# ─── SOLAR API — BUILDING INSIGHTS (billable; OFF BY DEFAULT) ─────────────────
+# Returns per-roof-segment geometry (pitch, azimuth, plane height, area) from
+# Google's high-resolution aerial DSM. Two uses here:
+#   1. a MEASURED building height, replacing the typology guess in
+#      building_context.estimate_height_m for properties it covers, and
+#   2. real roof pitch/azimuth, so the 3D view can shape a roof from data
+#      instead of a procedural gable.
+#
+# THIS IS THE ONLY ENDPOINT IN ALTIS THAT CAN COST MONEY, so it is disabled
+# unless ENABLE_SOLAR_API is explicitly set, and it carries a hard per-request
+# call budget on top. Google's pricing: 10,000 requests/month free, then
+# $10.00/1,000. At the default budget below a full viewport cannot exceed the
+# free tier in normal use — but the flag, not the budget, is the real guard.
+#
+# DATUM WARNING: `planeHeightAtCenterMeters` is height above SEA LEVEL, not
+# above the ground at the building (verified against Google's API reference —
+# a single-storey Houston house reads ~18 m because that is the neighbourhood's
+# elevation). A building height therefore requires subtracting a ground
+# elevation from the same point; see solar.building_height_m.
+#
+# COVERAGE is real but not global — Australia (the Lismore demo) returns
+# NOT_FOUND. Callers must treat absence as normal and fall back.
+SOLAR = {
+    'enabled':           os.getenv('ENABLE_SOLAR_API', '').strip().lower()
+                         in ('1', 'true', 'yes', 'on'),
+    'required_quality':  ('HIGH', 'MEDIUM'),  # ignore BASE — too coarse to trust
+    'max_calls_per_request': 25,   # hard budget guard per API call
+    'timeout_s':         12,
+    'cache_ttl_hours':   2160,     # roof geometry is static (90 days)
+}

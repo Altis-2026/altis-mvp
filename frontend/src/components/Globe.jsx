@@ -3,6 +3,8 @@ import { useIsMobile } from '../hooks/useIsMobile.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { getTheme } from '../theme.js';
 import Tutorial from './Tutorial.jsx';
+import { api } from '../services/api.js';
+import { buildingFeatures, placeholderRing } from '../utils/buildings.js';
 
 /* Globe atmosphere per theme. Dark keeps the deep-space starfield brand look;
    light turns the surrounding space into a soft daylight sky so the whole
@@ -46,6 +48,19 @@ const CAT_COLORS = {
   '2': '#FFB347', '1': '#FFD97A', 'TS': '#A8D4E6', 'TD': '#6B8FA3',
 };
 
+/* ── 3D property inspect ─────────────────────────────────────────────────────
+   An additional mode, not a replacement: the flat pin/cluster view stays the
+   default at portfolio scale, where thousands of pins render fine and extruded
+   geometry would not. Buildings appear only once the camera is inside a
+   neighbourhood, and only for the properties actually in the viewport, which
+   is the same principle the existing clustering and the address-label reveal
+   (minzoom 12.5) already follow. */
+const INSPECT_MIN_ZOOM = 14.5;   // below this, buildings are not drawn at all
+const INSPECT_FLY_ZOOM = 18.6;   // where the toggle takes you from altitude
+const INSPECT_PITCH = 62;        // enough to see water up a wall
+const MAX_BUILDINGS = 220;       // per viewport — the cap that keeps this fast
+const TERRAIN_EXAGGERATION = 1.4;
+
 export default function Globe({
   properties = [],
   portfolioProperties = [],
@@ -68,6 +83,14 @@ export default function Globe({
   const [showTrack, setShowTrack] = useState(true);
   const [showHeat,  setShowHeat]  = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.5);
+  const [inspect3D, setInspect3D] = useState(false);
+  const [buildingStatus, setBuildingStatus] = useState(null); // {loading,count,…}
+  /* Latest properties, readable from map event handlers without re-binding
+     them on every data change. */
+  const allPropsRef  = useRef([]);
+  const inspectRef   = useRef(false);
+  const buildingReq  = useRef(0);      // drops responses from stale viewports
+  const buildingTimer = useRef(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [guideVisible, setGuideVisible] = useState(false); // faded-in yet?
   const [guideGone,    setGuideGone]    = useState(false); // fully dismissed
@@ -430,6 +453,62 @@ export default function Globe({
         }
       });
 
+      /* ── 3D property inspect: one source, three extrusion layers.
+         Walls and roof slabs are coloured by triage decision through a
+         data-driven expression — the reason this is built from ordinary
+         fill-extrusions rather than a mesh layer. Water is added last so it
+         blends over the walls behind it. All three are empty and invisible
+         until inspect mode is switched on. */
+      map.addSource('buildings-3d', { type: 'geojson', data: emptyFC() });
+
+      map.addLayer({
+        id:     'building-walls',
+        type:   'fill-extrusion',
+        source: 'buildings-3d',
+        filter: ['==', ['get', 'kind'], 'wall'],
+        layout: { visibility: 'none' },
+        paint: {
+          'fill-extrusion-color':   ['get', 'color'],
+          'fill-extrusion-base':    ['get', 'base'],
+          'fill-extrusion-height':  ['get', 'height'],
+          'fill-extrusion-opacity': 0.94,
+          'fill-extrusion-vertical-gradient': true,
+        }
+      });
+
+      map.addLayer({
+        id:     'building-roofs',
+        type:   'fill-extrusion',
+        source: 'buildings-3d',
+        filter: ['==', ['get', 'kind'], 'roof'],
+        layout: { visibility: 'none' },
+        paint: {
+          'fill-extrusion-color':   ['get', 'color'],
+          'fill-extrusion-base':    ['get', 'base'],
+          'fill-extrusion-height':  ['get', 'height'],
+          // Fully opaque: the roof slabs are nested solids (see gableSlabs),
+          // so any translucency would composite them against each other and
+          // band the roof with darker rings.
+          'fill-extrusion-opacity': 1,
+          'fill-extrusion-vertical-gradient': false,
+        }
+      });
+
+      map.addLayer({
+        id:     'building-water',
+        type:   'fill-extrusion',
+        source: 'buildings-3d',
+        filter: ['==', ['get', 'kind'], 'water'],
+        layout: { visibility: 'none' },
+        paint: {
+          'fill-extrusion-color':   '#2E86C1',
+          'fill-extrusion-base':    ['get', 'base'],
+          'fill-extrusion-height':  ['get', 'height'],
+          'fill-extrusion-opacity': 0.55,
+          'fill-extrusion-vertical-gradient': true,
+        }
+      });
+
       pinsReady.current = true;
 
       /* ── Flood overlay (raster, inserted below pins) */
@@ -463,8 +542,19 @@ export default function Globe({
       onPropertySelect?.({ ...cleanFeatureProps(e.features[0].properties), isPortfolio: true });
     });
 
+    /* Clicking a house opens the same drawer its pin would — in inspect mode
+       the building IS the click target, since it covers the pin. The building
+       feature only carries an id, so the full property row is looked up. */
+    ['building-walls', 'building-roofs'].forEach(layer => {
+      map.on('click', layer, (e) => {
+        const id = e.features?.[0]?.properties?.property_id;
+        const prop = allPropsRef.current.find(p => String(p.property_id) === String(id));
+        if (prop) onPropertySelect?.(prop);
+      });
+    });
+
     /* Cursors */
-    ['clusters', 'pins', 'portfolio-pins'].forEach(layer => {
+    ['clusters', 'pins', 'portfolio-pins', 'building-walls', 'building-roofs'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -476,6 +566,10 @@ export default function Globe({
     /* Track zoom so layer hints (FEMA renders only at neighborhood scale)
        can tell the user why nothing appeared yet. */
     map.on('zoomend', () => setZoomLevel(map.getZoom()));
+
+    /* Reload buildings after any camera move that settles, so panning down a
+       street brings the next block's houses in. Debounced inside. */
+    map.on('moveend', () => { if (inspectRef.current) scheduleBuildingRefresh(); });
 
     return () => {
       stopRotation();
@@ -683,6 +777,182 @@ export default function Globe({
     }
   }, [showFema]);
 
+  /* ── 3D property inspect ─────────────────────────────────────── */
+
+  /* Every property currently on screen, event and portfolio alike, kept in a
+     ref so the map's long-lived event handlers always see the latest book. */
+  useEffect(() => {
+    allPropsRef.current = [...properties, ...portfolioProperties]
+      .filter(p => p.latitude && p.longitude);
+    if (inspectRef.current) scheduleBuildingRefresh();
+  }, [properties, portfolioProperties]);
+
+  /* Pull footprints for the properties in view and rebuild the extrusions.
+     Stable identity (no deps) because it is bound once to map events and
+     reads everything it needs from refs. */
+  const refreshBuildings = useCallback(async () => {
+    const map = mapRef.current;
+    if (!map || !inspectRef.current || !map.getSource('buildings-3d')) return;
+
+    if (map.getZoom() < INSPECT_MIN_ZOOM) {
+      map.getSource('buildings-3d').setData(emptyFC());
+      setBuildingStatus({ tooFar: true });
+      return;
+    }
+
+    const bounds = map.getBounds();
+    const visible = allPropsRef.current
+      .filter(p => bounds.contains([+p.longitude, +p.latitude]))
+      .slice(0, MAX_BUILDINGS);
+
+    if (visible.length === 0) {
+      map.getSource('buildings-3d').setData(emptyFC());
+      setBuildingStatus({ empty: true });
+      return;
+    }
+
+    const seq = ++buildingReq.current;
+    setBuildingStatus(s => ({ ...(s || {}), loading: true, tooFar: false, empty: false }));
+
+    let payload;
+    try {
+      payload = await api.getBuildings(visible.map(p => ({
+        property_id: p.property_id,
+        latitude:  +p.latitude,
+        longitude: +p.longitude,
+      })));
+    } catch {
+      /* The backend is unreachable — draw illustrative boxes locally rather
+         than dropping the user into an empty 3D scene. */
+      payload = {
+        available: false,
+        reason: 'Footprint service unreachable — showing illustrative boxes.',
+        buildings: visible.map(p => ({
+          property_id: p.property_id,
+          ring: placeholderRing(+p.longitude, +p.latitude),
+          height_m: 3.2, footprint_source: 'placeholder', height_source: 'default',
+        })),
+        summary: { rendered: visible.length, footprints_matched: 0, match_rate: 0 },
+      };
+    }
+
+    /* A newer viewport already asked; this answer is stale. */
+    if (seq !== buildingReq.current || !inspectRef.current) return;
+
+    const byId = new Map(visible.map(p => [String(p.property_id), p]));
+    const features = [];
+    let solarHeights = 0;
+    for (const b of payload.buildings || []) {
+      const prop = byId.get(String(b.property_id));
+      if (!prop) continue;
+
+      /* Solar API roof geometry, when the backend was allowed to fetch it,
+         reports the highest roof plane in metres above SEA LEVEL. Terrain is
+         already loaded in this mode, so the ground elevation under the
+         building is free to sample here — no second (billable) elevation API.
+         The result replaces the typology-guessed height only when it lands in
+         a physically plausible range; otherwise the guess stands, because a
+         datum mismatch should never produce a six-storey bungalow. */
+      const roofElev = b.solar?.max_plane_elev_m;
+      if (roofElev != null && b.solar?.quality_ok && b.centroid) {
+        const ground = mapRef.current?.queryTerrainElevation(b.centroid);
+        if (ground != null) {
+          const measured = roofElev - ground;
+          if (measured >= 2.2 && measured <= 70) {
+            b.height_m = Math.round(measured * 100) / 100;
+            b.height_source = 'solar';
+            solarHeights += 1;
+          }
+        }
+      }
+
+      features.push(...buildingFeatures(b, prop, {
+        color: TRIAGE_COLORS[prop.impact_class] || '#6B8FA3',
+      }));
+    }
+
+    const src = mapRef.current?.getSource('buildings-3d');
+    if (src) src.setData({ type: 'FeatureCollection', features });
+
+    setBuildingStatus({
+      loading: false,
+      available: payload.available,
+      reason: payload.reason,
+      count: (payload.buildings || []).length,
+      matched: payload.summary?.footprints_matched ?? 0,
+      matchRate: payload.summary?.match_rate ?? 0,
+      heightSources: payload.summary?.height_sources || {},
+      flooded: visible.filter(p => (+p.max_depth_ft || 0) >= 0.1).length,
+      solarHeights,
+      solar: payload.summary?.solar || null,
+    });
+  }, []);
+
+  /* Coalesce the burst of moveend events a single drag produces. */
+  const scheduleBuildingRefresh = useCallback(() => {
+    if (buildingTimer.current) clearTimeout(buildingTimer.current);
+    buildingTimer.current = setTimeout(() => { refreshBuildings(); }, 260);
+  }, [refreshBuildings]);
+
+  /* Entering inspect mode drapes real terrain, tilts the camera, and reveals
+     the extrusion layers; leaving it puts every one of those back. Terrain is
+     what makes a sloped lot read correctly — without it the houses and their
+     water planes sit on a flat sheet. */
+  useEffect(() => {
+    const map = mapRef.current;
+    inspectRef.current = inspect3D;
+    if (!map || !pinsReady.current) return;
+
+    const apply = () => {
+      if (inspect3D) {
+        if (!map.getSource('mapbox-dem')) {
+          map.addSource('mapbox-dem', {
+            type: 'raster-dem',
+            url:  'mapbox://mapbox.mapbox-terrain-dem-v1',
+            tileSize: 512, maxzoom: 14,
+          });
+        }
+        map.setTerrain({ source: 'mapbox-dem', exaggeration: TERRAIN_EXAGGERATION });
+        ['building-walls', 'building-roofs', 'building-water'].forEach(id => {
+          if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+        });
+
+        stopRotation();
+        /* From altitude, drop into the book so there is something to look at;
+           if the user is already in a neighbourhood, just tilt. */
+        const target = map.getZoom() < INSPECT_MIN_ZOOM
+          ? nearestPropertyCenter(allPropsRef.current, map.getCenter())
+          : null;
+        map.easeTo({
+          ...(target ? { center: target, zoom: INSPECT_FLY_ZOOM } : {}),
+          pitch: Math.max(map.getPitch(), INSPECT_PITCH),
+          duration: 1400,
+        });
+        scheduleBuildingRefresh();
+      } else {
+        ['building-walls', 'building-roofs', 'building-water'].forEach(id => {
+          if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+        });
+        if (map.getSource('buildings-3d')) map.getSource('buildings-3d').setData(emptyFC());
+        map.setTerrain(null);
+        map.easeTo({ pitch: 0, duration: 700 });
+        setBuildingStatus(null);
+      }
+    };
+
+    if (map.isStyleLoaded()) apply();
+    else map.once('idle', apply);
+  }, [inspect3D, scheduleBuildingRefresh, stopRotation]);
+
+  /* Depth changes (a fresh analysis lands) must move the water planes. */
+  useEffect(() => {
+    if (inspectRef.current) scheduleBuildingRefresh();
+  }, [properties.map(p => p.max_depth_ft).join(','), scheduleBuildingRefresh]);
+
+  useEffect(() => () => {
+    if (buildingTimer.current) clearTimeout(buildingTimer.current);
+  }, []);
+
   /* ── Fly-to ──────────────────────────────────────────────────── */
   useEffect(() => {
     if (!flyTarget || !mapRef.current) return;
@@ -839,6 +1109,54 @@ export default function Globe({
         display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end',
         maxWidth: isMobile ? 'calc(100vw - 72px)' : 'none', // stay clear of the left rail
       }}>
+        {/* 3D inspect status + the provenance caveat. Dollar reserves are
+            attached to these properties, so the panel states plainly which
+            shapes are real survey-grade data (none of them) and which parts
+            are estimated — it is not a footnote in a tooltip. */}
+        {inspect3D && !isMobile && (
+          <div style={{
+            maxWidth: 268, padding: '9px 12px', borderRadius: 9,
+            background: 'var(--panel)', border: '1px solid rgba(168,212,230,0.28)',
+            fontSize: '0.64rem', color: 'var(--text-secondary)', lineHeight: 1.5,
+            backdropFilter: 'blur(10px)',
+          }}>
+            {buildingStatus?.tooFar ? (
+              <span style={{ color: '#FFB347' }}>
+                Zoom into a neighbourhood (z{INSPECT_MIN_ZOOM}+) to draw buildings.
+              </span>
+            ) : buildingStatus?.empty ? (
+              <span style={{ color: '#FFB347' }}>No properties in view — pan to your portfolio.</span>
+            ) : buildingStatus?.loading ? (
+              <span>Loading building footprints…</span>
+            ) : buildingStatus ? (
+              <>
+                <div style={{ color: 'var(--teal)', fontWeight: 700, marginBottom: 3 }}>
+                  {buildingStatus.count} building{buildingStatus.count === 1 ? '' : 's'}
+                  {buildingStatus.flooded > 0 && ` · ${buildingStatus.flooded} with modeled water`}
+                </div>
+                <div>{footprintSummary(buildingStatus)}</div>
+                {buildingStatus.solarHeights > 0 && (
+                  <div style={{ marginTop: 4, color: '#7FD1A8' }}>
+                    {buildingStatus.solarHeights} measured height
+                    {buildingStatus.solarHeights === 1 ? '' : 's'} from Solar API
+                  </div>
+                )}
+                <div style={{ marginTop: 5, color: 'var(--text-muted)', fontSize: '0.6rem' }}>
+                  Footprints are OpenStreetMap outlines. Heights are estimated
+                  from building type unless marked as measured. Water height is
+                  the modeled depth for that property. Illustrative — not a
+                  structural survey.
+                </div>
+                {buildingStatus.available === false && buildingStatus.reason && (
+                  <div style={{ marginTop: 5, color: '#FFB347', fontSize: '0.6rem' }}>
+                    {buildingStatus.reason}
+                  </div>
+                )}
+              </>
+            ) : null}
+          </div>
+        )}
+
         {showFema && zoomLevel < 9 && (
           <div style={{
             maxWidth: 240, padding: '7px 11px', borderRadius: 8,
@@ -850,6 +1168,12 @@ export default function Globe({
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {hasAnyPins && (
+            <button onClick={() => setInspect3D(v => !v)} style={toggleStyle(inspect3D)}
+                    title="Drape real terrain and draw each property as a building, with the modeled flood depth as water up its walls. Neighbourhood zoom only — the pin view stays the default across a portfolio.">
+              ⌂ 3D inspect
+            </button>
+          )}
           {hasAnyPins && (
             <button onClick={() => setShowHeat(v => !v)} style={toggleStyle(showHeat)}
                     title="Dollar-weighted exposure concentration: estimated loss where analyzed, coverage otherwise. Pins stay on.">
@@ -900,6 +1224,29 @@ export default function Globe({
 /* ── Helpers ─────────────────────────────────────────────────────── */
 function emptyFC() {
   return { type: 'FeatureCollection', features: [] };
+}
+
+/* The property nearest the current camera centre, as [lon, lat] — where the
+   3D toggle flies to when it is pressed from altitude, so the mode always
+   opens on a house rather than an empty field. */
+function nearestPropertyCenter(props, center) {
+  let best = null, bestD = Infinity;
+  for (const p of props || []) {
+    const d = Math.hypot(+p.longitude - center.lng, +p.latitude - center.lat);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  return best ? [+best.longitude, +best.latitude] : null;
+}
+
+/* "12 real footprints · 3 estimated" — the plain-language provenance line
+   under the 3D legend. */
+function footprintSummary(status) {
+  if (!status || status.count == null) return null;
+  const estimated = Math.max(0, status.count - (status.matched || 0));
+  const parts = [];
+  if (status.matched) parts.push(`${status.matched} mapped footprint${status.matched === 1 ? '' : 's'}`);
+  if (estimated)      parts.push(`${estimated} placeholder box${estimated === 1 ? '' : 'es'}`);
+  return parts.join(' · ');
 }
 
 /* Undo Mapbox GL's JSON round-trip on feature properties: "null" → null,

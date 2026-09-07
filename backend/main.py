@@ -860,6 +860,15 @@ def submit_feedback(property_id: str, body: dict = Body(...)):
         note=str(body.get('note', '')),
         address=str(body.get('address', '')),
         portfolio_id=str(body.get('portfolio_id', '')),
+        # Structure observations an adjuster can read off Street View. These
+        # are the inputs severity.py is currently missing: depth above GROUND
+        # is not depth above the FINISHED FLOOR, and a slab-on-grade house and
+        # one on 4ft of piers take completely different losses from the same
+        # water. Captured as per-property ground truth, which is also the
+        # resolution the ZIP-level FEMA validation cannot reach.
+        first_floor_type=str(body.get('first_floor_type', '')),
+        storeys_observed=body.get('storeys_observed'),
+        has_basement=body.get('has_basement'),
     )
     return {"ok": True, "feedback_id": fid,
             "summary": get_feedback_summary(str(body.get('event_id', '')))}
@@ -1058,6 +1067,96 @@ def property_draft_note(body: dict = Body(...)):
     if not isinstance(row, dict) or not row:
         raise HTTPException(400, "property is required.")
     return draft_adjuster_note(row, body.get("event_label") or None)
+
+
+# ── 3D property inspect ───────────────────────────────────────────────────────
+
+@app.post("/api/buildings")
+def buildings_for_view(body: dict = Body(...)):
+    """
+    Building footprints + estimated heights for the properties in the globe's
+    current viewport, powering the 3D property-inspect view.
+
+    Body: {"properties": [{"property_id", "latitude", "longitude"}, …]}
+
+    Always returns a renderable answer. When OpenStreetMap is unreachable or
+    the viewport is too wide, `available` is false, `reason` says why, and
+    every property still comes back with an illustrative placeholder box — the
+    3D view degrades, it never goes blank. Every record carries
+    `footprint_source` and `height_source` so the UI can state plainly which
+    shapes are real and which are estimated; heights in particular are
+    inferred except where OSM tags them (see config.BUILDINGS).
+
+    Visualization only: nothing here feeds triage, severity, or calibration.
+    """
+    from backend.buildings import building_context
+
+    props = body.get("properties")
+    if not isinstance(props, list) or not props:
+        raise HTTPException(400, "properties (a non-empty list) is required.")
+
+    try:
+        return building_context(props)
+    except Exception as e:
+        # Scenery must never take down the map: report the failure and let the
+        # frontend fall back to its own placeholder boxes.
+        return {"available": False, "reason": f"Footprint lookup failed: {e}",
+                "buildings": [], "summary": {"requested": len(props), "rendered": 0}}
+
+
+@app.post("/api/streetview")
+def streetview_for_properties(body: dict = Body(...)):
+    """
+    Street-level imagery availability for a set of properties.
+
+    Body: {"properties": [{"property_id", "latitude", "longitude"}, …]}
+
+    Returns, per property, whether a Street View panorama exists nearby and
+    when it was captured. Only Google's free metadata endpoint is called — no
+    imagery passes through Altis, and no billable SKU is touched. The panorama
+    itself is rendered client-side via the Maps Embed API.
+
+    The capture date always PREDATES the flood (Google does not re-drive after
+    a storm), so this is structure context — foundation type, storey count —
+    not damage evidence, and the UI labels it as such.
+    """
+    from backend.streetview import lookup_batch
+
+    props = body.get("properties")
+    if not isinstance(props, list) or not props:
+        raise HTTPException(400, "properties (a non-empty list) is required.")
+    try:
+        return lookup_batch(props)
+    except Exception as e:
+        return {"available": False, "reason": f"Street View lookup failed: {e}",
+                "properties": {}, "summary": {"requested": len(props), "with_imagery": 0}}
+
+
+@app.get("/api/imagery-status")
+def imagery_status():
+    """
+    What optional imagery integrations this deployment has configured — so the
+    frontend can hide what it cannot use instead of rendering broken panels,
+    and an operator can see at a glance whether the billable one is off.
+    """
+    from backend import streetview, solar
+    from pipeline.config import SOLAR
+    return {
+        "street_view": {
+            "available": streetview.available(),
+            "billable": False,
+            "note": "Free: metadata + Maps Embed only.",
+        },
+        "solar": {
+            "available": solar.enabled(),
+            "billable": True,
+            "note": ("Enabled — Building Insights is a paid SKU "
+                     f"(budget {SOLAR['max_calls_per_request']} calls/request)."
+                     if solar.enabled() else
+                     "Disabled. Set ENABLE_SOLAR_API to turn on; it is the only "
+                     "endpoint in Altis that can incur cost."),
+        },
+    }
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
