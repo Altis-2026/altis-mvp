@@ -56,7 +56,7 @@ const CAT_COLORS = {
    is the same principle the existing clustering and the address-label reveal
    (minzoom 12.5) already follow. */
 const INSPECT_MIN_ZOOM = 14.5;   // below this, buildings are not drawn at all
-const INSPECT_FLY_ZOOM = 17;     // where the toggle takes you from altitude
+const INSPECT_FLY_ZOOM = 18.6;   // where the toggle takes you from altitude
 const INSPECT_PITCH = 62;        // enough to see water up a wall
 const MAX_BUILDINGS = 220;       // per viewport — the cap that keeps this fast
 const TERRAIN_EXAGGERATION = 1.4;
@@ -486,7 +486,10 @@ export default function Globe({
           'fill-extrusion-color':   ['get', 'color'],
           'fill-extrusion-base':    ['get', 'base'],
           'fill-extrusion-height':  ['get', 'height'],
-          'fill-extrusion-opacity': 0.94,
+          // Fully opaque: the roof slabs are nested solids (see gableSlabs),
+          // so any translucency would composite them against each other and
+          // band the roof with darker rings.
+          'fill-extrusion-opacity': 1,
           'fill-extrusion-vertical-gradient': false,
         }
       });

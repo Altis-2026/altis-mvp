@@ -178,7 +178,7 @@ export function orientedBox(ring) {
  * roof sitting exactly on the walls. Roofing an L-shaped house with its
  * bounding box instead puts ~70% more roof area than there is house, and it
  * reads as a mushroom cap floating over the walls. */
-function squashToRidge(ring, box, shrink) {
+function squashToRidge(ring, box, shrink, lengthShrink = 1) {
   const { mx, my } = metersPerDegree(box.center[1]);
   const cos = Math.cos(box.angle), sin = Math.sin(box.angle);
   const pts = openRing(ring);
@@ -186,8 +186,8 @@ function squashToRidge(ring, box, shrink) {
   const moved = pts.map(([lon, lat]) => {
     const dx = (lon - box.center[0]) * mx;
     const dy = (lat - box.center[1]) * my;
-    const u = dx * cos + dy * sin;          // along the ridge — preserved
-    const v = (-dx * sin + dy * cos) * shrink;  // across it — pulled in
+    const u = (dx * cos + dy * sin) * lengthShrink;  // along the ridge
+    const v = (-dx * sin + dy * cos) * shrink;       // across it — pulled in
     const x = u * cos - v * sin;
     const y = u * sin + v * cos;
     return [box.center[0] + x / mx, box.center[1] + y / my];
@@ -234,8 +234,22 @@ export function gableSlabs(ring, eaveM, { slabs = 8, rise = null, pitch,
   const out = [];
   for (let k = 0; k < n; k++) {
     out.push({
-      ring: squashToRidge(eaveRing, eaveBox, 1 - k / n),
-      base: eaveM + (k / n) * totalRise,
+      // Taper very slightly along the ridge as well as across it — a shallow
+      // hip rather than a pure gable. Squashing across the ridge alone leaves
+      // vertices that sit ON the ridge line unmoved, so consecutive slabs
+      // share those exact positions and their side faces land coincident
+      // there, which depth buffers resolve as flicker. A few percent of
+      // length shrink keeps every slab's geometry distinct, and hipped ends
+      // read as a roof just as readily as gabled ones.
+      ring: squashToRidge(eaveRing, eaveBox, 1 - k / n, 1 - 0.12 * (k / n)),
+      // Every slab starts at the eaves rather than on top of the one below.
+      // Stacking them (base = previous slab's height) puts each slab's top
+      // face exactly coplanar with the next slab's base, and the GPU has no
+      // basis to choose between them — the roof renders covered in flickering
+      // z-fighting speckle, worse the more slabs there are. Nested solids
+      // intersect instead of touching, so no two faces are ever coplanar. The
+      // silhouette is identical; only the hidden interior differs.
+      base: eaveM,
       height: eaveM + ((k + 1) / n) * totalRise,
     });
   }
@@ -274,7 +288,7 @@ export function expandRing(ring, meters) {
 export function buildingFeatures(building, property, options = {}) {
   const {
     color = '#6B8FA3',
-    slabs = 8,
+    slabs = 14,
     apronM = 1.6,
     minDepthFt = 0.1,
   } = options;
@@ -295,10 +309,18 @@ export function buildingFeatures(building, property, options = {}) {
     footprint_source: building?.footprint_source ?? 'placeholder',
   };
 
+  // The ROOF carries the full triage colour and the walls a darker shade of
+  // it, not the other way round: on any map camera the roof is the surface
+  // facing you, so it has to be the one reading as "Dispatch" at a glance.
+  // Shading the walls also separates the two planes, which a single flat
+  // colour does not — untinted, a house renders as one undifferentiated blob.
   const features = [{
     type: 'Feature',
     geometry: { type: 'Polygon', coordinates: [ring] },
-    properties: { ...shared, kind: 'wall', base: 0, height: eave, color },
+    properties: {
+      ...shared, kind: 'wall', base: 0, height: eave,
+      color: shadeColor(color, -0.3),
+    },
   }];
 
   for (const slab of gableSlabs(ring, eave, { slabs })) {
@@ -308,7 +330,7 @@ export function buildingFeatures(building, property, options = {}) {
       properties: {
         ...shared, kind: 'roof',
         base: slab.base, height: slab.height,
-        color: shadeColor(color, -0.22),
+        color,
       },
     });
   }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import SarPair from './SarPair.jsx';
+import StreetViewPanel from './StreetViewPanel.jsx';
 import { api } from '../services/api.js';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 
@@ -73,6 +74,11 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   /* Adjuster feedback (human-in-the-loop ground truth) */
   const [verdict, setVerdict]       = useState(null);   // 'up' | 'down' | null
   const [corrected, setCorrected]   = useState('');
+  /* Structure observations read off street-level imagery. Optional on every
+     verdict — they refine the loss estimate but must never gate recording a
+     triage correction. */
+  const [firstFloor, setFirstFloor] = useState('');
+  const [storeys,    setStoreys]    = useState('');
   const [note, setNote]             = useState('');
   const [fbStatus, setFbStatus]     = useState('idle'); // idle | saving | saved | error
   const [fbError, setFbError]       = useState('');
@@ -173,6 +179,9 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
         note,
         address:         property.address || '',
         portfolio_id:    property.isPortfolio ? (property.portfolio_id || '') : '',
+        first_floor_type: firstFloor || '',
+        storeys_observed: storeys || null,
+        has_basement:     firstFloor === 'basement' ? true : null,
       });
       setFbStatus('saved');
       onFeedbackSaved?.(res.summary);
@@ -376,6 +385,14 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               eventDate={liveEventDate}
             />
           </div>
+
+          {/* What the water was standing against — the structure context the
+              satellite cannot see. Renders nothing unless a Google Maps key
+              is configured and imagery exists at this address. */}
+          <StreetViewPanel
+            property={property}
+            googleKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+          />
 
           {/* Measurements */}
           <div style={{ marginBottom: 24 }}>
@@ -736,6 +753,44 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                 <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
                   Was this triage decision correct?
                 </div>
+                {/* What the depth is measured against. The pipeline reads depth
+                    above GROUND; the damage curve wants depth above the
+                    FINISHED FLOOR, and only a human looking at the structure
+                    can supply the difference. Optional, and recorded with
+                    either verdict. */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <select
+                    value={firstFloor} onChange={e => setFirstFloor(e.target.value)}
+                    title="How the first floor sits relative to grade — the difference between an interior gut and a wet crawlspace"
+                    style={{
+                      flex: '1 1 130px', padding: '7px 9px', fontSize: '0.72rem',
+                      background: 'var(--input-bg)', color: 'var(--text-primary)',
+                      border: '1px solid var(--wa-10)', borderRadius: 'var(--r-sm)',
+                      fontFamily: 'var(--font)', cursor: 'pointer',
+                    }}>
+                    <option value="">First floor — unknown</option>
+                    <option value="slab">Slab on grade</option>
+                    <option value="crawlspace">Crawlspace</option>
+                    <option value="raised">Raised (steps up)</option>
+                    <option value="piers">Elevated on piers</option>
+                    <option value="basement">Has basement</option>
+                  </select>
+                  <select
+                    value={storeys} onChange={e => setStoreys(e.target.value)}
+                    title="Storey count caps the loss: 4ft in a single-storey home is a near-total interior loss; in a two-storey it is the ground floor only"
+                    style={{
+                      flex: '0 1 110px', padding: '7px 9px', fontSize: '0.72rem',
+                      background: 'var(--input-bg)', color: 'var(--text-primary)',
+                      border: '1px solid var(--wa-10)', borderRadius: 'var(--r-sm)',
+                      fontFamily: 'var(--font)', cursor: 'pointer',
+                    }}>
+                    <option value="">Storeys — ?</option>
+                    <option value="1">1 storey</option>
+                    <option value="2">2 storeys</option>
+                    <option value="3">3+ storeys</option>
+                  </select>
+                </div>
+
                 <div style={{ display: 'flex', gap: 10, marginBottom: verdict === 'down' ? 12 : 0 }}>
                   <button
                     onClick={() => submitFeedback(true)}

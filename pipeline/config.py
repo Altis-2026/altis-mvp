@@ -393,3 +393,68 @@ BUILDINGS = {
     'cache_ttl_hours':        720,     # OSM buildings change slowly (30 days)
     'max_properties':        400,      # per /api/buildings request
 }
+
+# ─── GOOGLE MAPS PLATFORM (Round 10) ─────────────────────────────────────────
+# One key serves both integrations below. Set GOOGLE_MAPS_API_KEY in .env (and
+# in the backend host's environment for deploys). Without it, both features
+# report themselves unavailable and the UI hides them — nothing breaks.
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
+
+# ─── STREET-LEVEL IMAGERY (free) ─────────────────────────────────────────────
+# Street View gives a desk adjuster the two things a depth number can't: what
+# kind of structure this is, and how far the finished floor sits above grade.
+# Depth measured above GROUND is not depth above the FINISHED FLOOR — 3 ft
+# against a slab-on-grade house is an interior gut, the same 3 ft against a
+# house on 4 ft of piers is a wet crawlspace and no interior loss at all. That
+# distinction is currently invisible to severity.py, and it is readable at a
+# glance from the street.
+#
+# COST: zero, by construction. Only two Google surfaces are used here, and
+# Google's own pricing table lists both as unlimited/no-charge:
+#   - Street View Static *metadata* ("Street View Metadata" SKU: Unlimited)
+#     — availability + capture date + pano id. Consumes no quota.
+#   - Maps Embed API ("Embed" SKU: Unlimited) — the interactive panorama,
+#     rendered client-side in an iframe.
+# The Street View Static *image* API is a DIFFERENT, billable SKU (10k/month
+# free, then charged). It is deliberately not used.
+#
+# IMPORTANT — this is a PRE-EVENT BASELINE, never damage evidence. Google does
+# not re-drive a neighbourhood after a hurricane, so the panorama predates the
+# flood. The UI must label it with its capture date and never imply otherwise.
+STREETVIEW = {
+    'search_radius_m':   60,     # how far Google may look for a nearby pano
+    'timeout_s':         10,
+    'cache_ttl_hours':   720,    # coverage changes slowly (30 days)
+    'max_properties':    200,    # per /api/streetview request
+}
+
+# ─── SOLAR API — BUILDING INSIGHTS (billable; OFF BY DEFAULT) ─────────────────
+# Returns per-roof-segment geometry (pitch, azimuth, plane height, area) from
+# Google's high-resolution aerial DSM. Two uses here:
+#   1. a MEASURED building height, replacing the typology guess in
+#      building_context.estimate_height_m for properties it covers, and
+#   2. real roof pitch/azimuth, so the 3D view can shape a roof from data
+#      instead of a procedural gable.
+#
+# THIS IS THE ONLY ENDPOINT IN ALTIS THAT CAN COST MONEY, so it is disabled
+# unless ENABLE_SOLAR_API is explicitly set, and it carries a hard per-request
+# call budget on top. Google's pricing: 10,000 requests/month free, then
+# $10.00/1,000. At the default budget below a full viewport cannot exceed the
+# free tier in normal use — but the flag, not the budget, is the real guard.
+#
+# DATUM WARNING: `planeHeightAtCenterMeters` is height above SEA LEVEL, not
+# above the ground at the building (verified against Google's API reference —
+# a single-storey Houston house reads ~18 m because that is the neighbourhood's
+# elevation). A building height therefore requires subtracting a ground
+# elevation from the same point; see solar.building_height_m.
+#
+# COVERAGE is real but not global — Australia (the Lismore demo) returns
+# NOT_FOUND. Callers must treat absence as normal and fall back.
+SOLAR = {
+    'enabled':           os.getenv('ENABLE_SOLAR_API', '').strip().lower()
+                         in ('1', 'true', 'yes', 'on'),
+    'required_quality':  ('HIGH', 'MEDIUM'),  # ignore BASE — too coarse to trust
+    'max_calls_per_request': 25,   # hard budget guard per API call
+    'timeout_s':         12,
+    'cache_ttl_hours':   2160,     # roof geometry is static (90 days)
+}

@@ -117,21 +117,33 @@ test('roofRiseM never lets the roof out-tower the walls', () => {
   assert.ok(roofRiseM(40, { eaveM: eave }) < roofRiseM(40));
 });
 
-test('gable slabs stack contiguously from eave to ridge', () => {
+test('gable slabs rise from the eaves to the ridge', () => {
   const eave = 3.2;
   const slabs = gableSlabs(house(), eave, { slabs: 8 });
   assert.equal(slabs.length, 8);
-  assert.equal(slabs[0].base, eave);
-  for (let i = 0; i < slabs.length; i++) {
-    assert.ok(slabs[i].height > slabs[i].base, 'each slab has positive thickness');
-    if (i > 0) {
-      assert.ok(Math.abs(slabs[i].base - slabs[i - 1].height) < 1e-9,
-                'no gap or overlap between slabs');
-    }
+  for (const s of slabs) assert.ok(s.height > s.base, 'each slab has positive thickness');
+  for (let i = 1; i < slabs.length; i++) {
+    assert.ok(slabs[i].height > slabs[i - 1].height, 'each slab reaches higher');
   }
   const top = slabs[slabs.length - 1];
   const expected = eave + roofRiseM(orientedBox(house()).width, { eaveM: eave });
   assert.ok(Math.abs(top.height - expected) < 0.35, `top ${top.height} vs ${expected}`);
+});
+
+test('roof slabs are NESTED SOLIDS, never stacked — the z-fighting guard', () => {
+  /* Regression: slabs that sit on top of one another (base = the slab below's
+     height) put two faces at exactly the same elevation, and the depth buffer
+     has no basis to choose between them — the roof renders covered in
+     flickering speckle, confirmed in a real WebGL render. Every slab must
+     start at the eaves so the solids intersect rather than touch. */
+  const eave = 3.2;
+  const slabs = gableSlabs(house(), eave, { slabs: 14 });
+  for (const s of slabs) {
+    assert.equal(s.base, eave, 'every slab starts at the eaves');
+  }
+  // No two slabs may share a top elevation either.
+  const heights = slabs.map(s => s.height);
+  assert.equal(new Set(heights).size, heights.length, 'slab tops are all distinct');
 });
 
 test('the roof sits on the walls, not on the bounding box', () => {
@@ -164,12 +176,15 @@ test('gable slabs narrow monotonically toward the ridge', () => {
 });
 
 test('gable slabs keep the ridge along the long axis', () => {
-  // The topmost slab should still run the length of the house (plus the eave
-  // overhang at each end), but be thin across it.
-  const slabs = gableSlabs(house(20, 10), 3.2, { slabs: 8 });
+  // The topmost slab still runs most of the length of the house, but is thin
+  // across it. It is slightly shorter than the eaves because the roof hips in
+  // a little at each end (see squashToRidge's lengthShrink).
+  const slabs = gableSlabs(house(20, 10), 3.2, { slabs: 14 });
   const top = orientedBox(slabs[slabs.length - 1].ring);
-  assert.ok(top.length > 20 && top.length < 21.5, `ridge length ${top.length}`);
+  assert.ok(top.length > 17 && top.length < 21.5, `ridge length ${top.length}`);
   assert.ok(top.width < 2.5, `ridge width ${top.width}`);
+  const eaveSlab = orientedBox(slabs[0].ring);
+  assert.ok(top.length < eaveSlab.length, 'the ridge hips in relative to the eaves');
 });
 
 test('gableSlabs returns nothing for an unusable ring', () => {
@@ -204,7 +219,7 @@ test('a dry property gets walls and a roof but no water', () => {
     { color: '#6B8FA3' });
   const kinds = feats.map(f => f.properties.kind);
   assert.equal(kinds.filter(k => k === 'wall').length, 1);
-  assert.equal(kinds.filter(k => k === 'roof').length, 8);
+  assert.ok(kinds.filter(k => k === 'roof').length >= 8, 'roof is built from slabs');
   assert.equal(kinds.filter(k => k === 'water').length, 0);
 });
 

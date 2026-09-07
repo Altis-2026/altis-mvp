@@ -9,7 +9,7 @@ hurricane or flood event, and get back a ranked, explainable triage of every
 property: who needs an adjuster dispatched today, who can be resolved
 remotely, and how confident the model is in each call.
 
-[![tests](https://img.shields.io/badge/tests-207%20backend%20%2B%2029%20frontend-brightgreen)]()
+[![tests](https://img.shields.io/badge/tests-233%20backend%20%2B%2030%20frontend-brightgreen)]()
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)]()
 [![node](https://img.shields.io/badge/node-18%2B-blue)]()
 
@@ -140,6 +140,8 @@ hardening checklist. Rough pilot-scale cost: **$10–30/month**.
 | `GET /api/runs` / `POST /api/runs` | Pipeline run queue (Operations panel) |
 | `POST /api/runs/{run_id}/status` | Advance a queued run |
 | `POST /api/buildings` | Building footprints + heights for the 3D inspect view |
+| `POST /api/streetview` | Street-level imagery availability + capture date (free) |
+| `GET /api/imagery-status` | Which optional imagery integrations are configured |
 
 ## Testing
 
@@ -149,9 +151,10 @@ cd frontend && npm test         # map + building geometry   (29 tests)
 cd frontend && npm run build    # production build sanity check
 ```
 
-207 backend tests across ingestion, triage, calibration, uncertainty, priority
-ranking, feedback-to-ground-truth merging, the Round 6 API surface, and the
-building-footprint join. The frontend tests run on node's built-in runner
+233 backend tests across ingestion, triage, calibration, uncertainty, priority
+ranking, feedback-to-ground-truth merging, the Round 6 API surface, the
+building-footprint join, and the imagery integrations (including a guard that
+the one billable Google endpoint cannot reach the network while disabled). The frontend tests run on node's built-in runner
 (no test framework dependency) and cover the 3D inspect geometry.
 
 ## License

@@ -65,6 +65,17 @@ export const api = {
   /* Pre-event flood risk score (1–5), no event date needed */
   getRiskScore:   (id)     => get(`/portfolio/${id}/risk-score`),
 
+  /* Street-level imagery availability (free metadata only — no billable SKU).
+     Resolves even on failure: the backend answers with available:false. */
+  getStreetView: (properties) =>
+    authFetch('/streetview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ properties }),
+    }).then(r => r.json()),
+
+  /* Which optional imagery integrations this deployment has configured. */
+  getImageryStatus: () => get('/imagery-status'),
+
   /* Building footprints + estimated heights for the 3D property-inspect view.
      Never rejects on a footprint-service failure: the backend answers with
      `available: false` plus placeholder boxes, and the globe renders those. */

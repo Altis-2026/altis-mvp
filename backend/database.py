@@ -173,6 +173,13 @@ def init_db():
             address TEXT
         )
     """)
+    # Structure observations an adjuster reads off street-level imagery. Added
+    # after the fact so existing databases migrate in place.
+    for col in ('first_floor_type', 'storeys_observed', 'has_basement'):
+        try:
+            conn.execute(f"ALTER TABLE adjuster_feedback ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_runs (
             id TEXT PRIMARY KEY,
@@ -397,18 +404,48 @@ def delete_pending_upload(upload_id: str):
 
 # ── SQLite: adjuster feedback (human-in-the-loop ground truth) ──────────────
 
+FIRST_FLOOR_TYPES = ('slab', 'crawlspace', 'raised', 'piers', 'basement', '')
+
+
 def save_feedback(property_id: str, event_id: str, agree: bool,
                   original_class: str = '', corrected_class: str = '',
-                  note: str = '', address: str = '', portfolio_id: str = '') -> int:
-    """Persist one adjuster verdict on a property. Returns the new row id."""
+                  note: str = '', address: str = '', portfolio_id: str = '',
+                  first_floor_type: str = '', storeys_observed=None,
+                  has_basement=None) -> int:
+    """
+    Persist one adjuster verdict on a property. Returns the new row id.
+
+    The three structure fields are what a human can read off street-level
+    imagery that the satellite cannot see: how the first floor sits relative
+    to grade, how many storeys there are, and whether there is a basement.
+    They matter because severity.py converts depth to dollars through a
+    depth-damage curve that assumes depth above the FINISHED FLOOR — and the
+    pipeline only measures depth above GROUND. A slab-on-grade house and one
+    raised 4ft on piers take very different losses from identical water.
+
+    Unrecognised first_floor_type values are stored as '' rather than
+    rejected: this is an observation field, and a typo should not lose the
+    rest of an adjuster's verdict.
+    """
+    ff = str(first_floor_type or '').strip().lower()
+    if ff not in FIRST_FLOOR_TYPES:
+        ff = ''
+    try:
+        storeys = str(int(storeys_observed)) if storeys_observed not in (None, '') else ''
+    except (TypeError, ValueError):
+        storeys = ''
+    basement = '' if has_basement is None else ('1' if has_basement else '0')
+
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.execute("""
         INSERT INTO adjuster_feedback
         (property_id, event_id, portfolio_id, agree, original_class,
-         corrected_class, note, address)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         corrected_class, note, address,
+         first_floor_type, storeys_observed, has_basement)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (property_id, event_id, portfolio_id, 1 if agree else 0,
-          original_class, corrected_class, note, address))
+          original_class, corrected_class, note, address,
+          ff, storeys, basement))
     conn.commit()
     fid = cur.lastrowid
     conn.close()
