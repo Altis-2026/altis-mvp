@@ -264,6 +264,10 @@ def enrich_buildings(building_records: list, use_cache: bool = True, session=Non
         if not solar.get('available'):
             continue
         rec['solar'] = solar
+        # A ground elevation is only available here when a caller supplied one.
+        # Without it the roof data still rides along and the client finishes
+        # the subtraction against its own terrain — but this module never
+        # invents a height (see building_height_m's contract).
         height = building_height_m(solar, rec.get('ground_elev_m'))
         if height is not None:
             rec['height_m'] = height

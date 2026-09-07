@@ -243,5 +243,20 @@ def building_context(props: list, use_cache: bool = True, session=None) -> dict:
                 'buildings': records, 'summary': summary, 'bbox': bbox}
 
     records, summary = buildings_for_properties(geocoded, footprints)
+
+    # Optional measured roof geometry from Google's Solar API. A no-op unless
+    # ENABLE_SOLAR_API is set — see backend/solar.py, which will not make a
+    # network call while disabled. Records gain a `solar` block carrying roof
+    # planes and the highest plane's elevation ABOVE SEA LEVEL; the frontend
+    # converts that to a height by subtracting the terrain elevation it has
+    # already loaded, which costs nothing and needs no second elevation API.
+    from backend.solar import enrich_buildings
+    try:
+        solar_summary = enrich_buildings(records, use_cache=use_cache, session=session)
+    except Exception as e:                       # scenery must never 500
+        solar_summary = {'enabled': False, 'calls': 0, 'enriched': 0,
+                         'reason': f'Solar enrichment failed: {e}'}
+    summary['solar'] = solar_summary
+
     return {'available': True, 'reason': None, 'footprint_source': source,
             'buildings': records, 'summary': summary, 'bbox': bbox}

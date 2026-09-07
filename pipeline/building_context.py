@@ -355,6 +355,9 @@ def building_for_property(prop: dict, footprints: list, cfg=BUILDINGS) -> dict:
             'match_distance_m': round(dist, 1) if dist is not None else None,
             'osm_id':           None,
             'building_class':   None,
+            # Needed by any per-building enrichment (e.g. the Solar API roof
+            # lookup) to know where to ask about.
+            'centroid':         [lon, lat],
         }
 
     height, height_source, levels = estimate_height_m(
@@ -370,6 +373,7 @@ def building_for_property(prop: dict, footprints: list, cfg=BUILDINGS) -> dict:
         'match_distance_m': dist,
         'osm_id':           match['id'],
         'building_class':   match['tags'].get('building'),
+        'centroid':         [match['centroid'][0], match['centroid'][1]],
     }
 
 

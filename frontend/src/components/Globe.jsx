@@ -841,9 +841,31 @@ export default function Globe({
 
     const byId = new Map(visible.map(p => [String(p.property_id), p]));
     const features = [];
+    let solarHeights = 0;
     for (const b of payload.buildings || []) {
       const prop = byId.get(String(b.property_id));
       if (!prop) continue;
+
+      /* Solar API roof geometry, when the backend was allowed to fetch it,
+         reports the highest roof plane in metres above SEA LEVEL. Terrain is
+         already loaded in this mode, so the ground elevation under the
+         building is free to sample here — no second (billable) elevation API.
+         The result replaces the typology-guessed height only when it lands in
+         a physically plausible range; otherwise the guess stands, because a
+         datum mismatch should never produce a six-storey bungalow. */
+      const roofElev = b.solar?.max_plane_elev_m;
+      if (roofElev != null && b.solar?.quality_ok && b.centroid) {
+        const ground = mapRef.current?.queryTerrainElevation(b.centroid);
+        if (ground != null) {
+          const measured = roofElev - ground;
+          if (measured >= 2.2 && measured <= 70) {
+            b.height_m = Math.round(measured * 100) / 100;
+            b.height_source = 'solar';
+            solarHeights += 1;
+          }
+        }
+      }
+
       features.push(...buildingFeatures(b, prop, {
         color: TRIAGE_COLORS[prop.impact_class] || '#6B8FA3',
       }));
@@ -861,6 +883,8 @@ export default function Globe({
       matchRate: payload.summary?.match_rate ?? 0,
       heightSources: payload.summary?.height_sources || {},
       flooded: visible.filter(p => (+p.max_depth_ft || 0) >= 0.1).length,
+      solarHeights,
+      solar: payload.summary?.solar || null,
     });
   }, []);
 
@@ -1111,10 +1135,17 @@ export default function Globe({
                   {buildingStatus.flooded > 0 && ` · ${buildingStatus.flooded} with modeled water`}
                 </div>
                 <div>{footprintSummary(buildingStatus)}</div>
+                {buildingStatus.solarHeights > 0 && (
+                  <div style={{ marginTop: 4, color: '#7FD1A8' }}>
+                    {buildingStatus.solarHeights} measured height
+                    {buildingStatus.solarHeights === 1 ? '' : 's'} from Solar API
+                  </div>
+                )}
                 <div style={{ marginTop: 5, color: 'var(--text-muted)', fontSize: '0.6rem' }}>
-                  Footprints are OpenStreetMap outlines; heights are estimated,
-                  not surveyed. Water height is the modeled depth for that
-                  property. Illustrative — not a structural survey.
+                  Footprints are OpenStreetMap outlines. Heights are estimated
+                  from building type unless marked as measured. Water height is
+                  the modeled depth for that property. Illustrative — not a
+                  structural survey.
                 </div>
                 {buildingStatus.available === false && buildingStatus.reason && (
                   <div style={{ marginTop: 5, color: '#FFB347', fontSize: '0.6rem' }}>
