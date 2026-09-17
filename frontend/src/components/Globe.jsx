@@ -843,32 +843,45 @@ export default function Globe({
     const features = [];
     let solarHeights = 0;
     for (const b of payload.buildings || []) {
-      const prop = byId.get(String(b.property_id));
-      if (!prop) continue;
+      // A malformed record from the network (or a mapbox-gl call made before
+      // terrain finishes loading — queryTerrainElevation can genuinely throw
+      // mid-transition) must skip that ONE building, never abort the whole
+      // refresh. Losing the loop here would leave buildingStatus stuck on
+      // "loading" forever and the 3D view silently frozen — worse than one
+      // building rendering as a placeholder.
+      try {
+        const prop = byId.get(String(b.property_id));
+        if (!prop) continue;
 
-      /* Solar API roof geometry, when the backend was allowed to fetch it,
-         reports the highest roof plane in metres above SEA LEVEL. Terrain is
-         already loaded in this mode, so the ground elevation under the
-         building is free to sample here — no second (billable) elevation API.
-         The result replaces the typology-guessed height only when it lands in
-         a physically plausible range; otherwise the guess stands, because a
-         datum mismatch should never produce a six-storey bungalow. */
-      const roofElev = b.solar?.max_plane_elev_m;
-      if (roofElev != null && b.solar?.quality_ok && b.centroid) {
-        const ground = mapRef.current?.queryTerrainElevation(b.centroid);
-        if (ground != null) {
-          const measured = roofElev - ground;
-          if (measured >= 2.2 && measured <= 70) {
-            b.height_m = Math.round(measured * 100) / 100;
-            b.height_source = 'solar';
-            solarHeights += 1;
+        /* Solar API roof geometry, when the backend was allowed to fetch it,
+           reports the highest roof plane in metres above SEA LEVEL. Terrain is
+           already loaded in this mode, so the ground elevation under the
+           building is free to sample here — no second (billable) elevation
+           API. The result replaces the typology-guessed height only when it
+           lands in a physically plausible range; otherwise the guess stands,
+           because a datum mismatch should never produce a six-storey
+           bungalow. */
+        const roofElev = b.solar?.max_plane_elev_m;
+        if (roofElev != null && b.solar?.quality_ok && b.centroid) {
+          let ground = null;
+          try { ground = mapRef.current?.queryTerrainElevation(b.centroid); }
+          catch { /* terrain not settled yet for this tile — keep the guess */ }
+          if (ground != null) {
+            const measured = roofElev - ground;
+            if (measured >= 2.2 && measured <= 70) {
+              b.height_m = Math.round(measured * 100) / 100;
+              b.height_source = 'solar';
+              solarHeights += 1;
+            }
           }
         }
-      }
 
-      features.push(...buildingFeatures(b, prop, {
-        color: TRIAGE_COLORS[prop.impact_class] || '#6B8FA3',
-      }));
+        features.push(...buildingFeatures(b, prop, {
+          color: TRIAGE_COLORS[prop.impact_class] || '#6B8FA3',
+        }));
+      } catch (err) {
+        console.error('3D inspect: skipped one malformed building record', b?.property_id, err);
+      }
     }
 
     const src = mapRef.current?.getSource('buildings-3d');
