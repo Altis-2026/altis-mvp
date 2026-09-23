@@ -153,6 +153,47 @@ Workflow #4 (settle with no site visit) we expose as *inputs to* that decision, 
 the decision. We are not going to tell a carrier to pay a claim unseen on our say-so, and
 any buyer serious enough to matter will respect the line.
 
+### E. Pre-Landfall Susceptibility Model — **BUILD. This is the real ML play.**
+
+This is a different task than "train a model to predict depth more accurately than the
+physics," which §4 below still rejects. This one predicts **where water will go before
+any satellite has looked**, and it is buildable because its training label is abundant
+and free, unlike per-property adjuster truth.
+
+```
+input:  HAND (height above nearest drainage, from any DEM)
+        + rainfall forecast (or CHIRPS for historical training)
+        + land cover, soil permeability
+        + distance to stream/channel
+        + storm track (for hurricane events)
+label:  did this pixel show up wet in an observed SAR flood extent?
+output: per-pixel / per-property flood probability, days before landfall
+```
+
+The label — historical *(terrain + rainfall) → (observed SAR extent)* pairs — comes from
+the Sentinel-1 archive itself, which has near-global flood coverage back to 2014. This is
+where Umbra/ICEYE genuinely add value, not as depth ground-truth but as **more
+extent-labeled training events**, especially useful for urban flooding where their
+sub-metre resolution resolves building-scale wet/dry boundaries that a 10m Sentinel-1
+pixel blurs into one guess. More labeled events → a better susceptibility surface. That
+part of the ML instinct is correct; it was just aimed at the wrong target (depth
+accuracy) in the first draft of this plan.
+
+This is exactly **Phase 3 from the original spec** ("pre-landfall forecast triage"),
+never built. Concretely: given a forecast track and rainfall outlook, before the storm
+makes landfall, rank a carrier's whole book by susceptibility so field crews, adjusters,
+and reserves get pre-positioned instead of reactive. No triage vendor at our scale is
+doing this. It is a well-established technique in the flood-susceptibility-mapping
+literature (logistic regression or gradient-boosted trees on exactly these terrain/rain
+features perform competitively — this does not need a novel architecture, just the
+feature pipeline and a labeled corpus), so the engineering risk is in data plumbing, not
+in the model.
+
+Scope discipline: this predicts **extent/probability**, not depth-in-feet. Depth still
+comes from §2C's physics once the event actually happens. The susceptibility model is a
+*before* product; the router is a *during/after* product. They are not in tension and
+should not be blurred into one claim.
+
 ---
 
 ## 3. The five adjuster flags — what's real on free data
@@ -191,19 +232,25 @@ What they **are**, and this is worth real effort:
    convincing slide we could put in front of a carrier.
 3. **A confirmation tier**, clearly labelled as opportunistic, where coverage happens to
    exist.
+4. **Training data for §2E's susceptibility model** — extra extent-labeled events,
+   particularly valuable at building-scale resolution.
 
-### On building an ML model — still no, and here is the sharper reason
+### On ML models — two different questions, two different answers
 
-Restating the prior assessment because it hasn't changed: `adjuster_feedback` does not yet
-hold enough labels to train anything that beats the physics. But the deeper point is that
-**a flood model is not a learning problem, it is a physics problem with a calibration
-layer on top** — and `pipeline/calibration.py` is already the right shape for that layer.
-It is built, tested, and starved.
+**"Should we train something to predict depth more accurately than the physics?"**
+Still no, and the reasoning hasn't changed: `adjuster_feedback` doesn't hold enough
+labels, and a flood model is fundamentally a physics problem with a calibration layer on
+top — `pipeline/calibration.py` is already that layer, built and tested, just starved.
+The ML work here is feeding it: every flag override, every first-floor-type correction,
+every agree/disagree is a label. Ship §2B and the flags, run one pilot, and the calibrator
+gets something real to fit. Training a net on 60 Houston addresses would be theatre.
 
-So the ML work is: feed it. Every flag override, every first-floor-type correction, every
-agree/disagree is a label. Ship §2B and the flags, run one pilot, and the calibrator will
-have something real to fit. Training a neural net on 60 Houston addresses would be
-theatre, and a technical buyer would catch it.
+**"Should we train something to predict flood *extent/susceptibility* before a satellite
+looks?"** Yes — that's §2E, and it's a different, well-posed problem: the training label
+(historical rainfall/terrain → observed SAR extent) is abundant and free from the
+Sentinel-1 archive, with Umbra/ICEYE adding higher-resolution confirmation events. This is
+the legitimate near-term ML build, and it's the one where "could Umbra/ICEYE help train a
+prediction model" turns out to be exactly right.
 
 ---
 
@@ -237,16 +284,27 @@ theatre, and a technical buyer would catch it.
 17. Umbra/ICEYE STAC overlap search against our detections
 18. Measured agreement statistics, published in the PDF and the UI
 
+**Phase F — Pre-Landfall Susceptibility Model**
+19. Historical Sentinel-1 flood-extent corpus (terrain/rainfall → observed extent pairs)
+20. Fold in Umbra/ICEYE overlap events for higher-resolution urban labels
+21. HAND + rainfall-forecast + land-cover feature pipeline
+22. Gradient-boosted susceptibility model, calibrated and backtested against held-out
+    historical events
+23. Pre-landfall book-ranking view, surfaced ahead of any SAR pass for a live storm
+
 Phases A and B are independent and can interleave. C depends on nothing but is the
-largest single build. D depends on B and C. E can start any time.
+largest single build. D depends on B and C. E can start any time. F depends on nothing
+code-wise but is a genuinely separate effort (data corpus + feature pipeline + model
+training + backtesting) — budget it as comparable in size to C, not as an add-on to it.
 
 ---
 
 ## 6. Things I am deliberately *not* proposing
 
 - **Buying tasking.** No budget, and it puts us in ICEYE's race.
-- **A trained ML depth model.** Not enough labels; physics is better here and we'd be
-  caught.
+- **A trained ML depth-accuracy model.** Not enough labels; physics is better here and
+  we'd be caught. (The susceptibility model in Phase F is a different task with a
+  different, abundant label — see §4.)
 - **"More accurate than X" claims.** We have no per-property ground truth. Phase E is how
   that changes, and not before.
 - **Auto-settlement.** We inform the decision. We don't make it.
@@ -257,9 +315,12 @@ largest single build. D depends on B and C. E can start any time.
 
 ## 7. What I need from you
 
-Approve, cut, or reorder. My recommendation is **A → B → C → D → E**: Phase A is nearly
-free and makes the demo visibly smarter this week, Phase B is what makes us a structure
-model rather than a map, and Phase C is the thing nobody else is doing.
+Approve, cut, or reorder. My recommendation is **A → B → C → D → E → F**: Phase A is
+nearly free and makes the demo visibly smarter this week, Phase B is what makes us a
+structure model rather than a map, Phase C is the thing nobody else is doing on the
+*during/after* side, and Phase F is the thing nobody else is doing on the *before* side —
+it's the largest standalone effort on this list, so it's sequenced last rather than
+competing with C for attention, not because it matters less.
 
 Once approved I will work straight through without further questions, committing to
 `claude/altis-physics-depth-034vaw` as each item lands, with tests for every phase.
