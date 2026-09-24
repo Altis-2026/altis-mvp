@@ -1,0 +1,28 @@
+{
+ "bbox": [
+  -82.15,
+  26.88,
+  -81.92,
+  27.08
+ ],
+ "window": [
+  "2022-09-25",
+  "2022-10-12"
+ ],
+ "archives": {
+  "umbra": {
+   "ok": true,
+   "items_in_window": 0,
+   "overlapping": 0,
+   "note": "Umbra STAC catalog covers 2023 onward"
+  },
+  "iceye": {
+   "ok": true,
+   "items_total": 552,
+   "items_in_window": 0,
+   "overlapping": 0
+  }
+ },
+ "overlaps": [],
+ "searched_at": "2026-09-24T01:00:31.206725Z"
+}

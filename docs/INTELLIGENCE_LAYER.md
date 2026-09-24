@@ -156,9 +156,16 @@ flag covers those events.
   a book ranking, the insured value at high risk, and an option to colour the
   map by probability. Portfolios can be scored against the live Open-Meteo 7-day
   forecast.
-* Back-tests against the demo events are shown in the panel: AUC against radar
-  observations for Lismore, and Spearman against NFIP claims per zip for
-  Harvey and Ian.
+* **Leave-one-event-out AUC 0.829 pooled** (445 chips; 2 skipped when the
+  CHIRPS server dropped the connection). Per held-out event: Spain 0.91,
+  Nigeria 0.90, USA 0.89, Sri Lanka 0.89, Pakistan 0.86, India 0.85,
+  Ghana 0.79, Paraguay 0.73, Bolivia 0.64, Somalia 0.63.
+* **Back-test on Altis's own data: Lismore AUC 0.868** against the
+  radar-observed flooding. That event was never in training.
+* Harvey and Ian: SAR-dry is not ground truth, so no AUC is claimed. Against
+  raw NFIP claim counts per zip the Spearman is negative (−0.30 / −0.13). This
+  is a weak test, because counts aren't normalised by homes or policies per
+  zip and nearly every sampled zip flooded. It is reported, not hidden.
 
 ## Rebuilding the baked data
 

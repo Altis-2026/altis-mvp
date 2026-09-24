@@ -10,15 +10,17 @@
   "rain_3day_mm",
   "rain_7day_mm"
  ],
- "rain7_over_rain3_median": 1.0,
+ "rain7_over_rain3_median": 1.17,
  "training": {
   "dataset": "Sen1Floods11 v1.1 hand-labelled chips (CC-BY 4.0)",
-  "chips": 24,
-  "samples": 7200,
+  "chips": 409,
+  "samples": 204484,
   "events": [
    "Bolivia",
    "Ghana",
    "India",
+   "Nigeria",
+   "Pakistan",
    "Paraguay",
    "Somalia",
    "Spain",
@@ -38,91 +40,157 @@
  },
  "validation": {
   "scheme": "leave-one-event-out",
-  "pooled_oof_auc": 0.722,
+  "pooled_oof_auc": 0.829,
   "per_event": {
    "Bolivia": {
-    "n": 600,
-    "flood_share": 0.338,
-    "auc": 0.807,
-    "brier": 0.2828
+    "n": 7500,
+    "flood_share": 0.157,
+    "auc": 0.639,
+    "brier": 0.1463
+   },
+   "Ghana": {
+    "n": 23984,
+    "flood_share": 0.091,
+    "auc": 0.792,
+    "brier": 0.068
    },
    "India": {
-    "n": 1200,
-    "flood_share": 0.083,
-    "auc": 0.785,
-    "brier": 0.0866
+    "n": 34000,
+    "flood_share": 0.113,
+    "auc": 0.851,
+    "brier": 0.0791
+   },
+   "Nigeria": {
+    "n": 9000,
+    "flood_share": 0.218,
+    "auc": 0.901,
+    "brier": 0.1494
+   },
+   "Pakistan": {
+    "n": 14000,
+    "flood_share": 0.058,
+    "auc": 0.863,
+    "brier": 0.0499
    },
    "Paraguay": {
-    "n": 2100,
-    "flood_share": 0.028,
-    "auc": 0.76,
-    "brier": 0.0268
+    "n": 33500,
+    "flood_share": 0.071,
+    "auc": 0.728,
+    "brier": 0.0608
    },
    "Somalia": {
-    "n": 600,
-    "flood_share": 0.107,
-    "auc": 0.289,
-    "brier": 0.1058
+    "n": 13000,
+    "flood_share": 0.065,
+    "auc": 0.634,
+    "brier": 0.0677
    },
    "Spain": {
-    "n": 300,
-    "flood_share": 0.09,
-    "auc": 0.513,
-    "brier": 0.4519
+    "n": 15000,
+    "flood_share": 0.091,
+    "auc": 0.907,
+    "brier": 0.0613
    },
    "Sri-Lanka": {
-    "n": 900,
-    "flood_share": 0.037,
-    "auc": 0.888,
-    "brier": 0.0481
+    "n": 20500,
+    "flood_share": 0.046,
+    "auc": 0.89,
+    "brier": 0.0361
+   },
+   "USA": {
+    "n": 34000,
+    "flood_share": 0.032,
+    "auc": 0.892,
+    "brier": 0.0281
    }
   },
-  "oof_brier_calibrated": 0.0716,
+  "oof_brier_calibrated": 0.0619,
   "reliability": [
    {
     "bin_lo": 0.0,
     "bin_hi": 0.1,
-    "mean_predicted": 0.0395,
-    "observed_frequency": 0.0397,
-    "count": 4252
+    "mean_predicted": 0.0352,
+    "observed_frequency": 0.0353,
+    "count": 159406
    },
    {
     "bin_lo": 0.1,
     "bin_hi": 0.2,
-    "mean_predicted": 0.148,
-    "observed_frequency": 0.1443,
-    "count": 194
+    "mean_predicted": 0.1463,
+    "observed_frequency": 0.1457,
+    "count": 24835
    },
    {
     "bin_lo": 0.2,
     "bin_hi": 0.3,
-    "mean_predicted": 0.2312,
-    "observed_frequency": 0.2315,
-    "count": 1244
+    "mean_predicted": 0.2278,
+    "observed_frequency": 0.2256,
+    "count": 7850
    },
    {
     "bin_lo": 0.3,
     "bin_hi": 0.4,
-    "mean_predicted": 0.3158,
-    "observed_frequency": 0.1,
-    "count": 10
+    "mean_predicted": 0.3618,
+    "observed_frequency": 0.3583,
+    "count": 5093
+   },
+   {
+    "bin_lo": 0.4,
+    "bin_hi": 0.5,
+    "mean_predicted": 0.4455,
+    "observed_frequency": 0.4426,
+    "count": 3518
+   },
+   {
+    "bin_lo": 0.5,
+    "bin_hi": 0.6,
+    "mean_predicted": 0.5497,
+    "observed_frequency": 0.5442,
+    "count": 2003
+   },
+   {
+    "bin_lo": 0.6,
+    "bin_hi": 0.7,
+    "mean_predicted": 0.6346,
+    "observed_frequency": 0.6034,
+    "count": 1044
+   },
+   {
+    "bin_lo": 0.7,
+    "bin_hi": 0.8,
+    "mean_predicted": 0.7519,
+    "observed_frequency": 0.6963,
+    "count": 438
+   },
+   {
+    "bin_lo": 0.8,
+    "bin_hi": 0.9,
+    "mean_predicted": 0.8382,
+    "observed_frequency": 0.7031,
+    "count": 256
+   },
+   {
+    "bin_lo": 0.9,
+    "bin_hi": 1.0,
+    "mean_predicted": 0.9303,
+    "observed_frequency": 0.7073,
+    "count": 41
    }
   ],
   "single_feature_auc": {
-   "hand_m": 0.788,
-   "relelev_2km": 0.815
+   "hand_m": 0.75,
+   "relelev_2km": 0.733
   }
  },
  "feature_importance": {
-  "hand_m": 0.072,
-  "slope_deg": 0.119,
-  "log_acc_km2": 0.088,
-  "dist_stream_m": 0.11,
-  "relelev_500m": 0.088,
-  "relelev_2km": 0.11,
-  "jrc_occ_pct": 0.067,
-  "rain_3day_mm": 0.165,
-  "rain_7day_mm": 0.183
+  "hand_m": 0.056,
+  "slope_deg": 0.058,
+  "log_acc_km2": 0.052,
+  "dist_stream_m": 0.057,
+  "relelev_500m": 0.057,
+  "relelev_2km": 0.108,
+  "jrc_occ_pct": 0.077,
+  "rain_3day_mm": 0.272,
+  "rain_7day_mm": 0.263
  },
- "created_at": "2026-09-24T01:25:15.644401Z"
+ "created_at": "2026-09-24T02:12:37.557242Z"
 }

@@ -220,7 +220,8 @@ export default function PrelandfallPanel({ eventId, eventLabel, eventProperties,
               <div style={{ ...card, marginBottom: 14, fontSize: '0.72rem', color: 'var(--text-body)', lineHeight: 1.55 }}>
                 {data.backtest.vs_nfip_claims && (
                   <div style={{ marginBottom: 6 }}>
-                    vs FEMA flood-insurance claims: Spearman <b>{data.backtest.vs_nfip_claims.spearman}</b> across {data.backtest.vs_nfip_claims.zips} zip codes.
+                    vs FEMA flood-insurance claims per zip: Spearman <b>{data.backtest.vs_nfip_claims.spearman}</b> across {data.backtest.vs_nfip_claims.zips} zips.
+                    <span style={{ color: 'var(--text-muted)' }}> A weak test: raw claim counts aren't normalised by how many homes or policies each zip has, and nearly every zip in this sample flooded.</span>
                   </div>
                 )}
                 {data.backtest.vs_sar?.auc != null && (
