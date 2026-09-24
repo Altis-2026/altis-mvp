@@ -73,6 +73,7 @@ export default function Globe({
   leftInset = 0,
   stormTrack = null,
   zoneBbox = null,
+  pinColorOverride = null,   // {property_id: colour} from the pre-landfall panel
 }) {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
@@ -509,6 +510,38 @@ export default function Globe({
         }
       });
 
+      /* Synthetic revisit made visible: where the router says the water stood
+         higher before the satellite passed, a faint shell shows the peak. */
+      map.addLayer({
+        id:     'building-water-peak',
+        type:   'fill-extrusion',
+        source: 'buildings-3d',
+        filter: ['==', ['get', 'kind'], 'water_peak'],
+        layout: { visibility: 'none' },
+        paint: {
+          'fill-extrusion-color':   '#90CAF9',
+          'fill-extrusion-base':    ['get', 'base'],
+          'fill-extrusion-height':  ['get', 'height'],
+          'fill-extrusion-opacity': 0.22,
+        }
+      });
+
+      /* The finished-floor line: a thin white band just proud of the walls at
+         first-floor height, so water can be read against the floor. */
+      map.addLayer({
+        id:     'building-floor',
+        type:   'fill-extrusion',
+        source: 'buildings-3d',
+        filter: ['==', ['get', 'kind'], 'floor'],
+        layout: { visibility: 'none' },
+        paint: {
+          'fill-extrusion-color':   '#F4F5F7',
+          'fill-extrusion-base':    ['get', 'base'],
+          'fill-extrusion-height':  ['get', 'height'],
+          'fill-extrusion-opacity': 0.95,
+        }
+      });
+
       pinsReady.current = true;
 
       /* ── Flood overlay (raster, inserted below pins) */
@@ -534,12 +567,19 @@ export default function Globe({
        through JSON: null can arrive as the string "null" and booleans as
        "true"/"false", which would make the drawer render NaN/garbage —
        sanitize back to real types before handing to React. */
+    /* Feature properties are a slimmed, JSON-round-tripped copy (nested
+       objects such as `intel` are kept out of the map source), so resolve
+       the full row by id — real types, nothing stringified. */
+    const fullRow = (clean) =>
+      allPropsRef.current.find(p => String(p.property_id) === String(clean.property_id));
     map.on('click', 'pins', (e) => {
-      onPropertySelect?.(cleanFeatureProps(e.features[0].properties));
+      const clean = cleanFeatureProps(e.features[0].properties);
+      onPropertySelect?.({ ...clean, ...(fullRow(clean) || {}) });
     });
 
     map.on('click', 'portfolio-pins', (e) => {
-      onPropertySelect?.({ ...cleanFeatureProps(e.features[0].properties), isPortfolio: true });
+      const clean = cleanFeatureProps(e.features[0].properties);
+      onPropertySelect?.({ ...clean, ...(fullRow(clean) || {}), isPortfolio: true });
     });
 
     /* Clicking a house opens the same drawer its pin would — in inspect mode
@@ -607,10 +647,11 @@ export default function Globe({
       features: properties.map(p => ({
         type:       'Feature',
         geometry:   { type: 'Point', coordinates: [+p.longitude, +p.latitude] },
-        properties: { ...p, color: TRIAGE_COLORS[p.impact_class] || '#6B8FA3' },
+        properties: { ...slimFeatureProps(p),
+                      color: pinColorOverride?.[String(p.property_id)] || TRIAGE_COLORS[p.impact_class] || '#6B8FA3' },
       }))
     });
-  }, [properties]);
+  }, [properties, pinColorOverride]);
 
   /* ── Update portfolio properties ─────────────────────────────── */
   useEffect(() => {
@@ -626,7 +667,8 @@ export default function Globe({
       features: valid.map(p => ({
         type:       'Feature',
         geometry:   { type: 'Point', coordinates: [+p.longitude, +p.latitude] },
-        properties: { ...p, color: TRIAGE_COLORS[p.impact_class] || '#E8D5A3' },
+        properties: { ...slimFeatureProps(p),
+                      color: pinColorOverride?.[String(p.property_id)] || TRIAGE_COLORS[p.impact_class] || '#E8D5A3' },
       }))
     });
 
@@ -674,7 +716,7 @@ export default function Globe({
         properties: { label: `PORTFOLIO · ${valid.length} PROPERTIES` },
       }],
     });
-  }, [portfolioProperties]);
+  }, [portfolioProperties, pinColorOverride]);
 
   /* ── Event zone box (zone-summary scope) ─────────────────────── */
   useEffect(() => {
@@ -926,7 +968,7 @@ export default function Globe({
           });
         }
         map.setTerrain({ source: 'mapbox-dem', exaggeration: TERRAIN_EXAGGERATION });
-        ['building-walls', 'building-roofs', 'building-water'].forEach(id => {
+        BUILDING_LAYERS.forEach(id => {
           if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
         });
 
@@ -943,7 +985,7 @@ export default function Globe({
         });
         scheduleBuildingRefresh();
       } else {
-        ['building-walls', 'building-roofs', 'building-water'].forEach(id => {
+        BUILDING_LAYERS.forEach(id => {
           if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
         });
         if (map.getSource('buildings-3d')) map.getSource('buildings-3d').setData(emptyFC());
@@ -1260,6 +1302,21 @@ function footprintSummary(status) {
   if (status.matched) parts.push(`${status.matched} mapped footprint${status.matched === 1 ? '' : 's'}`);
   if (estimated)      parts.push(`${estimated} placeholder box${estimated === 1 ? '' : 'es'}`);
   return parts.join(' · ');
+}
+
+const BUILDING_LAYERS = ['building-walls', 'building-roofs', 'building-water',
+                         'building-water-peak', 'building-floor'];
+
+/* Map sources only need scalar fields for styling and filtering; nested
+   objects (the intelligence layer) would be JSON-stringified by the map and
+   multiply the source size, so they are left out and looked up on click. */
+function slimFeatureProps(p) {
+  const out = {};
+  for (const [k, v] of Object.entries(p || {})) {
+    if (v !== null && typeof v === 'object') continue;
+    out[k] = v;
+  }
+  return out;
 }
 
 /* Undo Mapbox GL's JSON round-trip on feature properties: "null" → null,

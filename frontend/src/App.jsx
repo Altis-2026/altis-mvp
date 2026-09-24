@@ -13,6 +13,7 @@ import SarComparePanel    from './components/SarComparePanel.jsx';
 import ReportsPanel       from './components/ReportsPanel.jsx';
 import DispatchQueuePanel from './components/DispatchQueuePanel.jsx';
 import OperationsPanel    from './components/OperationsPanel.jsx';
+import PrelandfallPanel   from './components/PrelandfallPanel.jsx';
 import DataGrid           from './components/DataGrid.jsx';
 import ChatBar            from './components/ChatBar.jsx';
 import { api }            from './services/api.js';
@@ -29,6 +30,13 @@ function computeBounds(properties) {
     if (lon > maxLon) maxLon = lon;
   });
   return [[minLon, minLat], [maxLon, maxLat]];
+}
+
+/* Portfolio rows remember which stored analysis they came from ('live' or a
+   pre-baked event id), so the drawer's deep analysis and evidence pack ask
+   the backend for the right record even after the user switches events. */
+function withEventKey(rows, key) {
+  return (rows || []).map(r => ({ ...r, portfolio_event_id: key }));
 }
 
 export default function App() {
@@ -52,6 +60,7 @@ export default function App() {
 
   /* ── Sidebar ──────────────────────────────────────────────────── */
   const [activePanel, setActivePanel] = useState(null);
+  const [pinColorOverride, setPinColorOverride] = useState(null); // {property_id: colour} | null
   const leftInset = RAIL_WIDTH + (activePanel ? PANEL_WIDTH : 0);
 
   /* ── Claims data grid (full-screen) ──────────────────────────── */
@@ -193,7 +202,7 @@ export default function App() {
       try {
         const saved = await api.getResults(id, 'live');
         if (saved?.results?.some(r => r.impact_class)) {
-          setPortfolioProps(saved.results);
+          setPortfolioProps(withEventKey(saved.results, 'live'));
           setPortfolioAnalyzed(true);
           setLiveMeta(saved.meta || null);
           if (saved.meta?.windows?.post_start) {
@@ -214,7 +223,7 @@ export default function App() {
     setAnalyzing(true);
     try {
       const data = await api.analyzePortfolio(portfolioId, selectedEvent);
-      setPortfolioProps(data.results || []);
+      setPortfolioProps(withEventKey(data.results, selectedEvent));
       setPortfolioAnalyzed(true);
     } catch (err) {
       console.error('Portfolio analysis failed:', err);
@@ -237,7 +246,7 @@ export default function App() {
       if (bboxFilter) payload.bbox_filter = bboxFilter;
 
       const data = await api.analyzeLive(pid, payload);
-      setPortfolioProps(data.results || []);
+      setPortfolioProps(withEventKey(data.results, 'live'));
       setPortfolioAnalyzed(true);
       setLiveMeta(data.meta || null);
       setLiveEventDate(eventDate);
@@ -304,6 +313,7 @@ export default function App() {
         leftInset={leftInset}
         stormTrack={stormTrack}
         zoneBbox={zoneSummary?.zone_source === 'event' ? zoneSummary.bbox : null}
+        pinColorOverride={pinColorOverride}
       />
 
       <Header
@@ -373,6 +383,17 @@ export default function App() {
             zoneSummary={zoneSummary}
             liveError={liveError}
             onDismissError={() => setLiveError('')}
+          />
+        )}
+        {activePanel === 'prelandfall' && (
+          <PrelandfallPanel
+            eventId={selectedEvent}
+            eventLabel={selectedEventMeta?.label}
+            eventProperties={properties}
+            portfolioId={portfolioId}
+            portfolioProperties={portfolioProps}
+            onSelectProperty={setSelectedProperty}
+            onColorOverride={setPinColorOverride}
           />
         )}
         {activePanel === 'compare' && (

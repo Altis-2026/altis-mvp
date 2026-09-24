@@ -125,6 +125,46 @@ rainfall, zones — reload from the database.
 
 ---
 
+## 10. Intelligence layer (flags · floor depth · synthetic revisit · pre-landfall)
+
+Full technical write-up: `docs/INTELLIGENCE_LAYER.md`.
+
+1. **Harvey → KPI bar.** You should see a new tile, **Wrongful Denials Prevented: 577**.
+   Remote-Deny drops from 842 to 265 because those properties are held back to Review.
+2. **Click any orange (Review) pin in Harvey.** The drawer opens with **Held back:
+   Remote-Deny → Review** and an ALERT, *Transient flooding likely missed by SAR*.
+   It quotes ~750 mm of rain, height above drainage, and "radar pass came 1.5 days
+   after the peak". Click **Evidence**, then **Confirm** or **Dismiss**; the verdict
+   saves as a label.
+3. **Ian → any pin.** You should see *Hurricane wind + possible undetected flooding*
+   (≈105–110 kt open-terrain) and the 4-day radar lag (Sentinel-1 didn't image
+   Port Charlotte until Oct 2).
+4. **Lismore → a red (Dispatch) pin.** Check three sections:
+   - **Water vs. finished floor**: the schematic shows the floor line, the water at
+     the satellite pass, and the higher routed peak.
+   - **Synthetic revisit**: the hydrograph peaks Feb 28 and the orange line marks the
+     Mar 2 satellite pass. The fit CSI appears in the caption.
+   - **Event context**: *Uninhabitable (planning)* gives a day range and hotel vs
+     long-let.
+5. **Evidence pack.** Click **⬇ Forensic evidence pack (PDF)** at the bottom of the
+   intel section. You get a 4-page PDF with the site map, lineage, limitations, and a
+   SHA-256 input digest in the footer.
+6. **3D.** Enter 3D inspect mode on Lismore at street zoom. Houses show a white
+   finished-floor band, the dark-blue observed water, and a faint light-blue shell
+   where the router says the peak stood higher.
+7. **Pre-landfall panel** (new sidebar icon under Analysis). With an event selected,
+   drag the rainfall slider: the band counts and the ranked list update instantly.
+   Tick **Colour map pins by flood probability**. Open **Model card** to see the
+   leave-one-event-out validation. With a portfolio loaded, click **Score vs 7-day
+   forecast** (live Open-Meteo).
+8. **Portfolio deep analysis.** On a live-analysed portfolio, open a property and
+   click **Run deep analysis** (1–3 min). The flags, floor depth and (if SAR saw
+   enough flooding) the routed hydrograph appear for every property.
+9. **API spot-checks:**
+   `GET /api/validation/nfip/harvey` · `GET /api/events/lismore/intel` ·
+   `POST /api/triage/route {"event_id":"lismore","property_id":"NRIV-00010"}` ·
+   `POST /api/triage/silent/harvey {"fnol_property_ids":[]}`.
+
 ## Known honest limitations (say these in demos, don't hide them)
 
 - **Storm surge**: recedes within hours; if no satellite pass catches it, we

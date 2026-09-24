@@ -152,6 +152,44 @@ export const api = {
     }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
   getFeedback: (evtId) => get(`/events/${evtId}/feedback`),
 
+  /* Intelligence layer (flags, structure depth, wind, routed hydrograph) */
+  getPortfolioIntel: (pid, evtId) => get(`/portfolio/${pid}/intel/${evtId}`),
+  runPortfolioIntel: (pid, evtId) =>
+    authFetch(`/portfolio/${pid}/intel/${evtId}`, { method: 'POST' })
+      .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+  submitFlagFeedback: (propertyId, payload) =>
+    authFetch(`/property/${propertyId}/flag-feedback`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+  evidencePackUrl: (propertyId, query) =>
+    `${BASE}/property/${encodeURIComponent(propertyId)}/evidence-pack?${new URLSearchParams(query)}`,
+  downloadEvidencePack: (propertyId, query) =>
+    authFetch(`/property/${encodeURIComponent(propertyId)}/evidence-pack?${new URLSearchParams(query)}`)
+      .then(async r => {
+        if (!r.ok) {
+          let detail = `Request failed (${r.status})`;
+          try { const j = await r.json(); if (j?.detail) detail = j.detail; } catch { /* binary */ }
+          throw new Error(detail);
+        }
+        return r.blob();
+      }),
+
+  /* Pre-landfall susceptibility (Phase F) */
+  getSusceptibility: (evtId) => get(`/events/${evtId}/susceptibility`),
+  getSusceptibilityModel: () => get('/susceptibility/model'),
+  runSusceptibility: (body) =>
+    authFetch('/susceptibility', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+  getOpenDataValidation: (evtId) => get(`/validation/opendata/${evtId}`),
+  silentClaims: (evtId, body) =>
+    authFetch(`/triage/silent/${evtId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
+
   /* Pipeline runs (monitor → pipeline loop) */
   getRuns:   ()        => get('/runs'),
   createRun: (payload) => authFetch('/runs', {

@@ -458,3 +458,59 @@ SOLAR = {
     'timeout_s':         12,
     'cache_ttl_hours':   2160,     # roof geometry is static (90 days)
 }
+
+# ─── INTELLIGENCE LAYER: FLAGS, STRUCTURE DEPTH, ROUTER (Phases A–C) ─────────
+# Thresholds for the adjuster flags in pipeline/flags.py. Each is a published
+# convention or a deliberately conservative screening cut, documented inline.
+INTEL = {
+    'dem_res_m':       30.0,   # terrain grid for HAND / sampling (AWS Terrain Tiles)
+    'hand_stream_km2': 1.0,    # contributing area that defines a drainage line
+    'wind': {
+        'damaging_kt':  50.0,  # sustained wind where roof-cover/opening damage becomes common
+        'land_factor':  0.85,  # marine → open-terrain reduction of 1-min sustained wind
+        'water_in_ft':  0.1,   # water above the finished floor
+        'water_lot_ft': 0.1,   # water at grade
+    },
+    'transient': {
+        'heavy_rain_3day_mm':   100.0,   # ~4 in / 3 days: flash-flood territory on low ground
+        'extreme_rain_3day_mm': 200.0,   # ~8 in / 3 days
+        'low_hand_m':           3.0,     # within 3 m of the nearest drainage line
+        'very_low_hand_m':      1.5,
+        'min_lag_hours':        12.0,    # SAR pass ≥ 12 h after the peak → drainage possible
+        'surge_max_ground_m':   3.0,     # ground ≤ 3 m above sea level under hurricane wind → caution
+        'surge_alert_ground_m': 2.0,     # ≤ 2 m → alert (typical major-hurricane surge reach)
+        'rain_lookback_days':   7,
+    },
+    'prior_water': {
+        'point_min_pct':  10.0,  # wet in ≥10% of JRC observations at the point…
+        'near_min_pct':   40.0,  # …or ≥40% somewhere within the radius
+        'near_radius_m':  30.0,
+        'caution_pct':    25.0,  # SAR-flooded + this recurrence → baseline-water caution
+    },
+    'access': {
+        'impassable_m': 0.30,    # NWS/FEMA "Turn Around Don't Drown": 12 in carries most cars
+        'snap_m':       200.0,
+    },
+    # Flag action: a TRANSIENT_MISS alert holds a Remote-Deny back to Review.
+    'hold_remote_deny': True,
+}
+
+# ─── HYDRAULIC ROUTER (Phase C) ───────────────────────────────────────────────
+ROUTER = {
+    'pad_deg':        0.35,    # route over the contributing catchment, not just the study box
+    'res_calib_m':    1000.0,  # coarse grid for the calibration search
+    'res_final_m':    500.0,   # grid for the reported run
+    'manning_floodplain': 0.06,
+    'manning_channel':    0.035,
+    'channel_area_km2':   25.0,   # cells draining ≥ this are burned toward their block minimum…
+    'burn_max_m':         2.0,    # …by at most this much (a channel is not a cell-wide trench)
+    'cfl':            0.4,
+    'k_grid':         [0.5, 0.8, 1.1, 1.5, 2.0, 2.6],  # runoff/forcing multiplier search
+    'k_refine':       2,       # golden refinements around the best grid value
+    'wet_sim_m':      0.10,    # simulated depth that SAR would call water
+    'obs_wet_ft':     0.30,    # SAR depth that counts as an observed wet point
+    'spinup_days':    7,       # rainfall window before the first post-event day
+    'after_pass_h':   18,      # keep simulating this long after the calibration pass
+    'min_wet_obs':    10,      # fewer observed wet points than this → not calibratable
+    'record_every_h': 1.0,
+}

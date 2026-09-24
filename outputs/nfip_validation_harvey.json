@@ -1,0 +1,678 @@
+{
+ "event_id": "harvey",
+ "truth": "FEMA NFIP redacted claims (OpenFEMA FimaNfipClaims), zip level",
+ "window": [
+  "2017-08-24",
+  "2017-09-08"
+ ],
+ "thresholds": {
+  "confirmed_min_claims": 25,
+  "quiet_max_claims": 2
+ },
+ "zips": {
+  "10005": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "10805": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "10807": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "10825": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "11215": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "11303": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "11405": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "11503": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "11999": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "12534": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "14925": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "75057": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "77004": {
+   "claims": 234,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 10300.314999999999
+  },
+  "77005": {
+   "claims": 214,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 13511.134999999998
+  },
+  "77006": {
+   "claims": 57,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 3189.49
+  },
+  "77007": {
+   "claims": 246,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 16411.68
+  },
+  "77008": {
+   "claims": 689,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 25264.01
+  },
+  "77009": {
+   "claims": 238,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 15910.244999999999
+  },
+  "77019": {
+   "claims": 101,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 28414.79
+  },
+  "77024": {
+   "claims": 878,
+   "median_water_depth_in": 2.0,
+   "median_building_paid_usd": 87192.255
+  },
+  "77025": {
+   "claims": 1353,
+   "median_water_depth_in": 2.0,
+   "median_building_paid_usd": 84998.695
+  },
+  "77027": {
+   "claims": 63,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 9345.07
+  },
+  "77030": {
+   "claims": 170,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 1722.4099999999999
+  },
+  "77031": {
+   "claims": 108,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 38095.41
+  },
+  "77035": {
+   "claims": 855,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 95000.0
+  },
+  "77036": {
+   "claims": 69,
+   "median_water_depth_in": 0.0,
+   "median_building_paid_usd": 0.0
+  },
+  "77042": {
+   "claims": 506,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 142334.19
+  },
+  "77043": {
+   "claims": 122,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 23885.6
+  },
+  "77045": {
+   "claims": 116,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 6094.68
+  },
+  "77046": {
+   "claims": 9,
+   "median_water_depth_in": 0.0,
+   "median_building_paid_usd": 0.0
+  },
+  "77047": {
+   "claims": 202,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 14748.34
+  },
+  "77051": {
+   "claims": 35,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 3846.84
+  },
+  "77054": {
+   "claims": 37,
+   "median_water_depth_in": 0.0,
+   "median_building_paid_usd": 0.0
+  },
+  "77055": {
+   "claims": 88,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 9194.985
+  },
+  "77056": {
+   "claims": 248,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 86395.875
+  },
+  "77057": {
+   "claims": 121,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 25239.93
+  },
+  "77058": {
+   "claims": 342,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 8108.099999999999
+  },
+  "77063": {
+   "claims": 367,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 56755.38
+  },
+  "77071": {
+   "claims": 259,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 23014.88
+  },
+  "77072": {
+   "claims": 354,
+   "median_water_depth_in": 0.0,
+   "median_building_paid_usd": 0.0
+  },
+  "77074": {
+   "claims": 1143,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 66694.73000000001
+  },
+  "77077": {
+   "claims": 696,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 77125.18
+  },
+  "77079": {
+   "claims": 1725,
+   "median_water_depth_in": 3.0,
+   "median_building_paid_usd": 212831.505
+  },
+  "77080": {
+   "claims": 117,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 16782.21
+  },
+  "77081": {
+   "claims": 105,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 6974.52
+  },
+  "77085": {
+   "claims": 28,
+   "median_water_depth_in": 0.5,
+   "median_building_paid_usd": 2287.89
+  },
+  "77096": {
+   "claims": 2516,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 127739.12
+  },
+  "77098": {
+   "claims": 42,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 4686.215
+  },
+  "77099": {
+   "claims": 275,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 7689.44
+  },
+  "77401": {
+   "claims": 2083,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 78324.995
+  },
+  "77402": {
+   "claims": 0,
+   "median_water_depth_in": null,
+   "median_building_paid_usd": null
+  },
+  "77477": {
+   "claims": 65,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 10906.65
+  },
+  "77478": {
+   "claims": 72,
+   "median_water_depth_in": 0.0,
+   "median_building_paid_usd": 0.0
+  },
+  "77489": {
+   "claims": 100,
+   "median_water_depth_in": 1.0,
+   "median_building_paid_usd": 4520.3150000000005
+  }
+ },
+ "properties_with_zip": 700,
+ "sar_only_remote_deny": 606,
+ "sar_only_deny_in_flood_confirmed_zips": 592,
+ "catch_rate": 0.698,
+ "sar_only_deny_in_quiet_zips": 10,
+ "quiet_hold_rate": 0.9,
+ "nfip_claims_total_in_sample_zips": 17048,
+ "zip_spearman_claims_vs_held_share": -0.255,
+ "zip_table": [
+  {
+   "zip": "77096",
+   "properties": 75,
+   "nfip_claims": 2516,
+   "held_share": 0.4,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77401",
+   "properties": 83,
+   "nfip_claims": 2083,
+   "held_share": 0.928,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77079",
+   "properties": 23,
+   "nfip_claims": 1725,
+   "held_share": 0.478,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77025",
+   "properties": 18,
+   "nfip_claims": 1353,
+   "held_share": 0.5,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77074",
+   "properties": 12,
+   "nfip_claims": 1143,
+   "held_share": 0.417,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77024",
+   "properties": 28,
+   "nfip_claims": 878,
+   "held_share": 0.321,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77035",
+   "properties": 4,
+   "nfip_claims": 855,
+   "held_share": 0.75,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77077",
+   "properties": 3,
+   "nfip_claims": 696,
+   "held_share": 0.667,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77008",
+   "properties": 7,
+   "nfip_claims": 689,
+   "held_share": 0.429,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77042",
+   "properties": 9,
+   "nfip_claims": 506,
+   "held_share": 0.333,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77063",
+   "properties": 12,
+   "nfip_claims": 367,
+   "held_share": 0.75,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77072",
+   "properties": 8,
+   "nfip_claims": 354,
+   "held_share": 0.75,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77058",
+   "properties": 1,
+   "nfip_claims": 342,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77099",
+   "properties": 5,
+   "nfip_claims": 275,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77071",
+   "properties": 2,
+   "nfip_claims": 259,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77056",
+   "properties": 45,
+   "nfip_claims": 248,
+   "held_share": 0.711,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77007",
+   "properties": 54,
+   "nfip_claims": 246,
+   "held_share": 0.241,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77009",
+   "properties": 1,
+   "nfip_claims": 238,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77004",
+   "properties": 3,
+   "nfip_claims": 234,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77005",
+   "properties": 22,
+   "nfip_claims": 214,
+   "held_share": 0.955,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77047",
+   "properties": 41,
+   "nfip_claims": 202,
+   "held_share": 0.122,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77030",
+   "properties": 20,
+   "nfip_claims": 170,
+   "held_share": 0.6,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77043",
+   "properties": 10,
+   "nfip_claims": 122,
+   "held_share": 0.9,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77057",
+   "properties": 38,
+   "nfip_claims": 121,
+   "held_share": 0.974,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77080",
+   "properties": 1,
+   "nfip_claims": 117,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77045",
+   "properties": 2,
+   "nfip_claims": 116,
+   "held_share": 0.5,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77031",
+   "properties": 4,
+   "nfip_claims": 108,
+   "held_share": 0.5,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77081",
+   "properties": 9,
+   "nfip_claims": 105,
+   "held_share": 0.778,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77019",
+   "properties": 22,
+   "nfip_claims": 101,
+   "held_share": 0.682,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77489",
+   "properties": 3,
+   "nfip_claims": 100,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77055",
+   "properties": 13,
+   "nfip_claims": 88,
+   "held_share": 0.846,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77478",
+   "properties": 6,
+   "nfip_claims": 72,
+   "held_share": 0.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77036",
+   "properties": 14,
+   "nfip_claims": 69,
+   "held_share": 0.714,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77477",
+   "properties": 4,
+   "nfip_claims": 65,
+   "held_share": 0.5,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77027",
+   "properties": 17,
+   "nfip_claims": 63,
+   "held_share": 0.353,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77006",
+   "properties": 15,
+   "nfip_claims": 57,
+   "held_share": 0.933,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77098",
+   "properties": 26,
+   "nfip_claims": 42,
+   "held_share": 0.769,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77054",
+   "properties": 18,
+   "nfip_claims": 37,
+   "held_share": 0.444,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77051",
+   "properties": 1,
+   "nfip_claims": 35,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77085",
+   "properties": 4,
+   "nfip_claims": 28,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77046",
+   "properties": 4,
+   "nfip_claims": 9,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "11503",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "12534",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 0.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "11999",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 0.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "11405",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "11303",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "10807",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "10825",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "10005",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "10805",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "75057",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 0.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "14925",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "11215",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 0.0,
+   "sar_flooded_share": 0.0
+  },
+  {
+   "zip": "77402",
+   "properties": 1,
+   "nfip_claims": 0,
+   "held_share": 1.0,
+   "sar_flooded_share": 0.0
+  }
+ ],
+ "limitations": [
+  "Zip-level truth: NFIP claims are released without addresses.",
+  "NFIP take-up differs by zip; a claim count is not a count of flooded homes.",
+  "Quiet zips may still contain uninsured flooding; the quiet-hold rate is a proxy for false alarms."
+ ],
+ "generated_at": "2026-09-24T01:30:42.332376+00:00"
+}

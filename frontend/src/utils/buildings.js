@@ -284,6 +284,10 @@ export function expandRing(ring, meters) {
  *   kind='wall'  — the footprint extruded to eave height, coloured by triage
  *   kind='roof'  — the stepped gable slabs
  *   kind='water' — the flood plane, ground → depth, only when depth > 0
+ *   kind='water_peak' — the routed peak water level, when it stood higher
+ *                  than at the satellite pass (property.intel.hydrograph)
+ *   kind='floor' — a thin band at the finished-floor height
+ *                  (property.intel.structure.floor_height_ft)
  */
 export function buildingFeatures(building, property, options = {}) {
   const {
@@ -345,6 +349,36 @@ export function buildingFeatures(building, property, options = {}) {
         color: '#2E86C1',
       },
     });
+  }
+
+  const intel = property?.intel && typeof property.intel === 'object' ? property.intel : null;
+  const peakFt = Number(intel?.hydrograph?.peak_depth_ft);
+  if (Number.isFinite(peakFt) && peakFt >= minDepthFt && peakFt > depthFt + 0.1) {
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [expandRing(ring, apronM + 0.4)] },
+      properties: {
+        ...shared, kind: 'water_peak',
+        base: 0, height: peakFt * FT_TO_M,
+        color: '#90CAF9',
+      },
+    });
+  }
+
+  const floorFt = Number(intel?.structure?.floor_height_ft);
+  if (Number.isFinite(floorFt) && floorFt > 0) {
+    const floorM = floorFt * FT_TO_M;
+    if (floorM < eave - 0.3) {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [expandRing(ring, 0.18)] },
+        properties: {
+          ...shared, kind: 'floor',
+          base: floorM, height: floorM + 0.12,
+          color: '#F4F5F7',
+        },
+      });
+    }
   }
 
   return features;

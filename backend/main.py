@@ -36,6 +36,7 @@ from fastapi import (
     FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Body, Depends, Header, Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from backend.database import (
@@ -46,6 +47,8 @@ from backend.database import (
     save_pending_upload, get_pending_upload, delete_pending_upload,
     save_feedback, get_feedback_for_event, get_feedback_summary,
     save_run, list_runs, update_run_status,
+    load_event_intel, save_flag_feedback, flag_feedback_summary,
+    save_portfolio_intel, get_portfolio_intel,
 )
 from backend.priority import rank_dispatch
 from backend.geocoder import geocode_batch
@@ -100,6 +103,10 @@ app = FastAPI(
 # frontend's exact domain); defaults to "*" for local dev, where the browser
 # is always talking to localhost so an open policy is harmless.
 _allowed_origins = os.getenv('ALLOWED_ORIGINS', '*')
+# Event payloads now carry the intelligence layer (flags, hydrographs) — a
+# few MB of highly repetitive JSON that gzips ~8×. PDFs and images are left
+# alone by the size/type heuristics of the middleware.
+app.add_middleware(GZipMiddleware, minimum_size=2048)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=(['*'] if _allowed_origins.strip() == '*'
@@ -1170,6 +1177,320 @@ def auth_check():
     or your stored code is valid"; 401 means "show the password screen."
     """
     return {"ok": True}
+
+
+# ── Intelligence layer: flags, structure depth, routed hydrograph ───────────
+
+COLOR_MAP_ALL = {'Dispatch': '#FF4444', 'Remote-Approve': '#4CAF82',
+                 'Remote-Deny': '#6B8FA3', 'Review': '#FFB347'}
+
+
+@app.get("/api/events/{event_id}/intel")
+def event_intel(event_id: str):
+    """Event-level intelligence: sources, products, flag counts, router skill."""
+    intel = load_event_intel(event_id)
+    if not intel:
+        raise HTTPException(404, f"No intelligence layer baked for '{event_id}'.")
+    ev = dict(intel.get('event') or {})
+    return {
+        'event_id': event_id, 'version': intel.get('version'),
+        'generated_at': intel.get('generated_at'),
+        'sources': intel.get('sources'), 'products': intel.get('products'),
+        'summary': intel.get('summary'), 'event': ev,
+        'flag_feedback': flag_feedback_summary(event_id),
+    }
+
+
+def _portfolio_intel_ctx(portfolio_id: str, event_id: str, results: list) -> dict:
+    meta = get_analysis_meta(portfolio_id, event_id) or {}
+    windows = meta.get('windows') or {}
+    bbox = meta.get('bbox')
+    if not bbox:
+        lats = [r['latitude'] for r in results if r.get('latitude') is not None]
+        lons = [r['longitude'] for r in results if r.get('longitude') is not None]
+        if not lats:
+            raise HTTPException(400, 'No geocoded properties to analyse.')
+        bbox = [min(lons) - 0.01, min(lats) - 0.01, max(lons) + 0.01, max(lats) + 0.01]
+    if not windows.get('post_start'):
+        raise HTTPException(400, 'Run the satellite analysis first — the event window is unknown.')
+    return {'event_id': event_id, 'label': meta.get('label') or event_id, 'bbox': bbox,
+            'post_start': windows['post_start'], 'post_end': windows.get('post_end') or windows['post_start']}
+
+
+@app.get("/api/portfolio/{portfolio_id}/intel/{event_id}")
+def portfolio_intel_get(portfolio_id: str, event_id: str):
+    from backend.intel import client_payload
+    cached = get_portfolio_intel(portfolio_id, event_id)
+    if not cached:
+        raise HTTPException(404, 'No deep analysis yet for this portfolio/event.')
+    return client_payload(cached)
+
+
+@app.post("/api/portfolio/{portfolio_id}/intel/{event_id}")
+def portfolio_intel_run(portfolio_id: str, event_id: str):
+    """
+    Compute the intelligence layer for a portfolio's analysed properties.
+    Pre-baked events: inherited from the nearest analysed event parcel (the
+    same rule the triage class used). Live events: computed from free data
+    sources (terrain, rainfall, radar pass times, JRC, OSM roads, NHC best
+    track — hurricanes are detected automatically) with the router at a
+    coarser grid so the request finishes in minutes.
+    """
+    from backend.intel import compute_intel, inherit_from_event, client_payload
+    results = get_analysis_results(portfolio_id, event_id)
+    if not results:
+        raise HTTPException(404, 'No analysis results found. Run analyze first.')
+    analysed = [r for r in results if r.get('impact_class') and r.get('latitude') is not None]
+    if not analysed:
+        raise HTTPException(400, 'No analysed properties with coordinates.')
+    if event_id in EVENTS:
+        ev_intel = load_event_intel(event_id)
+        ev_df = load_event_data(event_id)
+        if not ev_intel or ev_df is None:
+            raise HTTPException(404, f"No intelligence layer baked for '{event_id}'.")
+        intel = inherit_from_event(analysed, ev_df.to_dict('records'), ev_intel)
+    else:
+        ctx = _portfolio_intel_ctx(portfolio_id, event_id, analysed)
+        try:
+            intel = compute_intel(analysed, ctx, router_opts={'res_calib_m': 1000.0, 'res_final_m': 500.0})
+        except Exception as e:  # noqa: BLE001 — never 500 with a stack trace
+            raise HTTPException(502, f'Deep analysis failed: {type(e).__name__}: {e}')
+    save_portfolio_intel(portfolio_id, event_id, intel)
+    return client_payload(intel)
+
+
+@app.post("/api/property/{property_id}/flag-feedback")
+def flag_feedback(property_id: str, body: dict = Body(...)):
+    """An adjuster confirms or dismisses one flag — a label for flag calibration."""
+    try:
+        fid = save_flag_feedback(property_id, str(body.get('event_id') or ''),
+                                 str(body.get('flag_code') or ''), str(body.get('verdict') or ''),
+                                 str(body.get('flag_level') or ''), str(body.get('portfolio_id') or ''),
+                                 str(body.get('note') or ''))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {'id': fid, 'summary': flag_feedback_summary(str(body.get('event_id') or '') or None)}
+
+
+def _clean(v):
+    if isinstance(v, float) and v != v:
+        return None
+    return v
+
+
+def _property_row(property_id: str, event_id: str, portfolio_id: str | None = None) -> dict:
+    """One property's triage row with its intel merged, from an event or a portfolio."""
+    from backend.intel import merge_intel_rows
+    pid = str(property_id)
+    if portfolio_id:
+        results = get_analysis_results(portfolio_id, event_id) or []
+        row = next((dict(r) for r in results if str(r.get('property_id')) == pid), None)
+        if row is None:
+            raise HTTPException(404, f"Property '{pid}' has no analysis in this portfolio/event.")
+        intel = get_portfolio_intel(portfolio_id, event_id)
+        if intel:
+            row = merge_intel_rows([row], intel, COLOR_MAP_ALL)[0]
+        return {k: _clean(v) for k, v in row.items()}
+    df = load_event_data(event_id)
+    if df is None:
+        raise HTTPException(404, f"No data for event '{event_id}'.")
+    m = df[df['property_id'].astype(str) == pid]
+    if m.empty:
+        raise HTTPException(404, f"Property '{pid}' not found in event '{event_id}'.")
+    return {k: _clean(v) for k, v in m.iloc[0].to_dict().items()}
+
+
+def _event_info(event_id: str, portfolio_id: str | None = None) -> dict:
+    if event_id in EVENTS:
+        e = EVENTS[event_id]
+        return {'id': event_id, 'label': e['label'], 'sub': e.get('sub', '')}
+    meta = (get_analysis_meta(portfolio_id, event_id) if portfolio_id else None) or {}
+    w = meta.get('windows') or {}
+    return {'id': event_id, 'label': meta.get('label') or 'Live analysis',
+            'sub': f"post-event window {w.get('post_start', '?')} → {w.get('post_end', '?')}"}
+
+
+@app.get("/api/property/{property_id}/evidence-pack")
+def evidence_pack(property_id: str, event_id: str, portfolio_id: str = None):
+    """Forensic per-property PDF: decision, measurements, structure, hydrograph, flags, lineage."""
+    from backend.evidence_pack import build_evidence_pack, EvidenceError
+    row = _property_row(property_id, event_id, portfolio_id)
+    ev = _event_info(event_id, portfolio_id)
+    intel_event = load_event_intel(event_id) if event_id in EVENTS else get_portfolio_intel(portfolio_id or '', event_id)
+    intel_event = {k: v for k, v in (intel_event or {}).items() if k != 'properties'}
+    try:
+        pdf = build_evidence_pack(row, ev, intel_event)
+    except EvidenceError as e:
+        raise HTTPException(500, str(e))
+    safe = ''.join(c for c in str(property_id) if c.isalnum() or c in '-_')[:60]
+    return StreamingResponse(io.BytesIO(pdf), media_type='application/pdf',
+                             headers={'Content-Disposition': f'attachment; filename="altis-evidence-{safe}.pdf"'})
+
+
+@app.post("/api/triage/route")
+def triage_route(body: dict = Body(...)):
+    """ICEYE workflow #1 — FNOL routing with reasons."""
+    from backend import triage_api
+    row = _property_row(body.get('property_id', ''), body.get('event_id', ''), body.get('portfolio_id'))
+    return {'property_id': row.get('property_id'), **triage_api.route(row)}
+
+
+@app.post("/api/triage/emergency")
+def triage_emergency(body: dict = Body(...)):
+    """ICEYE workflow #2 — emergency advance eligibility (per diem optional)."""
+    from backend import triage_api
+    row = _property_row(body.get('property_id', ''), body.get('event_id', ''), body.get('portfolio_id'))
+    per = body.get('per_diem_usd')
+    try:
+        per = float(per) if per not in (None, '') else None
+    except (TypeError, ValueError):
+        raise HTTPException(400, 'per_diem_usd must be a number')
+    return {'property_id': row.get('property_id'), **triage_api.emergency(row, per)}
+
+
+@app.get("/api/triage/habitability/{event_id}/{property_id}")
+def triage_habitability(event_id: str, property_id: str, portfolio_id: str = None):
+    """ICEYE workflow #3 — accommodation planning band."""
+    from backend import triage_api
+    row = _property_row(property_id, event_id, portfolio_id)
+    return {'property_id': row.get('property_id'), **triage_api.habitability(row)}
+
+
+@app.post("/api/triage/consistency")
+def triage_consistency(body: dict = Body(...)):
+    """ICEYE workflow #5 — claim-vs-observation consistency (outliers with reasons)."""
+    from backend import triage_api
+    row = _property_row(body.get('property_id', ''), body.get('event_id', ''), body.get('portfolio_id'))
+    peril = body.get('claimed_peril')
+    if peril not in (None, '', 'flood', 'wind'):
+        raise HTTPException(400, "claimed_peril must be 'flood' or 'wind'")
+    depth = body.get('claimed_depth_ft')
+    try:
+        depth = float(depth) if depth not in (None, '') else None
+    except (TypeError, ValueError):
+        raise HTTPException(400, 'claimed_depth_ft must be a number')
+    return {'property_id': row.get('property_id'),
+            **triage_api.consistency(row, peril or None, depth, body.get('claimed_water_in_home'))}
+
+
+@app.post("/api/triage/silent/{event_id}")
+def triage_silent(event_id: str, body: dict = Body(default={})):
+    """
+    ICEYE workflow #6 — expected losses with no FNOL. Body:
+      {fnol_property_ids: [...], portfolio_id?: str}
+    """
+    from backend import triage_api
+    from backend.intel import merge_intel_rows
+    pid = body.get('portfolio_id')
+    if pid:
+        rows = get_analysis_results(pid, event_id) or []
+        intel = get_portfolio_intel(pid, event_id)
+        if intel:
+            rows = merge_intel_rows([dict(r) for r in rows], intel, COLOR_MAP_ALL)
+    else:
+        df = load_event_data(event_id)
+        if df is None:
+            raise HTTPException(404, f"No data for event '{event_id}'.")
+        rows = df.to_dict('records')
+    rows = [{k: _clean(v) for k, v in r.items()} for r in rows]
+    ids = body.get('fnol_property_ids') or []
+    if not isinstance(ids, list):
+        raise HTTPException(400, 'fnol_property_ids must be a list')
+    return {'event_id': event_id, **triage_api.silent(rows, ids)}
+
+
+# ── Validation (open SAR data, NFIP) and pre-landfall susceptibility ─────────
+
+@app.get("/api/validation/opendata/{event_id}")
+def validation_opendata(event_id: str):
+    """Umbra / ICEYE open-SAR overlap for an event (baked; searched live if absent)."""
+    import json as _json
+    path = Path(__file__).parent.parent / 'outputs' / f'opendata_{event_id}.json'
+    if path.exists():
+        return _json.loads(path.read_text())
+    if event_id not in EVENTS:
+        raise HTTPException(404, f"Unknown event '{event_id}'.")
+    from datetime import date as _date, timedelta as _td
+    from backend.opendata import search
+    from pipeline.config import HARVEY, IAN, LISMORE
+    cfg = {c['event_id']: c for c in (HARVEY, IAN, LISMORE)}[event_id]
+    return search(cfg['bbox'], _date.fromisoformat(cfg['post_start']) - _td(days=3),
+                  _date.fromisoformat(cfg['post_end']))
+
+
+@app.get("/api/validation/nfip/{event_id}")
+def validation_nfip(event_id: str):
+    """Transient-flood flag vs FEMA NFIP flood-insurance claims (zip level)."""
+    import json as _json
+    path = Path(__file__).parent.parent / 'outputs' / f'nfip_validation_{event_id}.json'
+    if not path.exists():
+        raise HTTPException(404, f"No NFIP validation for '{event_id}' "
+                                 f"(run validation/nfip_flag_check.py {event_id}).")
+    return _json.loads(path.read_text())
+
+
+@app.get("/api/susceptibility/model")
+def susceptibility_model_card():
+    from backend.susceptibility_service import model_card
+    try:
+        return model_card()
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.get("/api/events/{event_id}/susceptibility")
+def event_susceptibility(event_id: str):
+    """Baked pre-landfall hindcast for a demo event (curves per property + backtest)."""
+    import json as _json
+    path = Path(__file__).parent.parent / 'outputs' / f'{event_id}_susceptibility.json'
+    if not path.exists():
+        raise HTTPException(404, f"No susceptibility hindcast for '{event_id}'.")
+    return _json.loads(path.read_text())
+
+
+@app.post("/api/susceptibility")
+def susceptibility(body: dict = Body(...)):
+    """
+    Score a portfolio (or explicit properties) for flood susceptibility.
+    Body: {portfolio_id? | properties?: [{property_id, latitude, longitude}],
+           rain_3day_mm?: number, use_forecast?: bool}
+    With use_forecast, the heaviest 3-day total of the free Open-Meteo 7-day
+    forecast at the portfolio centroid sets the scenario.
+    """
+    from backend.susceptibility_service import score_properties
+    from backend import geodata
+    props = body.get('properties')
+    if body.get('portfolio_id'):
+        props = get_portfolio(body['portfolio_id'])
+        if not props:
+            raise HTTPException(404, 'Portfolio not found.')
+    if not props:
+        raise HTTPException(400, 'Provide portfolio_id or properties.')
+    if len(props) > 5000:
+        raise HTTPException(400, 'At most 5,000 properties per request.')
+    rain = body.get('rain_3day_mm')
+    forecast = None
+    if body.get('use_forecast'):
+        lats = [float(p['latitude']) for p in props if p.get('latitude') is not None]
+        lons = [float(p['longitude']) for p in props if p.get('longitude') is not None]
+        if not lats:
+            raise HTTPException(400, 'No geocoded properties.')
+        try:
+            forecast = geodata.forecast_rain(sum(lats) / len(lats), sum(lons) / len(lons))
+            rain = forecast['max_3day_mm']
+        except geodata.GeoDataError as e:
+            raise HTTPException(502, f'Forecast unavailable: {e}')
+    try:
+        rain = float(rain) if rain not in (None, '') else None
+        res = score_properties(props, rain)
+    except (TypeError, ValueError) as e:
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(503, str(e))
+    except geodata.GeoDataError as e:
+        raise HTTPException(502, f'Terrain data unavailable: {e}')
+    res['forecast'] = forecast
+    return res
 
 
 @app.get("/api/health")

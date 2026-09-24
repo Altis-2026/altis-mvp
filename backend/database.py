@@ -65,8 +65,36 @@ def load_event_data(event_id: str) -> pd.DataFrame | None:
     # Drop rows without coordinates
     df = df.dropna(subset=['latitude', 'longitude'])
 
+    # Intelligence layer (flags, structure depth, wind, routed hydrograph),
+    # baked by pipeline/05_build_intel.py. A flag can hold a Remote-Deny back
+    # to Review; the original class is kept alongside so nothing is hidden.
+    intel = load_event_intel(event_id)
+    if intel:
+        from backend.intel import merge_intel_rows
+        rows = merge_intel_rows(df.to_dict('records'), intel, COLOR_MAP)
+        df = pd.DataFrame(rows)
+
     _event_cache[event_id] = df
     return df
+
+
+_intel_cache: dict = {}
+
+
+def load_event_intel(event_id: str) -> dict | None:
+    """The baked intel JSON for a demo event, or None."""
+    import json as _json
+    if event_id in _intel_cache:
+        return _intel_cache[event_id]
+    path = OUTPUT_DIR / f"{event_id}_intel.json"
+    data = None
+    if path.exists():
+        try:
+            data = _json.loads(path.read_text())
+        except (ValueError, OSError):
+            data = None
+    _intel_cache[event_id] = data
+    return data
 
 
 def get_event_stats(df: pd.DataFrame) -> dict:
@@ -85,7 +113,22 @@ def get_event_stats(df: pd.DataFrame) -> dict:
         'remote_total':     remote_total,
         'estimated_savings': remote_total * 750,
         'pct_remote':       round(remote_total / total * 100, 1) if total > 0 else 0,
+        **_intel_stats(df),
     }
+
+
+def _intel_stats(df: pd.DataFrame) -> dict:
+    """Counts from the intelligence layer, when the rows carry it."""
+    if 'intel' not in df.columns:
+        return {}
+    held = alerts = displaced = 0
+    for it in df['intel']:
+        if not isinstance(it, dict):
+            continue
+        held += 1 if it.get('class_override') else 0
+        alerts += 1 if any(f.get('level') == 'alert' for f in it.get('flags') or []) else 0
+        displaced += 1 if (it.get('habitability') or {}).get('displacement') else 0
+    return {'held_remote_deny': held, 'alert_properties': alerts, 'displaced': displaced}
 
 
 # ── SQLite: portfolios ────────────────────────────────────────────────────────
@@ -193,8 +236,114 @@ def init_db():
             note TEXT
         )
     """)
+    # Adjuster verdicts on individual flags — the label stream that will
+    # calibrate flag thresholds once pilots produce volume.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS flag_feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT DEFAULT (datetime('now')),
+            property_id TEXT,
+            event_id TEXT,
+            portfolio_id TEXT,
+            flag_code TEXT,
+            flag_level TEXT,
+            verdict TEXT,
+            note TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS intel_cache (
+            portfolio_id TEXT,
+            event_id TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            intel_json TEXT,
+            PRIMARY KEY (portfolio_id, event_id)
+        )
+    """)
     conn.commit()
     conn.close()
+
+
+def _ensure_intel_tables(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS flag_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT DEFAULT (datetime('now')),
+        property_id TEXT, event_id TEXT, portfolio_id TEXT, flag_code TEXT,
+        flag_level TEXT, verdict TEXT, note TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS intel_cache (
+        portfolio_id TEXT, event_id TEXT, created_at TEXT DEFAULT (datetime('now')),
+        intel_json TEXT, PRIMARY KEY (portfolio_id, event_id))""")
+
+
+FLAG_CODES = ('WIND_WATER', 'TRANSIENT_MISS', 'PRIOR_WATER', 'ACCESS', 'FLOOR_CLEAR')
+FLAG_VERDICTS = ('confirmed', 'dismissed')
+
+
+def save_flag_feedback(property_id: str, event_id: str, flag_code: str, verdict: str,
+                       flag_level: str = '', portfolio_id: str = '', note: str = '') -> int:
+    if flag_code not in FLAG_CODES:
+        raise ValueError(f'unknown flag code {flag_code!r}')
+    if verdict not in FLAG_VERDICTS:
+        raise ValueError(f'verdict must be one of {FLAG_VERDICTS}')
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        _ensure_intel_tables(conn)
+        cur = conn.execute("""
+            INSERT INTO flag_feedback (property_id, event_id, portfolio_id, flag_code,
+                                       flag_level, verdict, note)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (str(property_id), event_id or '', portfolio_id or '', flag_code,
+              (flag_level or '')[:16], verdict, (note or '')[:2000]))
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def flag_feedback_summary(event_id: str | None = None) -> dict:
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        _ensure_intel_tables(conn)
+        q = "SELECT flag_code, verdict, COUNT(*) FROM flag_feedback"
+        args = ()
+        if event_id:
+            q += " WHERE event_id = ?"
+            args = (event_id,)
+        q += " GROUP BY flag_code, verdict"
+        out = {}
+        for code, verdict, n in conn.execute(q, args):
+            out.setdefault(code, {'confirmed': 0, 'dismissed': 0})[verdict] = n
+        return out
+    finally:
+        conn.close()
+
+
+def save_portfolio_intel(portfolio_id: str, event_id: str, intel: dict):
+    import json as _json
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        _ensure_intel_tables(conn)
+        conn.execute("INSERT OR REPLACE INTO intel_cache (portfolio_id, event_id, intel_json) "
+                     "VALUES (?, ?, ?)", (portfolio_id, event_id, _json.dumps(intel, default=str)))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_portfolio_intel(portfolio_id: str, event_id: str) -> dict | None:
+    import json as _json
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        _ensure_intel_tables(conn)
+        row = conn.execute("SELECT intel_json FROM intel_cache WHERE portfolio_id = ? AND event_id = ?",
+                           (portfolio_id, event_id)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    try:
+        return _json.loads(row[0])
+    except (ValueError, TypeError):
+        return None
 
 
 def save_portfolio(portfolio_id: str, properties: list, center: dict,

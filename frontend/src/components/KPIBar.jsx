@@ -127,6 +127,22 @@ export default function KPIBar({ stats, exposure, leftInset = 72 }) {
             color="var(--teal)"
             sub={`${stats.remote_total?.toLocaleString()} truck rolls avoided`}
           />
+          {stats.held_remote_deny > 0 && (
+            <KPI
+              label="Wrongful Denials Prevented"
+              value={stats.held_remote_deny.toLocaleString()}
+              color="#FFB347"
+              sub="SAR read dry; flags say it can't be trusted"
+            />
+          )}
+          {stats.alert_properties > 0 && (
+            <KPI
+              label="Properties with Alerts"
+              value={stats.alert_properties.toLocaleString()}
+              color="#FF6B6B"
+              sub={stats.displaced ? `${stats.displaced.toLocaleString()} households likely displaced` : 'wind/water · access · missed flooding'}
+            />
+          )}
         </>
       )}
     </div>

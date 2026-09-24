@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import IntelPanel from './IntelPanel.jsx';
 import SarPair from './SarPair.jsx';
 import StreetViewPanel from './StreetViewPanel.jsx';
 import { api } from '../services/api.js';
@@ -321,6 +322,10 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
           </div>
         ) : (
         <div style={{ padding: '20px 24px', flex: 1 }}>
+
+          {/* Intelligence layer: adjuster flags, depth above the finished
+              floor, routed hydrograph, event context, evidence pack. */}
+          <IntelPanel property={property} eventId={eventId} />
 
           {/* Property aerial — high-res basemap satellite of the parcel so an
               ops user can see the actual structure alongside the flood data.
