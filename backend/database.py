@@ -322,8 +322,10 @@ def save_portfolio_intel(portfolio_id: str, event_id: str, intel: dict):
     conn = sqlite3.connect(str(DB_PATH))
     try:
         _ensure_intel_tables(conn)
+        from backend.intel import json_safe
         conn.execute("INSERT OR REPLACE INTO intel_cache (portfolio_id, event_id, intel_json) "
-                     "VALUES (?, ?, ?)", (portfolio_id, event_id, _json.dumps(intel, default=str)))
+                     "VALUES (?, ?, ?)", (portfolio_id, event_id,
+                                          _json.dumps(json_safe(intel), default=str, allow_nan=False)))
         conn.commit()
     finally:
         conn.close()

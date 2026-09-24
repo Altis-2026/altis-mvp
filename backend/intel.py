@@ -341,7 +341,7 @@ def compute_intel(props: list, ctx: dict, session=None, log=print, run_router: b
         event_rain = {'daily_median_property': mid.get('daily'),
                       'max_3day_mm_max': max(r['max_3day_mm'] for r in valid),
                       'max_3day_mm_median': float(np.median([r['max_3day_mm'] for r in valid]))}
-    return {
+    return json_safe({
         'version': INTEL_VERSION,
         'event_id': ctx.get('event_id'),
         'generated_at': datetime.now(timezone.utc).isoformat(),
@@ -357,7 +357,20 @@ def compute_intel(props: list, ctx: dict, session=None, log=print, run_router: b
         },
         'summary': counts,
         'properties': out_props,
-    }
+    })
+
+
+def json_safe(obj):
+    """Recursively replace NaN/±inf with None (browsers reject NaN in JSON)."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [json_safe(v) for v in obj]
+    if isinstance(obj, np.generic):
+        return json_safe(obj.item())
+    return obj
 
 
 def _router_timing(intel: dict):

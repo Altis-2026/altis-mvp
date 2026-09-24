@@ -101,7 +101,8 @@ def main(events):
                    'mode': 'hindcast — observed event rainfall stands in for the forecast'},
                'backtest': back, 'properties': res['properties']}
         path = ROOT / 'outputs' / f'{eid}_susceptibility.json'
-        path.write_text(json.dumps(out, separators=(',', ':')))
+        from backend.intel import json_safe
+        path.write_text(json.dumps(json_safe(out), separators=(',', ':'), allow_nan=False))
         print(f'  ✓ {path.name} {path.stat().st_size / 1e6:.2f} MB  backtest {back}  bands {bands}')
         # Open-data overlap search, baked alongside.
         try:

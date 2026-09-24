@@ -411,3 +411,51 @@ def test_inherit_from_event():
                               {'property_id': 'Far', 'latitude': 31.0, 'longitude': -97.0}], ev_rows, intel)
     assert out['properties']['P']['inherited_from']['property_id'] == 'E1'
     assert 'Far' not in out['properties']
+
+
+# ── Regression tests for the two router bugs found in the Lismore bake ───────
+
+def test_d4_conditioning_opens_diagonal_valleys():
+    """
+    A valley that connects only diagonally (legal for an 8-neighbour fill) is
+    a dam to a 4-neighbour flow model. Before d4_conditioned(), water stood
+    20 m deep behind such links; afterwards every cell must drain along
+    orthogonal steps that never climb.
+    """
+    from pipeline.terrain import d4_conditioned, drainage
+    z = np.full((9, 9), 50.0)
+    for k in range(9):                      # a diagonal channel from (0,0) to (8,8)
+        z[k, k] = 10.0 - k
+    z[8, 8] = 0.0                           # outlet at the corner edge
+    out = d4_conditioned(z)
+    _, parent4, order4 = drainage(out, connectivity=4)
+    h, w = out.shape
+    for i in order4:
+        p = parent4[i]
+        if p >= 0:
+            r, c = divmod(int(i), w)
+            pr, pc = divmod(int(p), w)
+            assert abs(r - pr) + abs(c - pc) == 1          # orthogonal link
+            assert out.ravel()[p] <= out.ravel()[i] + 1e-9  # never uphill
+    # The channel itself was not raised to the ridge height.
+    assert out[4, 4] < 20.0
+
+
+def test_router_drains_a_diagonal_valley_after_conditioning():
+    from pipeline.terrain import d4_conditioned
+    z = np.full((12, 12), 30.0)
+    for k in range(12):
+        z[k, k] = 12.0 - k
+    zc = d4_conditioned(z)
+    r = route(zc, 100, 100, 6 * 3600, rain_rate=lambda t: 2e-5 if t < 3600 else 0.0, dt_max=30)
+    assert r['h'].max() < 1.0                               # no 20-m ponds behind diagonal links
+    assert r['volume_out'] > 0.5 * r['volume_in']
+
+
+def test_sea_mask_only_open_ocean():
+    from backend.routing import sea_mask
+    z = np.full((6, 8), 5.0)
+    z[:, 6:] = -10.0                                        # open sea on the east edge
+    z[2, 2] = -1.0                                          # an inland depression below sea level
+    m = sea_mask(z)
+    assert m[:, 6:].all() and not m[2, 2] and m.sum() == 12

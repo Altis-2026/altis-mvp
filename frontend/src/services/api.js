@@ -184,6 +184,8 @@ export const api = {
       body: JSON.stringify(body),
     }).then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e)); return r.json(); }),
   getOpenDataValidation: (evtId) => get(`/validation/opendata/${evtId}`),
+  getNfipValidation: (evtId) => get(`/validation/nfip/${evtId}`),
+  getEventIntel: (evtId) => get(`/events/${evtId}/intel`),
   silentClaims: (evtId, body) =>
     authFetch(`/triage/silent/${evtId}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

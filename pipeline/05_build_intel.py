@@ -44,7 +44,7 @@ def main(argv):
                'post_start': cfg['post_start'], 'post_end': cfg['post_end']}
         intel = compute_intel(props, ctx, run_router=run_router)
         path = ROOT / 'outputs' / f'{eid}_intel.json'
-        path.write_text(json.dumps(intel, separators=(',', ':'), default=str))
+        path.write_text(json.dumps(intel, separators=(',', ':'), default=str, allow_nan=False))
         print(f'  ✓ {path.name}  {path.stat().st_size / 1e6:.2f} MB  in {intel["seconds"]}s')
         print('   sources:', {k: v.get('ok') for k, v in intel['sources'].items()})
         print('   summary:', intel['summary'])

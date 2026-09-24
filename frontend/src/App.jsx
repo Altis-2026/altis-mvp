@@ -406,6 +406,7 @@ export default function App() {
         {activePanel === 'reports' && (
           <ReportsPanel
             events={events}
+            eventId={selectedEvent}
             eventLabel={selectedEventMeta?.label}
             eventProperties={properties}
             portfolioId={portfolioId}

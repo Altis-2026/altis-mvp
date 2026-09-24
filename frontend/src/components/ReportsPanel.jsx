@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../services/api.js';
 import { downloadCSV } from '../utils/csv.js';
 
@@ -96,8 +96,65 @@ const EVENT_EXPORT_COLS = ['property_id', 'address', 'impact_class', 'max_depth_
 const PORTFOLIO_EXPORT_COLS = ['property_id', 'policy_number', 'address', 'coverage_amount',
   'impact_class', 'max_depth_ft', 'confidence_score', 'adjuster_note'];
 
+/* Independent checks on the intelligence layer for one event: FEMA NFIP
+   flood-insurance claims (zip level), the router's fit at the radar pass,
+   and the Umbra/ICEYE open-SAR overlap search. Each line says what it is
+   measured against; missing checks simply don't render. */
+function ValidationCard({ eventId }) {
+  const [nfip, setNfip] = useState(null);
+  const [od, setOd] = useState(null);
+  const [intel, setIntel] = useState(null);
+  useEffect(() => {
+    setNfip(null); setOd(null); setIntel(null);
+    if (!eventId) return;
+    let alive = true;
+    api.getNfipValidation?.(eventId).then(d => alive && setNfip(d)).catch(() => {});
+    api.getOpenDataValidation(eventId).then(d => alive && setOd(d)).catch(() => {});
+    api.getEventIntel?.(eventId).then(d => alive && setIntel(d)).catch(() => {});
+    return () => { alive = false; };
+  }, [eventId]);
+  const router = intel?.event?.router;
+  const sk = router?.skill_at_pass;
+  if (!nfip && !od && !intel) return null;
+  const row = { fontSize: '0.72rem', color: 'var(--text-body)', lineHeight: 1.55, marginBottom: 8 };
+  return (
+    <div style={{ background: 'var(--wa-02)', border: '1px solid var(--wa-05)', borderRadius: 'var(--r-md)',
+                  padding: '12px 14px', marginBottom: 18 }}>
+      <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--teal)',
+                    textTransform: 'uppercase', marginBottom: 10 }}>Independent validation</div>
+      {nfip && nfip.catch_rate != null && (
+        <div style={row}>
+          <b>FEMA flood-insurance claims:</b> SAR-only triage would have remote-denied{' '}
+          <b>{nfip.sar_only_deny_in_flood_confirmed_zips}</b> properties in zip codes that filed{' '}
+          {nfip.nfip_claims_total_in_sample_zips?.toLocaleString()} NFIP claims. The transient-flood flag holds back{' '}
+          <b>{Math.round(nfip.catch_rate * 100)}%</b> of them
+          {nfip.quiet_hold_rate != null && <> (and {Math.round(nfip.quiet_hold_rate * 100)}% of the {nfip.sar_only_deny_in_quiet_zips} in near-zero-claim zips)</>}.
+          <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>Zip-level truth; NFIP take-up varies by zip.</div>
+        </div>
+      )}
+      {sk && (
+        <div style={row}>
+          <b>Hydraulic router:</b> fit to the radar pass CSI <b>{sk.csi}</b> ({sk.hits} hits, {sk.misses} misses,
+          {' '}{sk.false_alarms} false alarms) on a {router.res_final_m} m grid.
+        </div>
+      )}
+      {intel && !router && intel.sources?.router && !intel.sources.router.ok && (
+        <div style={row}><b>Hydraulic router:</b> not run. {String(intel.sources.router.reason || '').replace(/^\w+: /, '')}</div>
+      )}
+      {od?.archives && (
+        <div style={row}>
+          <b>High-resolution open SAR:</b>{' '}
+          {od.overlaps?.length
+            ? `${od.overlaps.length} overlapping Umbra/ICEYE scene(s) available for agreement scoring.`
+            : `searched Umbra (${od.archives.umbra?.items_in_window ?? 0} items in window) and ICEYE (${od.archives.iceye?.items_total ?? 0} items) — no scene covers this event, so no measured agreement is claimed.`}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReportsPanel({
-  events = [], eventLabel, eventProperties = [],
+  events = [], eventId, eventLabel, eventProperties = [],
   portfolioId, portfolioLabel, portfolioProperties = [],
 }) {
   const [reportEventId, setReportEventId] = useState(events[0]?.id || '');
@@ -177,6 +234,8 @@ export default function ReportsPanel({
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 20px' }}>
+
+        <ValidationCard eventId={eventId || reportEventId} />
 
         {/* Export section */}
         <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 10 }}>
