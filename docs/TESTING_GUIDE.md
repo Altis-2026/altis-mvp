@@ -165,6 +165,39 @@ Full technical write-up: `docs/INTELLIGENCE_LAYER.md`.
    `POST /api/triage/route {"event_id":"lismore","property_id":"NRIV-00010"}` ·
    `POST /api/triage/silent/harvey {"fnol_property_ids":[]}`.
 
+## 11. Demo mode — the 25-second recorded run
+
+Press **Shift+D** anywhere in the app. It selects the Lismore event, hides all
+chrome, and plays a scripted sequence over the real map and the real analysis.
+
+| Key | |
+|---|---|
+| `Shift+D` | start / stop |
+| `Space` | pause / resume |
+| `R` | restart from the top |
+| `Esc` | exit |
+
+The transport bar fades out after ~2 s of no mouse movement, so leave the mouse
+alone once it starts. Scrub with the slider to line up a retake.
+
+**The beats** (~25 s): title -> the single radar pass -> 800 properties
+classified -> **the routed flood in motion** (the hero: it rewinds nine days,
+builds to the 28 Feb peak, holds there, then runs on to the satellite pass on
+2 March - the reveal that the flood crested 2.5 days before anything was
+observed) -> one house with the finished-floor line -> the pre-landfall
+prediction -> an end card of the numbers.
+
+**Recording tips**
+- Record at 1920x1080 or larger; the type is sized in viewport units.
+- A Mapbox token must be set (`VITE_MAPBOX_TOKEN`), otherwise the overlay plays
+  over an empty background.
+- The flood frames are ~400 kB gzipped and load once; give it a couple of
+  seconds before the first take so the hero beat does not stall.
+- `R` re-runs it identically, so you can take as many passes as you like.
+
+To rebuild the flood replay after re-running the router:
+`python pipeline/08_bake_flood_animation.py lismore`
+
 ## Known honest limitations (say these in demos, don't hide them)
 
 - **Storm surge**: recedes within hours; if no satellite pass catches it, we

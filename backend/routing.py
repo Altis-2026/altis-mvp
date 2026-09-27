@@ -134,7 +134,8 @@ def _cells(grid: Grid, lons, lats):
     return r, c
 
 
-def _run(zg: Grid, channel, rain, t0, t_end_s, k, record=None, t_pass_s=None):
+def _run(zg: Grid, channel, rain, t0, t_end_s, k, record=None, t_pass_s=None,
+         grid_every_s=None):
     dx, dy = zg.cell_m
     n = np.where(channel, ROUTER['manning_channel'], ROUTER['manning_floodplain'])
     ndays = rain.shape[0]
@@ -147,7 +148,7 @@ def _run(zg: Grid, channel, rain, t0, t_end_s, k, record=None, t_pass_s=None):
     return route(zg.data, dx, dy, t_end_s, rain_rate=rain_rate, manning=n,
                  record_every_s=ROUTER['record_every_h'] * 3600, record_cells=record,
                  cfl=ROUTER['cfl'], dt_max=120.0, snapshot_at_s=t_pass_s,
-                 sea_mask=sea)
+                 sea_mask=sea, grid_every_s=grid_every_s)
 
 
 def _skill(sim_depth_m, depth_ft, wet, dry):

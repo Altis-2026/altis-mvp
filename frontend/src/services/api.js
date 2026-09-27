@@ -178,6 +178,14 @@ export const api = {
   /* Pre-landfall susceptibility (Phase F) */
   getSusceptibility: (evtId) => get(`/events/${evtId}/susceptibility`),
   getSusceptibilityModel: () => get('/susceptibility/model'),
+
+  /* Routed flood replay (demo mode): metadata, then the raw uint8 frames. */
+  getFloodAnimation: (evtId) => get(`/events/${evtId}/flood-animation`),
+  getFloodAnimationFrames: (evtId) =>
+    authFetch(`/events/${evtId}/flood-animation.bin`).then(r => {
+      if (!r.ok) throw new Error(`Flood frames unavailable (${r.status})`);
+      return r.arrayBuffer();
+    }),
   runSusceptibility: (body) =>
     authFetch('/susceptibility', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

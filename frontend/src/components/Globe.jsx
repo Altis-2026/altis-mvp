@@ -1,10 +1,11 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useCallback, useState } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { getTheme } from '../theme.js';
 import Tutorial from './Tutorial.jsx';
 import { api } from '../services/api.js';
 import { buildingFeatures, placeholderRing } from '../utils/buildings.js';
+import { cornersFromBounds } from '../utils/floodReplay.js';
 
 /* Globe atmosphere per theme. Dark keeps the deep-space starfield brand look;
    light turns the surrounding space into a soft daylight sky so the whole
@@ -61,7 +62,7 @@ const INSPECT_PITCH = 62;        // enough to see water up a wall
 const MAX_BUILDINGS = 220;       // per viewport — the cap that keeps this fast
 const TERRAIN_EXAGGERATION = 1.4;
 
-export default function Globe({
+function GlobeInner({
   properties = [],
   portfolioProperties = [],
   selectedProperty,
@@ -74,7 +75,10 @@ export default function Globe({
   stormTrack = null,
   zoneBbox = null,
   pinColorOverride = null,   // {property_id: colour} from the pre-landfall panel
-}) {
+  floodReplay = null,        // {painter, frame, opacity} — the routed flood in motion
+  cinema = false,            // hide all chrome for recording
+  forceInspect3D = null,     // demo director drives 3D mode
+}, ref) {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
   const rafRef       = useRef(null);
@@ -1032,6 +1036,60 @@ export default function Globe({
     }
   }, [flyTarget]);
 
+  /* ── Routed flood replay (demo mode) ─────────────────────────────
+     The bake ships the router's depth field every hour; the painter turns the
+     current frame into a canvas and Mapbox drapes it over the terrain, so the
+     water climbs real topography rather than sitting on a flat plane. */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !pinsReady.current) return;
+    const painter = floodReplay?.painter;
+    if (!painter) {
+      if (map.getLayer('flood-replay')) map.removeLayer('flood-replay');
+      if (map.getSource('flood-replay')) map.removeSource('flood-replay');
+      return;
+    }
+    if (!map.getSource('flood-replay')) {
+      // The canvas must be in the document for Mapbox to sample it, but it is
+      // never seen: the map is what displays it.
+      painter.canvas.style.cssText = 'position:absolute;left:-10000px;top:0;pointer-events:none';
+      if (!painter.canvas.isConnected) document.body.appendChild(painter.canvas);
+      map.addSource('flood-replay', {
+        type: 'canvas',
+        canvas: painter.canvas,
+        coordinates: cornersFromBounds(floodReplay.bounds),
+        animate: true,
+      });
+      map.addLayer({
+        id: 'flood-replay',
+        type: 'raster',
+        source: 'flood-replay',
+        paint: { 'raster-opacity': 0, 'raster-fade-duration': 0,
+                 'raster-resampling': 'linear' },
+      }, map.getLayer('pins') ? 'pins' : undefined);
+    }
+    return () => {
+      if (painter?.canvas?.isConnected && !floodReplay?.painter) {
+        painter.canvas.remove();
+      }
+    };
+  }, [floodReplay?.painter, floodReplay?.bounds]);
+
+  /* Frame + opacity, separated so scrubbing never rebuilds the source. */
+  useEffect(() => {
+    const map = mapRef.current;
+    const painter = floodReplay?.painter;
+    if (!map || !painter || !map.getLayer('flood-replay')) return;
+    painter.paint(floodReplay.frame ?? 0, 1);
+    map.setPaintProperty('flood-replay', 'raster-opacity', floodReplay.opacity ?? 0);
+  }, [floodReplay?.painter, floodReplay?.frame, floodReplay?.opacity]);
+
+  /* The demo director can drive 3D inspect mode. */
+  useEffect(() => {
+    if (forceInspect3D === null) return;
+    setInspect3D(forceInspect3D);
+  }, [forceInspect3D]);
+
   /* ── Flood overlay tile URL ──────────────────────────────────── */
   useEffect(() => {
     const map = mapRef.current;
@@ -1095,6 +1153,25 @@ export default function Globe({
     transition: 'all 0.15s ease',
   });
 
+  /* Camera + layer control for the demo director (components/DemoMode.jsx).
+     Everything it touches is the same map instance the app already drives, so
+     a recorded run is the real product, not a mock. */
+  useImperativeHandle(ref, () => ({
+    map: () => mapRef.current,
+    stopRotation,
+    flyTo: (opts) => { stopRotation(); mapRef.current?.flyTo(opts); },
+    easeTo: (opts) => { stopRotation(); mapRef.current?.easeTo(opts); },
+    jumpTo: (opts) => { stopRotation(); mapRef.current?.jumpTo(opts); },
+    setLayerOpacity: (id, prop, value) => {
+      const m = mapRef.current;
+      if (m?.getLayer(id)) m.setPaintProperty(id, prop, value);
+    },
+    setVisible: (id, on) => {
+      const m = mapRef.current;
+      if (m?.getLayer(id)) m.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    },
+  }), [stopRotation]);
+
   const hasTriagePins = properties.length > 0 ||
     portfolioProperties.some(p => p.impact_class);
   const hasAnyPins = properties.length > 0 || portfolioProperties.length > 0;
@@ -1106,7 +1183,7 @@ export default function Globe({
       {/* Pin legend — plain claims-operations language, shown whenever
           triaged pins are on the map so a first-time viewer never has to
           ask what the colors mean. */}
-      {hasTriagePins && !dimmed && !isMobile && (
+      {hasTriagePins && !dimmed && !isMobile && !cinema && (
         <div className="anim-fade-in" style={{
           /* Sits above the chat bar (~72px tall) so they never overlap. */
           position: 'fixed', bottom: 96, left: 16 + leftInset, zIndex: 5,
@@ -1132,7 +1209,7 @@ export default function Globe({
 
       {/* First-run guide — fades in, lingers a few seconds, fades away on its
           own (and disappears the moment anything is loaded). */}
-      {!hasAnyPins && !guideGone && (
+      {!hasAnyPins && !guideGone && !cinema && (
         <div style={{
           position: 'fixed', bottom: 90, left: '50%',
           transform: `translateX(-50%) translateY(${guideVisible ? 0 : 8}px)`,
@@ -1160,8 +1237,9 @@ export default function Globe({
 
       {/* Map layer toggles */}
       <div style={{
+        display: cinema ? 'none' : 'flex',
         position: 'fixed', bottom: isMobile ? 150 : 22, right: isMobile ? 8 : 16, zIndex: 5,
-        display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end',
+        flexDirection: 'column', gap: 6, alignItems: 'flex-end',
         maxWidth: isMobile ? 'calc(100vw - 72px)' : 'none', // stay clear of the left rail
       }}>
         {/* 3D inspect status + the provenance caveat. Dollar reserves are
@@ -1275,6 +1353,9 @@ export default function Globe({
     </>
   );
 }
+
+const Globe = forwardRef(GlobeInner);
+export default Globe;
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 function emptyFC() {

@@ -1429,6 +1429,31 @@ def validation_nfip(event_id: str):
     return _json.loads(path.read_text())
 
 
+@app.get("/api/events/{event_id}/flood-animation")
+def flood_animation_meta(event_id: str):
+    """
+    Metadata for the routed flood replay: bounds, frame shape, hourly
+    timestamps, which frame the satellite pass falls on, and the calibration
+    that produced it. The frames themselves come from the .bin route below.
+    """
+    import json as _json
+    path = Path(__file__).parent.parent / 'outputs' / f'{event_id}_flood.json'
+    if not path.exists():
+        raise HTTPException(404, f"No flood replay baked for '{event_id}'. Events where the "
+                                 f"satellite saw too little flooding to calibrate against have none.")
+    return _json.loads(path.read_text())
+
+
+@app.get("/api/events/{event_id}/flood-animation.bin")
+def flood_animation_frames(event_id: str):
+    """Raw frames: frames x rows x cols, uint8, depth in 10 cm steps (0 = dry)."""
+    path = Path(__file__).parent.parent / 'outputs' / f'{event_id}_flood.bin'
+    if not path.exists():
+        raise HTTPException(404, f"No flood replay baked for '{event_id}'.")
+    return StreamingResponse(io.BytesIO(path.read_bytes()), media_type='application/octet-stream',
+                             headers={'Cache-Control': 'public, max-age=86400'})
+
+
 @app.get("/api/susceptibility/model")
 def susceptibility_model_card():
     from backend.susceptibility_service import model_card

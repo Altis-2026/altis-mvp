@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Globe            from './components/Globe.jsx';
 import Header           from './components/Header.jsx';
 import KPIBar            from './components/KPIBar.jsx';
@@ -14,6 +14,7 @@ import ReportsPanel       from './components/ReportsPanel.jsx';
 import DispatchQueuePanel from './components/DispatchQueuePanel.jsx';
 import OperationsPanel    from './components/OperationsPanel.jsx';
 import PrelandfallPanel   from './components/PrelandfallPanel.jsx';
+import DemoMode, { DEMO_EVENT } from './components/DemoMode.jsx';
 import DataGrid           from './components/DataGrid.jsx';
 import ChatBar            from './components/ChatBar.jsx';
 import { api }            from './services/api.js';
@@ -61,7 +62,45 @@ export default function App() {
   /* ── Sidebar ──────────────────────────────────────────────────── */
   const [activePanel, setActivePanel] = useState(null);
   const [pinColorOverride, setPinColorOverride] = useState(null); // {property_id: colour} | null
+
+  /* ── Demo mode (Shift+D): a scripted run for screen recording ── */
+  const globeRef = useRef(null);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [floodState, setFloodState] = useState(null);
+  const [demoInspect3D, setDemoInspect3D] = useState(null);
+  const [demoPins, setDemoPins] = useState(null);
   const leftInset = RAIL_WIDTH + (activePanel ? PANEL_WIDTH : 0);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.shiftKey && (e.key === 'D' || e.key === 'd') &&
+          !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '')) {
+        e.preventDefault();
+        setDemoOpen(v => !v);
+        setSelectedProperty(null);
+        setGrid(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  /* Colour the pins by pre-landfall flood probability for the demo's last
+     beat. Fetched from the same endpoint the Pre-landfall panel uses. */
+  const applyDemoPins = useCallback(async (mode) => {
+    if (mode !== 'susceptibility' || !selectedEvent) { setDemoPins(null); return; }
+    try {
+      const d = await api.getSusceptibility(selectedEvent);
+      const BAND = { 'very high': '#E5484D', high: '#F28C38', elevated: '#E0C35A', low: '#4F8A9C' };
+      const band = (p) => (p >= 0.6 ? 'very high' : p >= 0.35 ? 'high' : p >= 0.15 ? 'elevated' : 'low');
+      const m = {};
+      for (const [id, v] of Object.entries(d.properties || {})) {
+        const p = v.p_hindcast ?? 0;
+        m[id] = BAND[band(p)];
+      }
+      setDemoPins(m);
+    } catch { setDemoPins(null); }
+  }, [selectedEvent]);
 
   /* ── Claims data grid (full-screen) ──────────────────────────── */
   const [grid, setGrid] = useState(null); // { kind, rows, title } | null
@@ -141,6 +180,12 @@ export default function App() {
       setLoading(false);
     }
   }, [selectedEvent, events]);
+
+  /* The scripted demo is written against one event and is the only one with a
+     calibrated flood replay, so entering demo mode selects it. */
+  useEffect(() => {
+    if (demoOpen && selectedEvent !== DEMO_EVENT) handleEventSelect(DEMO_EVENT);
+  }, [demoOpen, selectedEvent, handleEventSelect]);
 
   /* ── Portfolio uploaded successfully ─────────────────────────── */
   const handlePortfolioSuccess = useCallback((data, settings = null) => {
@@ -302,6 +347,10 @@ export default function App() {
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
 
       <Globe
+        ref={globeRef}
+        cinema={demoOpen}
+        floodReplay={floodState}
+        forceInspect3D={demoInspect3D}
         properties={properties}
         portfolioProperties={portfolioProps}
         selectedProperty={selectedProperty}
@@ -313,24 +362,27 @@ export default function App() {
         leftInset={leftInset}
         stormTrack={stormTrack}
         zoneBbox={zoneSummary?.zone_source === 'event' ? zoneSummary.bbox : null}
-        pinColorOverride={pinColorOverride}
+        pinColorOverride={demoOpen ? demoPins : pinColorOverride}
       />
 
+      {!demoOpen && (
       <Header
         selectedEvent={selectedEventMeta}
         onUploadClick={() => setShowUpload(true)}
         onGridClick={canOpenGrid ? () => openGrid() : null}
         loading={loading}
       />
+      )}
 
-      {selectedEvent && (
+      {selectedEvent && !demoOpen && (
         <TimeSlider timeMode={timeMode} onTimeChange={setTimeMode} hasTile={!!tileUrl} />
       )}
 
-      {(stats || liveMeta?.exposure) && (
+      {(stats || liveMeta?.exposure) && !demoOpen && (
         <KPIBar stats={stats} exposure={liveMeta?.exposure} leftInset={leftInset} />
       )}
 
+      <div style={{ display: demoOpen ? 'none' : 'contents' }}>
       <Sidebar activePanel={activePanel} onSetPanel={setActivePanel} compareCount={compareList.length}>
         {activePanel === 'events' && (
           <EventsPanel
@@ -418,6 +470,7 @@ export default function App() {
           <OperationsPanel selectedEventMeta={selectedEventMeta} />
         )}
       </Sidebar>
+      </div>
 
       <PropertyDrawer
         property={selectedProperty}
@@ -451,7 +504,7 @@ export default function App() {
         />
       )}
 
-      {!grid && (
+      {!grid && !demoOpen && (
         <ChatBar
           eventMeta={selectedEventMeta}
           eventStats={stats}
@@ -460,6 +513,17 @@ export default function App() {
           panelOpen={!!activePanel}
         />
       )}
+
+      <DemoMode
+        open={demoOpen}
+        onClose={() => setDemoOpen(false)}
+        globeRef={globeRef}
+        eventId={selectedEvent}
+        properties={properties}
+        onFloodState={setFloodState}
+        onSetInspect3D={setDemoInspect3D}
+        onSetPinColors={applyDemoPins}
+      />
 
     </div>
   );

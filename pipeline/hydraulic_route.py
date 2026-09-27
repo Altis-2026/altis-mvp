@@ -69,7 +69,8 @@ def _face_flux(q, eta_a, eta_b, zmax, inv_d, dt, gn2, fr_max):
 def route(z: np.ndarray, dx: float, dy: float, t_end_s: float, rain_rate=None,
           manning=0.06, h0=None, record_every_s: float = 3600.0, record_cells=None,
           cfl: float = 0.4, fr_max: float = 1.0, dt_max: float = 60.0, boundary_slope_min=1e-4,
-          snapshot_at_s: float | None = None, sea_mask=None, sea_level: float = 0.0):
+          snapshot_at_s: float | None = None, sea_mask=None, sea_level: float = 0.0,
+          grid_every_s: float | None = None):
     """
     Run the router.
 
@@ -79,6 +80,9 @@ def route(z: np.ndarray, dx: float, dy: float, t_end_s: float, rain_rate=None,
     record_cells  (rows, cols) index arrays to record depth at every
                `record_every_s`.
     snapshot_at_s  also return the full depth field at this time (h_snapshot).
+    grid_every_s  also keep the whole depth field this often, as `grids`
+               (T × h × w float32) with their times in `grid_times` — the
+               flood in motion, for animation.
     sea_mask   cells held at `sea_level` (open ocean): water arriving there
                leaves the domain, counted in volume_out.
     Returns RouterResult with h (final), h_max (peak depth), t_peak (s),
@@ -129,6 +133,8 @@ def route(z: np.ndarray, dx: float, dy: float, t_end_s: float, rain_rate=None,
         wy[:-1, :] |= wall
         wy[1:, :] |= wall
     h_snap = None
+    grids, grid_times = [], []
+    next_grid = 0.0
     sea = None
     if sea_mask is not None and np.any(sea_mask):
         sea = np.asarray(sea_mask, bool) & ~wall
@@ -147,6 +153,10 @@ def route(z: np.ndarray, dx: float, dy: float, t_end_s: float, rain_rate=None,
         hmax_now = float(h[land].max()) if land is not None and land.any() else float(h.max())
         dt = dt_max if hmax_now < H_DRY else min(dt_max, cfl * min(dx, dy) / np.sqrt(G * hmax_now))
         dt = min(dt, t_end_s - t)
+        if grid_every_s is not None and t >= next_grid - 1e-9:
+            grids.append(h.astype(np.float32))
+            grid_times.append(t)
+            next_grid += grid_every_s
         if snapshot_at_s is not None and h_snap is None:
             if t >= snapshot_at_s - 1e-9:
                 h_snap = h.copy()
@@ -237,7 +247,12 @@ def route(z: np.ndarray, dx: float, dy: float, t_end_s: float, rain_rate=None,
         series.append(h[rr, cc].copy())
     if snapshot_at_s is not None and h_snap is None:
         h_snap = h.copy()
+    if grid_every_s is not None:
+        grids.append(h.astype(np.float32))
+        grid_times.append(t)
     return RouterResult(h=h, h_max=h_max, h_snapshot=h_snap, t_peak=t_peak, wet_seconds=wet_s,
                         times=np.array(times), series=np.array(series) if series else np.zeros((0, len(rr))),
+                        grids=(np.array(grids) if grids else None),
+                        grid_times=np.array(grid_times),
                         volume_in=vol_in, volume_out=vol_out,
                         volume_final=float(h.sum() * cell_area) - vol_sea0, steps=steps)

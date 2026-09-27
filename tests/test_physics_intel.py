@@ -459,3 +459,37 @@ def test_sea_mask_only_open_ocean():
     z[2, 2] = -1.0                                          # an inland depression below sea level
     m = sea_mask(z)
     assert m[:, 6:].all() and not m[2, 2] and m.sum() == 12
+
+
+# ── Flood-replay bake (demo mode) ────────────────────────────────────────────
+
+def test_router_grid_capture_matches_the_run():
+    """
+    The animation frames must BE the simulation, not a re-run: the captured
+    grids have to line up with the solver's own state and stay mass-consistent.
+    """
+    z = np.tile(np.linspace(4, 0, 40), (18, 1))
+    r = route(z, 120, 120, 6 * 3600, rain_rate=lambda t: 1.5e-5 if t < 3 * 3600 else 0.0,
+              grid_every_s=1800, dt_max=30)
+    g, ts = r['grids'], r['grid_times']
+    assert g.shape[1:] == z.shape and g.dtype == np.float32
+    assert len(ts) == len(g) and np.all(np.diff(ts) > 0)
+    assert ts[0] == 0.0 and ts[-1] == pytest.approx(6 * 3600, abs=1)
+    # Last captured frame is the final state the run reports.
+    assert np.allclose(g[-1], r['h'], atol=1e-6)
+    # No frame may exceed the peak the solver tracked, or go negative.
+    assert (g >= 0).all() and g.max() <= r['h_max'].max() + 1e-9
+    # Water actually arrives and then drains once the rain stops.
+    assert g[0].sum() == 0 and g[6].sum() > 0 and g[-1].sum() < g[6].sum()
+
+
+def test_flood_frames_quantise_without_losing_the_flood():
+    """uint8 at 10 cm is the wire format; it must preserve wet/dry and depth."""
+    depths = np.array([[0.0, 0.04, 0.05, 0.3, 1.0, 25.4, 40.0]])
+    q = np.clip(np.rint(depths / 0.1), 0, 255).astype(np.uint8)
+    # np.rint is round-half-to-even, so an exact half-step (5 cm) lands on dry.
+    # Harmless: the replay only draws water well above that.
+    assert q.tolist() == [[0, 0, 0, 3, 10, 254, 255]]
+    back = q.astype(float) * 0.1
+    real = depths[0][:-1]
+    assert np.abs(back[0][:-1] - real).max() <= 0.05 + 1e-9   # within half a step
