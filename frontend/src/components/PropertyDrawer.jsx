@@ -90,6 +90,19 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
     setDraft(null); setDrafting(false); setDraftErr(''); setCopied(false);
   }, [property?.property_id]);
 
+  // Escape closes the drawer (unless the user is typing in a field).
+  useEffect(() => {
+    if (!property) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [property, onClose]);
+
   const runDraftNote = async () => {
     if (drafting) return;
     setDrafting(true);
@@ -207,18 +220,20 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
 
   return (
     <>
-      {/* Backdrop (closes drawer on click, doesn't block globe) */}
+      {/* Backdrop: a click on the map closes the drawer. It starts right of
+          the sidebar rail so the rail's buttons stay clickable. */}
       <div
         onClick={onClose}
         style={{
-          position: 'fixed', inset: 0, zIndex: 'var(--z-drawer)',
-          pointerEvents: 'all',
+          position: 'fixed', top: 0, bottom: 0, right: 0, left: isMobile ? '100%' : 56,
+          zIndex: 'var(--z-drawer)', pointerEvents: 'all',
         }}
       />
 
       {/* Drawer panel */}
       <div
         className="anim-slide-in-right"
+        data-tour="drawer"
         onClick={e => e.stopPropagation()}
         style={{
           position:   'fixed',
@@ -252,12 +267,12 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.08em', fontWeight: 600 }}>
               {property.property_id}
             </span>
-            <button onClick={onClose} style={{
+            <button onClick={onClose} aria-label="Close property details" title="Close (Esc)" style={{
               background: 'none', border: 'none', color: 'var(--text-muted)',
               cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '0 0 0 12px',
               transition: 'color 0.15s',
             }}
-              onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
               onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
             >
               ✕
@@ -317,16 +332,14 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
                 <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--approve)', textTransform: 'uppercase' }}>
-                  Validated flood probability
+                  Calibrated flood probability
                 </span>
                 <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                   {floodProb.toFixed(0)}%
                 </strong>
               </div>
               <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
-                Calibrated against FEMA Individual Assistance ground truth
-                {property.flood_probability_source ? ` (${property.flood_probability_source})` : ''}.
-                Labels are zip-resolution, so treat this as FEMA-anchored, not per-house verified.
+                {calibrationNote(property)}
               </div>
             </div>
           )}
@@ -992,6 +1005,20 @@ function verdictBtn(active, color) {
     color: active ? color : 'var(--text-secondary)',
     transition: 'all 0.15s ease',
   };
+}
+
+/* Plain-language provenance for the calibrated probability — built from what
+   the backend actually reports, never a hardcoded data-source claim. */
+function calibrationNote(property) {
+  const src = property.flood_probability_source;
+  const labels = property.flood_probability_label_source;
+  const labelText = labels && /NFIP/i.test(labels) ? 'FEMA NFIP flood-insurance claims'
+                  : labels ? labels.split(' — ')[0] : 'FEMA claims ground truth';
+  const fitted = src ? ` fitted on the ${src.charAt(0).toUpperCase() + src.slice(1)} event` : '';
+  const borrowed = property.flood_probability_borrowed === true || property.flood_probability_borrowed === 1;
+  return `Calibrated against ${labelText}${fitted}.${borrowed
+    ? ' This analysis has no calibration of its own, so it borrows that fit; treat it as indicative.'
+    : ''} Labels are zip-code resolution, so this is a calibrated area-level estimate, not a per-house verification.`;
 }
 
 function parseJsonField(value) {

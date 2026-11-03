@@ -1,15 +1,17 @@
 /* TimeSlider.jsx — Pre/post satellite imagery toggle (bottom left) */
 import { useIsMobile } from '../hooks/useIsMobile.js';
 
-export default function TimeSlider({ timeMode, onTimeChange, hasTile }) {
+export default function TimeSlider({ timeMode, onTimeChange, hasTile, leftInset = 56 }) {
   const isMobile = useIsMobile();
   return (
     <div
       className="anim-fade-in"
+      data-tour="timeslider"
       style={{
         position:   'fixed',
         bottom:     isMobile ? 92 : 32,
-        left:       isMobile ? 64 : 72,
+        left:       isMobile ? 64 : leftInset + 16,
+        transition: 'left 0.25s ease',
         zIndex:     'var(--z-ui)',
         display:    'flex',
         flexDirection: 'column',

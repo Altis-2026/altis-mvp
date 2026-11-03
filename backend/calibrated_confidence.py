@@ -83,14 +83,19 @@ def get_calibration(event_id: Optional[str]) -> Optional[dict]:
     """
     Resolve which fitted calibration to use for an event.
 
-    A pre-baked event uses its own if present. Live analysis (event_id None, or
-    an event with no fitted calibration) falls back through
-    DEFAULT_CALIBRATION_ORDER. Returns None when nothing has been fitted yet.
+    A pre-baked event uses its own calibration, or none at all. Only live
+    analysis (event_id None / 'live', no event of its own) borrows, through
+    DEFAULT_CALIBRATION_ORDER, and is marked is_borrowed so the UI says so.
+    Returns None when no applicable calibration has been fitted.
     """
     candidates = []
-    if event_id:
+    if event_id and event_id != 'live':
+        # A named event only ever uses its OWN calibration. Silently borrowing
+        # another event's (e.g. Harvey's NFIP fit applied to an Australian
+        # river flood) would present an unvalidated number as calibrated.
         candidates.append(event_id)
-    candidates.extend(e for e in DEFAULT_CALIBRATION_ORDER if e != event_id)
+    else:
+        candidates.extend(DEFAULT_CALIBRATION_ORDER)
 
     for candidate in candidates:
         blob = _load_blob(candidate)
@@ -158,4 +163,6 @@ def attach_flood_probability(rows: list, event_id: Optional[str] = None) -> Opti
     for row, prob in zip(analysed, probs):
         row['flood_probability'] = round(float(prob) * 100.0, 1)
         row['flood_probability_source'] = provenance['fitted_on_event']
+        row['flood_probability_borrowed'] = bool(provenance['is_borrowed'])
+        row['flood_probability_label_source'] = provenance.get('label_source')
     return provenance

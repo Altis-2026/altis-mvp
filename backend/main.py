@@ -478,12 +478,14 @@ async def analyze_portfolio(portfolio_id: str, event_id: str,
 def get_storm_track(event_id: str):
     """
     NHC best-track overlay (simplified, public-domain HURDAT2) for events that
-    have one. 404 for events without a track — the UI just draws nothing.
+    have one. Events without a track (river floods, live analysis) get an
+    empty FeatureCollection rather than a 404, so the browser console stays
+    clean; the UI simply draws nothing.
     """
     from backend.storm_tracks import storm_track_geojson
     gj = storm_track_geojson(event_id)
     if gj is None:
-        raise HTTPException(404, f"No storm track available for '{event_id}'.")
+        return {"type": "FeatureCollection", "features": []}
     return gj
 
 

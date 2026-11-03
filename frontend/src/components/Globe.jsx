@@ -2,7 +2,6 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { useTheme } from '../hooks/useTheme.js';
 import { getTheme } from '../theme.js';
-import Tutorial from './Tutorial.jsx';
 import { api } from '../services/api.js';
 import { buildingFeatures, placeholderRing } from '../utils/buildings.js';
 
@@ -72,6 +71,7 @@ export default function Globe({
   dimmed,
   leftInset = 0,
   stormTrack = null,
+  onOpenTutorial,
   zoneBbox = null,
 }) {
   const containerRef = useRef(null);
@@ -91,7 +91,6 @@ export default function Globe({
   const inspectRef   = useRef(false);
   const buildingReq  = useRef(0);      // drops responses from stale viewports
   const buildingTimer = useRef(null);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [guideVisible, setGuideVisible] = useState(false); // faded-in yet?
   const [guideGone,    setGuideGone]    = useState(false); // fully dismissed
   const isMobile = useIsMobile();
@@ -1066,8 +1065,9 @@ export default function Globe({
           ask what the colors mean. */}
       {hasTriagePins && !dimmed && !isMobile && (
         <div className="anim-fade-in" style={{
-          /* Sits above the chat bar (~72px tall) so they never overlap. */
-          position: 'fixed', bottom: 96, left: 16 + leftInset, zIndex: 5,
+          /* Sits above the chat bar and the satellite-view toggle (bottom
+             left, ~100px tall) so they never overlap. */
+          position: 'fixed', bottom: 120, left: 16 + leftInset, zIndex: 5,
           padding: '10px 14px', borderRadius: 10,
           background: 'var(--panel)', border: '1px solid rgba(255,255,255,0.08)',
           backdropFilter: 'blur(12px)', transition: 'left 0.25s ease',
@@ -1117,8 +1117,8 @@ export default function Globe({
       )}
 
       {/* Map layer toggles */}
-      <div style={{
-        position: 'fixed', bottom: isMobile ? 150 : 22, right: isMobile ? 8 : 16, zIndex: 5,
+      <div data-tour="map-controls" style={{
+        position: 'fixed', bottom: isMobile ? 176 : 22, right: isMobile ? 8 : 16, zIndex: 5,
         display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end',
         maxWidth: isMobile ? 'calc(100vw - 72px)' : 'none', // stay clear of the left rail
       }}>
@@ -1210,7 +1210,8 @@ export default function Globe({
             FEMA zones
           </button>
           <button
-            onClick={() => setShowTutorial(true)}
+            onClick={() => onOpenTutorial?.()}
+            data-tour="tutorial-btn"
             style={{
               ...toggleStyle(false),
               display: 'flex', alignItems: 'center', gap: 5,
@@ -1229,7 +1230,6 @@ export default function Globe({
         </div>
       </div>
 
-      <Tutorial open={showTutorial} onClose={() => setShowTutorial(false)} />
     </>
   );
 }
@@ -1278,13 +1278,15 @@ function cleanFeatureProps(p) {
 /* Pin radius: selected pin is largest; Dispatch pins are emphasised and all
    pins grow with zoom so a dense neighbourhood stays readable up close. */
 function pinRadius(selId) {
-  return [
+  // Mapbox only allows ["zoom"] as the input of a TOP-LEVEL interpolate/step,
+  // so the per-feature case goes inside each zoom stop, not the other way round.
+  const at = (dispatch, other) => [
     'case',
     ['==', ['get', 'property_id'], selId], 12,
-    ['==', ['get', 'impact_class'], 'Dispatch'],
-      ['interpolate', ['linear'], ['zoom'], 4, 6, 10, 8.5, 14, 12],
-    ['interpolate', ['linear'], ['zoom'], 4, 4, 10, 6, 14, 8.5],
+    ['==', ['get', 'impact_class'], 'Dispatch'], dispatch,
+    other,
   ];
+  return ['interpolate', ['linear'], ['zoom'], 4, at(6, 4), 10, at(8.5, 6), 14, at(12, 8.5)];
 }
 
 function pinStroke(selId) {

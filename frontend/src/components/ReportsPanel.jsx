@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../services/api.js';
 import { downloadCSV } from '../utils/csv.js';
 
@@ -97,10 +97,19 @@ const PORTFOLIO_EXPORT_COLS = ['property_id', 'policy_number', 'address', 'cover
   'impact_class', 'max_depth_ft', 'confidence_score', 'adjuster_note'];
 
 export default function ReportsPanel({
-  events = [], eventLabel, eventProperties = [],
+  events = [], selectedEvent, eventLabel, eventProperties = [],
   portfolioId, portfolioLabel, portfolioProperties = [],
 }) {
-  const [reportEventId, setReportEventId] = useState(events[0]?.id || '');
+  const [reportEventId, setReportEventId] = useState(selectedEvent || events[0]?.id || '');
+  // Follow the event the user is looking at; fall back to the first event once
+  // the list arrives. Clears any report loaded for a different event.
+  useEffect(() => {
+    const next = selectedEvent || events[0]?.id || '';
+    if (next && next !== reportEventId) {
+      setReportEventId(next);
+      setReport(null); setReportError(''); setCalibration(null); setCalibError('');
+    }
+  }, [selectedEvent, events]);  // eslint-disable-line react-hooks/exhaustive-deps
   const [report,         setReport]        = useState(null);
   const [reportError,    setReportError]   = useState('');
   const [loadingReport,  setLoadingReport] = useState(false);
@@ -254,7 +263,7 @@ export default function ReportsPanel({
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          <select value={reportEventId} onChange={e => setReportEventId(e.target.value)} style={{
+          <select value={reportEventId} onChange={e => { setReportEventId(e.target.value); setReport(null); setReportError(''); setCalibration(null); setCalibError(''); }} style={{
             flex: 1, padding: '6px 8px', fontSize: '0.74rem', background: 'var(--wa-03)',
             border: '1px solid var(--wa-08)', borderRadius: 'var(--r-sm)', color: 'var(--text-primary)',
           }}>

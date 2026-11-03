@@ -27,8 +27,14 @@ const SpeechRecognitionImpl =
     ? (window.SpeechRecognition || window.webkitSpeechRecognition)
     : null;
 
-export default function ChatBar({ eventMeta, eventStats, selectedProperty, portfolioId, panelOpen }) {
+export default function ChatBar({ eventMeta, eventStats, selectedProperty, portfolioId, panelOpen, leftInset = RAIL_W, hasTimeSlider = false }) {
   const isMobile = useIsMobile();
+  const [winW, setWinW] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWinW(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [expanded, setExpanded] = useState(false); // transcript panel visible
   const [focused,  setFocused]  = useState(false); // input focused → show chips
   const [input,     setInput]     = useState('');
@@ -152,11 +158,11 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
   const hidden = isMobile && (panelOpen || !!selectedProperty);
 
   return (
-    <div style={{
+    <div data-tour="chat" style={{
       position: 'fixed', bottom: isMobile ? 12 : 22, zIndex: 25,
       ...(isMobile
         ? { left: RAIL_W + 4, right: 8 }
-        : { left: '50%', transform: 'translateX(-50%)', width: 'min(600px, 92vw)' }),
+        : desktopSlot(winW, leftInset, !!selectedProperty, hasTimeSlider)),
       display: hidden ? 'none' : 'flex', flexDirection: 'column',
       alignItems: 'stretch', gap: 8,
     }}>
@@ -378,6 +384,29 @@ export default function ChatBar({ eventMeta, eventStats, selectedProperty, portf
 }
 
 const RAIL_W = 56; // matches the sidebar rail so the bar clears it on phones
+
+/* Desktop placement: the bottom row is shared with the satellite-view toggle
+   (bottom left, beside any open side panel) and the map-layer toggles (bottom
+   right, hidden under an open property drawer). Fit the bar in the gap
+   between them; if the gap is too small, lift the bar above that row. */
+function desktopSlot(vw, leftInset, drawerOpen, hasTimeSlider) {
+  const drawerW = drawerOpen ? Math.min(520, Math.max(380, vw * 0.36)) : 0;
+  const mapLeft = leftInset + 16;
+  const mapRight = vw - (drawerOpen ? drawerW + 16 : 16);
+  const left = hasTimeSlider ? leftInset + 262 : mapLeft;
+  const right = drawerOpen ? mapRight : vw - 500;
+  const gap = right - left;
+  if (gap >= 380) {
+    const w = Math.min(600, gap);
+    return { left: left + (gap - w) / 2, width: w };
+  }
+  // Lifted: keep clear of the pin legend (bottom left, hidden while the
+  // drawer dims the map) as well.
+  const liftLeft = mapLeft + (drawerOpen ? 0 : 250);
+  const span = Math.max(260, mapRight - liftLeft);
+  const w = Math.min(600, span);
+  return { left: liftLeft + (span - w) / 2, width: w, bottom: 112 };
+}
 
 const roundBtn = (bg) => ({
   width: 30, height: 30, borderRadius: '50%', border: 'none', flexShrink: 0,

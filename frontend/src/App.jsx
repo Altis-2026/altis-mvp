@@ -15,6 +15,7 @@ import DispatchQueuePanel from './components/DispatchQueuePanel.jsx';
 import OperationsPanel    from './components/OperationsPanel.jsx';
 import DataGrid           from './components/DataGrid.jsx';
 import ChatBar            from './components/ChatBar.jsx';
+import Tutorial           from './components/Tutorial.jsx';
 import { api }            from './services/api.js';
 
 function computeBounds(properties) {
@@ -116,7 +117,9 @@ export default function App() {
     if (evt) setFlyTarget({ center: [evt.lon, evt.lat], zoom: evt.zoom || 10 });
 
     // NHC best-track overlay (only exists for hurricane events; 404 = none).
-    api.getStormTrack(eventId).then(setStormTrack).catch(() => setStormTrack(null));
+    api.getStormTrack(eventId)
+      .then(t => setStormTrack(t?.features?.length ? t : null))
+      .catch(() => setStormTrack(null));
 
     try {
       const [propsData, tilesData] = await Promise.all([
@@ -289,6 +292,49 @@ export default function App() {
 
   const canOpenGrid = properties.length > 0 || portfolioProps.length > 0;
 
+  /* ── Guided tour: drives the real UI step by step ─────────────── */
+  const [showTour, setShowTour] = useState(false);
+  const [tourWantsProperty, setTourWantsProperty] = useState(false);
+
+  const openTour = useCallback(() => {
+    setGrid(null);
+    setShowUpload(false);
+    setShowTour(true);
+  }, []);
+
+  const closeTour = useCallback(() => {
+    setShowTour(false);
+    setTourWantsProperty(false);
+    setSelectedProperty(null);
+    setActivePanel(null);
+  }, []);
+
+  // The tour asks for "the top property"; open it as soon as one exists
+  // (the demo event may still be loading when the step starts).
+  useEffect(() => {
+    if (!tourWantsProperty || properties.length === 0) return;
+    const rank = { 'Dispatch': 0, 'Review': 1, 'Remote-Approve': 2, 'Remote-Deny': 3 };
+    const top = [...properties].sort((a, b) =>
+      ((rank[a.impact_class] ?? 9) - (rank[b.impact_class] ?? 9)) ||
+      ((+b.max_depth_ft || 0) - (+a.max_depth_ft || 0)))[0];
+    setSelectedProperty(top);
+    setTourWantsProperty(false);
+  }, [tourWantsProperty, properties]);
+
+  const tourCtl = {
+    eventLabel: selectedEventMeta?.label,
+    setPanel: setActivePanel,
+    closeProperty: () => { setTourWantsProperty(false); setSelectedProperty(null); },
+    ensureEvent: () => {
+      if (selectedEvent || loading || events.length === 0) return;
+      const demo = events.find(e => e.id === 'harvey') || events[0];
+      handleEventSelect(demo.id);
+    },
+    openTopProperty: () => {
+      if (!selectedProperty) setTourWantsProperty(true);
+    },
+  };
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
 
@@ -304,6 +350,7 @@ export default function App() {
         leftInset={leftInset}
         stormTrack={stormTrack}
         zoneBbox={zoneSummary?.zone_source === 'event' ? zoneSummary.bbox : null}
+        onOpenTutorial={openTour}
       />
 
       <Header
@@ -314,11 +361,11 @@ export default function App() {
       />
 
       {selectedEvent && (
-        <TimeSlider timeMode={timeMode} onTimeChange={setTimeMode} hasTile={!!tileUrl} />
+        <TimeSlider timeMode={timeMode} onTimeChange={setTimeMode} hasTile={!!tileUrl} leftInset={leftInset} />
       )}
 
       {(stats || liveMeta?.exposure) && (
-        <KPIBar stats={stats} exposure={liveMeta?.exposure} leftInset={leftInset} />
+        <KPIBar stats={stats} exposure={liveMeta?.exposure} leftInset={leftInset} drawerOpen={drawerOpen} />
       )}
 
       <Sidebar activePanel={activePanel} onSetPanel={setActivePanel} compareCount={compareList.length}>
@@ -385,6 +432,7 @@ export default function App() {
         {activePanel === 'reports' && (
           <ReportsPanel
             events={events}
+            selectedEvent={selectedEvent}
             eventLabel={selectedEventMeta?.label}
             eventProperties={properties}
             portfolioId={portfolioId}
@@ -429,6 +477,8 @@ export default function App() {
         />
       )}
 
+      <Tutorial open={showTour} onClose={closeTour} ctl={tourCtl} />
+
       {!grid && (
         <ChatBar
           eventMeta={selectedEventMeta}
@@ -436,6 +486,8 @@ export default function App() {
           selectedProperty={selectedProperty}
           portfolioId={portfolioAnalyzed ? portfolioId : null}
           panelOpen={!!activePanel}
+          leftInset={leftInset}
+          hasTimeSlider={!!selectedEvent}
         />
       )}
 

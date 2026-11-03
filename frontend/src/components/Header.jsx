@@ -69,6 +69,7 @@ export default function Header({ selectedEvent, onUploadClick, onGridClick, load
       {/* Right: actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 6 : 10, pointerEvents: 'all' }}>
         <button
+          data-tour="theme-btn"
           onClick={toggleTheme}
           style={{ ...ghostBtn, padding: compact ? '8px 10px' : '8px 12px' }}
           aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -89,7 +90,7 @@ export default function Header({ selectedEvent, onUploadClick, onGridClick, load
           {!compact && (theme === 'dark' ? 'Light' : 'Dark')}
         </button>
         {onGridClick && (
-          <button onClick={onGridClick} style={compact ? { ...ghostBtn, padding: '8px 10px' } : ghostBtn}
+          <button data-tour="grid-btn" onClick={onGridClick} style={compact ? { ...ghostBtn, padding: '8px 10px' } : ghostBtn}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--wa-08)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--wa-04)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -99,6 +100,7 @@ export default function Header({ selectedEvent, onUploadClick, onGridClick, load
           </button>
         )}
         <button
+          data-tour="upload-btn"
           onClick={onUploadClick}
           style={compact ? { ...tealBtn, padding: '8px 12px' } : tealBtn}
           onMouseEnter={e => {

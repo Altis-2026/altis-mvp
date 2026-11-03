@@ -69,7 +69,7 @@
   --z-ui:     10;
   --z-drawer: 20;
   --z-modal:  30;
-  --z-header: 40;
+  --z-header: 16;   /* above the sidebar panel (15), below the drawer (20) */
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────

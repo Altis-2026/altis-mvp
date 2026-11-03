@@ -123,6 +123,20 @@ def test_live_analysis_borrows_and_declares_it(calib_dir):
     assert rows[0]['flood_probability_source'] == 'harvey'
 
 
+def test_named_event_without_its_own_calibration_gets_none(calib_dir):
+    """A named event (e.g. an Australian river flood) must never silently
+    borrow another event's FEMA-fitted calibration."""
+    rows = _rows()
+    assert cc.attach_flood_probability(rows, 'lismore') is None
+    assert all('flood_probability' not in r for r in rows)
+
+
+def test_live_rows_flag_borrowed_calibration(calib_dir):
+    rows = _rows()
+    cc.attach_flood_probability(rows, 'live')
+    assert rows[0]['flood_probability_borrowed'] is True
+
+
 def test_own_event_calibration_is_not_marked_borrowed(calib_dir):
     prov = cc.attach_flood_probability(_rows(), 'harvey')
     assert prov['is_borrowed'] is False

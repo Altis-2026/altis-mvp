@@ -145,8 +145,17 @@ def _call_llm(messages: list[dict], max_tokens: int = 600,
     except requests.RequestException as e:
         raise ChatError(f"Couldn't reach the assistant: {e}")
 
+    if resp.status_code in (401, 403):
+        print(f"  [chat] provider rejected credentials ({resp.status_code}): {resp.text[:300]}")
+        raise ChatError("The assistant is unavailable right now: the AI provider rejected "
+                        "this server's API key. An administrator needs to update "
+                        "OPENROUTER_API_KEY.")
+    if resp.status_code == 429:
+        raise ChatError("The assistant is busy (rate limited). Try again in a minute.")
     if resp.status_code != 200:
-        raise ChatError(f"Assistant request failed ({resp.status_code}): {resp.text[:300]}")
+        print(f"  [chat] provider error {resp.status_code}: {resp.text[:300]}")
+        raise ChatError(f"The assistant request failed (provider error {resp.status_code}). "
+                        "Try again shortly.")
 
     data = resp.json()
     try:

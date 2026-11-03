@@ -40,7 +40,7 @@ function money(v) {
 
 import { useIsNarrow } from '../hooks/useIsMobile.js';
 
-export default function KPIBar({ stats, exposure, leftInset = 72 }) {
+export default function KPIBar({ stats, exposure, leftInset = 72, drawerOpen = false }) {
   const narrow = useIsNarrow();
   if (!stats && !exposure) return null;
 
@@ -51,13 +51,15 @@ export default function KPIBar({ stats, exposure, leftInset = 72 }) {
   return (
     <div
       className="anim-slide-in-up"
+      data-tour="kpis"
       style={{
         position:   'fixed',
         top:        narrow ? 64 : 72,
         left:       narrow ? 64 : leftInset + 16,
         right:      narrow ? 8 : 'auto',
-        maxWidth:   narrow ? 'none' : `calc(100vw - ${leftInset + 32}px)`,
-        overflowX:  'auto',
+        maxWidth:   narrow ? 'none'
+          : drawerOpen ? `calc(100vw - ${leftInset + 48}px - clamp(380px, 36vw, 520px))`
+          : `calc(100vw - ${leftInset + 32}px)`,
         transition: 'left 0.25s ease',
         zIndex:     'var(--z-ui)',
         display:    'flex',
@@ -65,7 +67,8 @@ export default function KPIBar({ stats, exposure, leftInset = 72 }) {
         border:     '1px solid var(--wa-06)',
         borderRadius: 'var(--r-lg)',
         backdropFilter: 'blur(20px)',
-        overflow:   'hidden',
+        overflowX:  'auto',
+        overflowY:  'hidden',
         whiteSpace: 'nowrap',
       }}
     >
