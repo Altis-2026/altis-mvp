@@ -58,6 +58,16 @@ need zero infra experience — not because they're the only option. See
    | `DATA_DIR` | `/data` | see Step 6 |
    | `ALLOWED_ORIGINS` | your Vercel URL, e.g. `https://altis.vercel.app` | locks CORS; add after Step 2 gives you the URL |
    | `DEMO_PASSWORD` | a password of your choice | optional — see **Access gate** below |
+   | `GOOGLE_MAPS_API_KEY` | your Google Maps Platform key | optional — enables Street View availability lookups (free SKUs only) and, with the flag below, Solar API roof geometry |
+   | `ENABLE_SOLAR_API` | `true` | **optional and BILLABLE.** Leave UNSET and the Solar API is completely inert — no network call is ever made. Set it only when you want measured roof heights. Google gives 10,000 Building Insights requests/month free, then $10.00/1,000; Altis additionally caps calls per request (`SOLAR['max_calls_per_request']`, default 25). |
+
+   **On the two Google keys.** Street View here uses only endpoints Google
+   prices at no charge (metadata + Maps Embed); the billable Street View
+   *image* SKU is never called. The Solar API is the one endpoint in Altis that
+   can cost money, which is why it needs its own explicit flag on top of the
+   key — a key alone will not switch it on. `GET /api/imagery-status` reports
+   which of the two are live, so you can confirm the billing posture of a
+   running deployment without reading the config.
 
 6. **Attach a volume** so the database and cached imagery survive redeploys:
    Settings → Volumes → mount path `/data`. Without this, every redeploy
@@ -78,6 +88,7 @@ need zero infra experience — not because they're the only option. See
    | Variable | Value |
    |---|---|
    | `VITE_MAPBOX_TOKEN` | your Mapbox token |
+   | `VITE_GOOGLE_MAPS_API_KEY` | your Google Maps Platform key — renders the Street View panorama in the property drawer via the Maps Embed API (free, unlimited). Omit it and the panel simply doesn't render. |
    | `VITE_API_BASE_URL` | `https://<your-railway-domain>/api` |
 
 5. Deploy. You now have a real URL.

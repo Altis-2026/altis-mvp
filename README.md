@@ -9,7 +9,7 @@ hurricane or flood event, and get back a ranked, explainable triage of every
 property: who needs an adjuster dispatched today, who can be resolved
 remotely, and how confident the model is in each call.
 
-[![tests](https://img.shields.io/badge/tests-111%20passing-brightgreen)]()
+[![tests](https://img.shields.io/badge/tests-233%20backend%20%2B%2030%20frontend-brightgreen)]()
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)]()
 [![node](https://img.shields.io/badge/node-18%2B-blue)]()
 
@@ -57,6 +57,15 @@ freely available satellite radar instead of waiting on ground reports.
 - **3D globe UI** — Mapbox GL globe with zoom-aware clustering, dispatch pins
   visually emphasized over remote-resolved ones, and address labels that
   appear only once you're zoomed in close enough to read them.
+- **3D property inspect** — an optional mode that drapes real terrain and
+  draws each property as a building: its actual OpenStreetMap footprint,
+  extruded to an estimated height with a procedural gable roof, colored by
+  triage decision, with the modeled flood depth rendered as water standing
+  against its walls. A claims manager sees "water is 3.2 ft up this house"
+  instead of reading it out of a column. Gated to neighborhood zoom — the flat
+  pin/cluster view stays the default across a portfolio — and labeled in the
+  UI as illustrative: footprints are real, heights are estimated, and neither
+  is a structural survey.
 
 ## Architecture
 
@@ -130,16 +139,23 @@ hardening checklist. Rough pilot-scale cost: **$10–30/month**.
 | `GET /api/events/{event_id}/feedback` | Feedback summary for an event |
 | `GET /api/runs` / `POST /api/runs` | Pipeline run queue (Operations panel) |
 | `POST /api/runs/{run_id}/status` | Advance a queued run |
+| `POST /api/buildings` | Building footprints + heights for the 3D inspect view |
+| `POST /api/streetview` | Street-level imagery availability + capture date (free) |
+| `GET /api/imagery-status` | Which optional imagery integrations are configured |
 
 ## Testing
 
 ```bash
-pytest -q                       # backend / pipeline logic
+pytest -q                       # backend / pipeline logic  (207 tests)
+cd frontend && npm test         # map + building geometry   (29 tests)
 cd frontend && npm run build    # production build sanity check
 ```
 
-111 tests across ingestion, triage, calibration, uncertainty, priority
-ranking, feedback-to-ground-truth merging, and the full Round 6 API surface.
+233 backend tests across ingestion, triage, calibration, uncertainty, priority
+ranking, feedback-to-ground-truth merging, the Round 6 API surface, the
+building-footprint join, and the imagery integrations (including a guard that
+the one billable Google endpoint cannot reach the network while disabled). The frontend tests run on node's built-in runner
+(no test framework dependency) and cover the 3D inspect geometry.
 
 ## License
 
