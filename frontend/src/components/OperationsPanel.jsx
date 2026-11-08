@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.js';
+import DataFreshness from './DataFreshness.jsx';
 
 /* OperationsPanel — closes the monitor → pipeline loop. The monitor service
    watches NHC/USGS feeds and, on a new flood event, enqueues a pipeline run
@@ -27,7 +28,7 @@ function ago(iso) {
   } catch { return ''; }
 }
 
-export default function OperationsPanel({ selectedEventMeta }) {
+export default function OperationsPanel({ selectedEventMeta, portfolioBbox }) {
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -77,12 +78,21 @@ export default function OperationsPanel({ selectedEventMeta }) {
           fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.5,
         }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4CAF82', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-            <strong style={{ color: 'var(--text-primary)' }}>Monitor active</strong>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--teal)', display: 'inline-block' }} />
+            <strong style={{ color: 'var(--text-primary)' }}>Event monitor</strong>
           </span>
-          {' '}· watching NHC cyclones and USGS flood gauges. New events auto-queue a run.
+          {' '}· when <code style={{ color: 'var(--text-secondary)' }}>monitor/monitor.py</code> is running it watches
+          NHC cyclones and USGS flood gauges, and new events queue a run here.
           <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>{queued} run{queued === 1 ? '' : 's'} queued</div>
         </div>
+
+        {(selectedEventMeta || portfolioBbox) && (
+          <DataFreshness
+            eventId={selectedEventMeta?.id}
+            bbox={selectedEventMeta?.bbox || portfolioBbox}
+            title={selectedEventMeta ? `Satellites over ${selectedEventMeta.label}` : 'Satellites over this portfolio'}
+          />
+        )}
 
         <button onClick={queueForEvent} disabled={!selectedEventMeta || busy} style={{
           width: '100%', marginTop: 10, padding: '9px 0', borderRadius: 'var(--r-sm)',

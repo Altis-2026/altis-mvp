@@ -156,6 +156,9 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   const sevLow    = num(property.severity_low_usd);
   const sevMid    = num(property.severity_mid_usd);
   const sevHigh   = num(property.severity_high_usd);
+  const gaugeDepth = num(property.gauge_depth_ft);
+  const gaugeDist  = num(property.gauge_dist_m);
+  const gaugeConflict = property.gauge_conflict == 1;
   const floodZone = property.flood_zone && property.flood_zone !== 'null' ? property.flood_zone : null;
 
   // Phase 2 structure attributes. Each stays null when unknown so the drawer
@@ -447,6 +450,36 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             property={property}
             googleKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
           />
+
+          {/* River-gauge evidence: an independent physics estimate that does
+              not depend on radar seeing the water (validation/gauge_depth_check.py). */}
+          {gaugeDepth != null && (
+            <div style={{
+              marginBottom: 24, padding: '12px 14px', borderRadius: 'var(--r-md)',
+              background: gaugeConflict ? 'rgba(255,179,71,0.08)' : 'var(--wa-02)',
+              border: `1px solid ${gaugeConflict ? 'rgba(255,179,71,0.35)' : 'var(--wa-05)'}`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em', color: gaugeConflict ? '#FFB347' : 'var(--teal)', textTransform: 'uppercase' }}>
+                  {gaugeConflict ? 'River gauge disagrees with radar' : 'River gauge estimate'}
+                </span>
+                <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  {gaugeDepth.toFixed(1)} ft
+                </strong>
+              </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
+                The {property.gauge_river || 'river'} crest, carried along the channel to this spot
+                {gaugeDist != null ? ` (${(gaugeDist / 1000).toFixed(1)} km from the channel)` : ''}, puts the
+                peak water surface {gaugeDepth > 0 ? `${gaugeDepth.toFixed(1)} ft above this ground level` : 'below this ground level'}.
+                {gaugeConflict && ' Radar saw no water here, so this is a possible missed claim: worth a review before closing.'}
+              </div>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
+                NOAA gauge crest + USGS 1 m lidar ground. Models main-river flooding only, not rain ponding.
+                Against surveyed USGS high-water marks it found water at far more flooded sites than radar,
+                with depth errors of a few feet.
+              </div>
+            </div>
+          )}
 
           {/* Measurements */}
           <div style={{ marginBottom: 24 }}>

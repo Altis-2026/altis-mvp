@@ -92,7 +92,7 @@ function renderMiniMarkdown(md) {
 }
 
 const EVENT_EXPORT_COLS = ['property_id', 'address', 'impact_class', 'max_depth_ft',
-  'pct_flooded', 'confidence_score', 'urban_flag', 'adjuster_note'];
+  'pct_flooded', 'confidence_score', 'urban_flag', 'adjuster_note', 'gauge_depth_ft', 'gauge_river', 'gauge_conflict'];
 const PORTFOLIO_EXPORT_COLS = ['property_id', 'policy_number', 'address', 'coverage_amount',
   'impact_class', 'max_depth_ft', 'confidence_score', 'adjuster_note'];
 

@@ -291,6 +291,11 @@ export default function App() {
   }, [properties, portfolioProps, activePortfolio, selectedEventMeta]);
 
   const canOpenGrid = properties.length > 0 || portfolioProps.length > 0;
+  const portfolioBbox = (() => {
+    const b = computeBounds(portfolioProps);
+    // Padded so a one-property book still forms a valid search box.
+    return b ? [b[0][0] - 0.02, b[0][1] - 0.02, b[1][0] + 0.02, b[1][1] + 0.02] : null;
+  })();
 
   /* ── Guided tour: drives the real UI step by step ─────────────── */
   const [showTour, setShowTour] = useState(false);
@@ -441,7 +446,7 @@ export default function App() {
           />
         )}
         {activePanel === 'operations' && (
-          <OperationsPanel selectedEventMeta={selectedEventMeta} />
+          <OperationsPanel selectedEventMeta={selectedEventMeta} portfolioBbox={portfolioBbox} />
         )}
       </Sidebar>
 

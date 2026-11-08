@@ -602,6 +602,13 @@ def analyze_portfolio_live_endpoint(portfolio_id: str, body: dict = Body(...)):
     if calib_prov:
         out['meta']['calibration'] = calib_prov
 
+    # River-gauge evidence (US): independent of radar, so it can flag
+    # properties the satellite missed. Never fails the run.
+    from backend.gauges import attach_gauge_depth_live
+    gauge_meta = attach_gauge_depth_live(results, out['meta'].get('windows') or windows)
+    if gauge_meta:
+        out['meta']['gauges'] = gauge_meta
+
     save_analysis_results(portfolio_id, 'live', results)
     save_analysis_meta(portfolio_id, 'live', out['meta'])
     if event_date:

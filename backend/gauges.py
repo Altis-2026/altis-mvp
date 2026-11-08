@@ -448,3 +448,66 @@ def gauge_depth_for_points(lat, lon, bbox, start: str, end: str, ground_ft=None,
         depth = np.where(ok & np.isfinite(ground_ft), np.maximum(0.0, wse - np.asarray(ground_ft, float)), np.nan)
     return {"wse_ft": wse, "depth_ft": depth, "dist_to_channel_m": best_d,
             "river": np.where(ok, ref, None), "rivers_used": used, "all_gauge_peaks": peaks}
+
+
+# ── Live analysis hook ─────────────────────────────────────────────────────
+
+def _in_conus_box(lat, lon) -> bool:
+    return 17 <= lat <= 72 and -170 <= lon <= -65
+
+
+def attach_gauge_depth_live(rows: list, windows: Optional[dict], conflict_min_ft: float = 1.0,
+                            radar_dry_max_pct: float = 5.0) -> Optional[dict]:
+    """Add gauge depth + conflict flag to live-analysis rows in place.
+
+    US only (NOAA/USGS). Never raises: a gauge failure must not cost the user
+    their satellite run, so problems are returned as a status note instead.
+    """
+    if not rows or not windows or not windows.get("post_start"):
+        return None
+    pts = [(i, r) for i, r in enumerate(rows)
+           if r.get("latitude") is not None and r.get("longitude") is not None
+           and r.get("impact_class") not in (None, "No Coverage")
+           and _in_conus_box(float(r["latitude"]), float(r["longitude"]))]
+    if not pts:
+        return {"status": "not_applicable", "reason": "no US properties (NOAA gauges are US only)"}
+    try:
+        from datetime import date as _d, timedelta as _td
+        start = (_d.fromisoformat(windows["post_start"][:10]) - _td(days=3)).isoformat()
+        end = (windows.get("post_end") or windows["post_start"])[:10]
+        lat = np.array([float(r["latitude"]) for _, r in pts])
+        lon = np.array([float(r["longitude"]) for _, r in pts])
+        bbox = [lon.min() - 0.01, lat.min() - 0.01, lon.max() + 0.01, lat.max() + 0.01]
+        res = gauge_depth_for_points(lat, lon, bbox, start, end)
+        near = np.isfinite(res["wse_ft"])
+        ground = np.full(len(lat), np.nan)
+        if near.any():
+            from backend.live_pipeline import init_ee
+            if init_ee():
+                import ee
+                dem = (ee.ImageCollection("USGS/3DEP/1m").filterBounds(ee.Geometry.Rectangle(bbox))
+                       .mosaic().select(0))
+                idx = np.where(near)[0]
+                fc = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([float(lon[k]), float(lat[k])]),
+                                                      {"k": int(k)}) for k in idx])
+                for f in dem.reduceRegions(fc, ee.Reducer.mean(), 1).getInfo()["features"]:
+                    v = f["properties"].get("mean")
+                    if v is not None:
+                        ground[f["properties"]["k"]] = v * 3.28084
+        n_conf = 0
+        for k, (_, r) in enumerate(pts):
+            if not near[k] or not np.isfinite(ground[k]):
+                continue
+            depth = max(0.0, float(res["wse_ft"][k] - ground[k]))
+            r["gauge_depth_ft"] = round(depth, 2)
+            r["gauge_wse_ft"] = round(float(res["wse_ft"][k]), 2)
+            r["gauge_dist_m"] = round(float(res["dist_to_channel_m"][k]))
+            r["gauge_river"] = res["river"][k]
+            dry = float(r.get("pct_flooded") or 0) <= radar_dry_max_pct
+            r["gauge_conflict"] = int(dry and depth >= conflict_min_ft)
+            n_conf += r["gauge_conflict"]
+        return {"status": "ok", "window": [start, end], "rivers": list(res["rivers_used"]),
+                "n_with_gauge_depth": int(sum(1 for _, r in pts if "gauge_depth_ft" in r)),
+                "n_conflicts": n_conf}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "reason": f"{type(e).__name__}: {e}"}

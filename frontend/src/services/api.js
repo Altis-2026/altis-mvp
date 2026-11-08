@@ -62,6 +62,12 @@ export const api = {
   getTiles:       (id)     => get(`/events/${id}/tiles`),
   getStormTrack:  (id)     => get(`/events/${id}/storm-track`),  // throws on 404 → caller treats as "no track"
 
+  /* Free public data: satellite pass timing (Copernicus) and river gauges (NOAA) */
+  getEventPasses: (id)     => get(`/events/${id}/passes`),
+  getPasses:      (bbox)   => get(`/passes?bbox=${bbox.join(',')}`),
+  getGauges:      (bbox)   => get(`/gauges?bbox=${bbox.join(',')}`),
+  getEventGauges: (id)     => get(`/events/${id}/gauges`),
+
   /* Pre-event flood risk score (1–5), no event date needed */
   getRiskScore:   (id)     => get(`/portfolio/${id}/risk-score`),
 
