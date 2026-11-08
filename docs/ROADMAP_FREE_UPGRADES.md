@@ -54,6 +54,8 @@ Flood Database from the event library.
 - **Risk:** the Bolivia result says the gain may not transfer; train on more regions (add UrbanSARFloods for cities) before trusting it.
 
 ### B4. Validate analogs as a predictor (event-level backtest)
+- **Status (2026-11-08):** backtest run (`validation/analog_backtest.py`, 231 FEMA events with >= 100 NFIP claims, leave-one-out): **analogs do not beat the naive baseline** on absolute error (payout error difference CI -0.04..+0.03 log10; share-paid -0.008..+0.011), though they rank events somewhat (Spearman 0.24 payout, 0.35 share paid). Cause alone is worse than baseline. Keep the 'evidence, not a forecast' label.
+- **Pre-specified next change (do not tune beyond this):** adjust payouts to constant dollars (BLS CPI, free) and add event scale (claim count of the analog vs. affected exposure, or IMERG rainfall total); rerun the identical backtest once.
 - **Why:** analog priors are shown as history. To call them a forecast we must show they predict.
 - **How:** leave-one-event-out over the FEMA library: for each US event, predict median payout, share paid and claim count from its analogs found *without* it, and compare with a naive baseline (national median). Report error and rank correlation.
 - **Ships if:** analogs beat the naive baseline with a CI that excludes zero improvement. Until then the UI keeps the "evidence, not a forecast" label.
