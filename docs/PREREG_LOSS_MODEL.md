@@ -109,3 +109,55 @@ falls from 49% of value for sub-$100k homes to 17% for $1-3M buildings.
   noterms, contents, band coverage.
 - The model is the training-storm fit in `outputs/loss_model.json` with
   `structure: power`. No further changes before the scored run.
+
+---
+
+## Result (single scored run, 2026-11-08, after Amendment 1 was committed in a47e426d)
+
+Output: `outputs/loss_model_check.json`. Four held-out storms x two depth bases =
+8 cells; 3,530 to 22,686 real claims per cell. Every claim is fed its own
+recorded depth, so this isolates the DOLLAR CALCULATION from flood detection.
+
+| Storm / depth basis | Claims | Model total vs paid | Shipped before | Avg-reserve | Claim-level error: model / avg / shipped |
+|---|---|---|---|---|---|
+| Florence, above first floor | 7,055 | 1.14x | 0.69x | 1.24x | 0.80 / 0.96 / 0.84 |
+| Florence, above ground | 11,391 | 1.33x | 1.19x | 1.48x | 0.92 / 1.17 / 0.93 |
+| Imelda, above first floor | 3,530 | 0.88x | 0.30x | 1.09x | 0.46 / 0.61 / 0.75 |
+| Imelda, above ground | 4,577 | 0.86x | 0.52x | 1.09x | 0.50 / 0.65 / 0.63 |
+| Ida, above first floor | 7,409 | 0.93x | 0.62x | 1.00x | 0.63 / 0.74 / 0.89 |
+| Ida, above ground | 15,255 | 1.19x | 1.13x | 1.40x | 0.83 / 1.07 / 1.01 |
+| Helene, above first floor | 11,227 | 0.73x | 0.55x | 0.63x | 0.58 / 0.63 / 0.80 |
+| Helene, above ground | 22,686 | 0.85x | 1.02x | 0.73x | 0.72 / 0.70 / 1.02 |
+
+(Claim-level error = sum of absolute errors / total paid, lower is better.)
+
+**Pre-registered criteria**
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| C1 uncalibrated total within +/-20% (reported, not gating) | 6 of 8 cells (range 0.73x to 1.33x) | reported |
+| C2 claim-level error below average reserve in every cell, CI below 0 in >= 6 of 8 | 7 of 8 cells; CI below 0 in 7 of 8. Misses: Helene above ground, 0.72 vs 0.70 (CI -0.03 to +0.05, a tie) | **FAIL** (by one tied cell) |
+| C3 total closer to 1.0 than the shipped method in >= 7 of 8 | 5 of 8 | **FAIL** |
+| C4 after 200 settled claims: median error <= 15% and p90 <= 30% in >= 6 of 8 | 8 of 8 (median 3-7%, worst p90 15%) | **PASS** |
+
+**Overall: not met** (C2 and C3 failed). Nothing was adjusted afterwards.
+
+**Plain reading**
+- Mean total error across the 8 cells: model 17.6%, usual average-reserve 24.3%,
+  previously shipped method 33.3%. The model is better on average and on
+  claim-level error (8 of 8 cells vs the shipped method, 7 of 8 vs the average
+  reserve) but the shipped method happens to land closer in 3 cells, and
+  Florence/Ida are statistically tied with it at the claim level.
+- Uncalibrated, the total for a storm can still be off by about +/-30%.
+- **Learning the storm's scale from settled claims works:** after 50 settled
+  claims the total is typically within 9%, after 200 within 6%, after 1,000
+  within 2.5% (worst-case 90th percentile 31%, 15%, 7.5%).
+- **Individual claims remain rough:** claim-level error 46% to 92% of dollars,
+  rank correlation 0.33 to 0.60. It estimates a book well; it does not
+  replace an adjuster on any single claim.
+- Policy data matters: with only the limit known ("min") totals run 5% to 25%
+  lower than with full policy fields ("full"); the assumption-labelled
+  fallbacks (values from coverage) systematically under-predict.
+- The 10th-90th percentile claim band held 70% to 90% of actuals (nominal 80%).
+- **Scope:** given the true depth. Real use adds the flood-depth error measured
+  elsewhere, and it is conditional on a claim being filed.
