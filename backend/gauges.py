@@ -163,6 +163,7 @@ def nwis_peak_stage(usgs_id: str, start: str, end: str) -> Optional[dict]:
 # ── Gauges in an area ───────────────────────────────────────────────────────
 
 def gauges_in_bbox(bbox, include_detail: bool = True, max_gauges: int = 30) -> list[dict]:
+    """(max_gauges caps detail lookups; wide validation areas raise it.)"""
     """Gauges inside [minlon, minlat, maxlon, maxlat] with live status."""
     key = ("bbox", tuple(round(v, 3) for v in bbox), include_detail, int(time.time() // _LIVE_TTL_S))
     if key in _MEM:
@@ -197,11 +198,11 @@ def gauges_in_bbox(bbox, include_detail: bool = True, max_gauges: int = 30) -> l
     return out
 
 
-def event_gauge_peaks(bbox, start: str, end: str) -> list[dict]:
+def event_gauge_peaks(bbox, start: str, end: str, max_gauges: int = 30) -> list[dict]:
     """Peak stage per gauge during a past event window, with flood category
     and water-surface elevation (NAVD88) where the datum is published."""
     out = []
-    for g in gauges_in_bbox(bbox, include_detail=True):
+    for g in gauges_in_bbox(bbox, include_detail=True, max_gauges=max_gauges):
         try:
             det = gauge_detail(g["lid"])
         except requests.RequestException:
@@ -397,7 +398,8 @@ def river_name(gauge_name: str) -> str:
 
 
 def gauge_depth_for_points(lat, lon, bbox, start: str, end: str, ground_ft=None,
-                           pad_deg: float = 0.35, max_dist_m: float = RIVERINE_MAX_DIST_M) -> dict:
+                           pad_deg: float = 0.35, max_dist_m: float = RIVERINE_MAX_DIST_M,
+                           max_gauges: int = 60) -> dict:
     """Peak water-surface elevation and depth from gauged main stems.
 
     ground_ft: ground elevation (ft NAVD88) per point; if None, only WSE and
@@ -407,7 +409,7 @@ def gauge_depth_for_points(lat, lon, bbox, start: str, end: str, ground_ft=None,
     lat = np.atleast_1d(np.asarray(lat, float))
     lon = np.atleast_1d(np.asarray(lon, float))
     wide = [bbox[0] - pad_deg, bbox[1] - pad_deg, bbox[2] + pad_deg, bbox[3] + pad_deg]
-    peaks = event_gauge_peaks(wide, start, end)
+    peaks = event_gauge_peaks(wide, start, end, max_gauges=max_gauges)
     rivers = {}
     for g in peaks:
         # Reservoir / lake pool gauges measure a level pool held behind a dam,
@@ -482,18 +484,9 @@ def attach_gauge_depth_live(rows: list, windows: Optional[dict], conflict_min_ft
         near = np.isfinite(res["wse_ft"])
         ground = np.full(len(lat), np.nan)
         if near.any():
-            from backend.live_pipeline import init_ee
-            if init_ee():
-                import ee
-                dem = (ee.ImageCollection("USGS/3DEP/1m").filterBounds(ee.Geometry.Rectangle(bbox))
-                       .mosaic().select(0))
-                idx = np.where(near)[0]
-                fc = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([float(lon[k]), float(lat[k])]),
-                                                      {"k": int(k)}) for k in idx])
-                for f in dem.reduceRegions(fc, ee.Reducer.mean(), 1).getInfo()["features"]:
-                    v = f["properties"].get("mean")
-                    if v is not None:
-                        ground[f["properties"]["k"]] = v * 3.28084
+            idx = np.where(near)[0]
+            gsub, _ = sample_ground_ft(lat[idx], lon[idx], bbox)
+            ground[idx] = gsub
         n_conf = 0
         for k, (_, r) in enumerate(pts):
             if not near[k] or not np.isfinite(ground[k]):
@@ -511,3 +504,33 @@ def attach_gauge_depth_live(rows: list, windows: Optional[dict], conflict_min_ft
                 "n_conflicts": n_conf}
     except Exception as e:  # noqa: BLE001
         return {"status": "error", "reason": f"{type(e).__name__}: {e}"}
+
+
+
+def sample_ground_ft(lat, lon, bbox, chunk: int = 2000):
+    """Ground elevation (ft NAVD88) at points: USGS 3DEP 1 m lidar, 3DEP 10 m
+    where 1 m has no coverage. Returns (ground_ft, source) arrays; NaN/None
+    where neither exists (outside the US)."""
+    from backend.live_pipeline import init_ee
+    lat = np.atleast_1d(np.asarray(lat, float))
+    lon = np.atleast_1d(np.asarray(lon, float))
+    g = np.full(len(lat), np.nan)
+    src = np.array([None] * len(lat), dtype=object)
+    if not len(lat) or not init_ee():
+        return g, src
+    import ee
+    geom = ee.Geometry.Rectangle([float(v) for v in bbox])
+    one = ee.ImageCollection("USGS/3DEP/1m").filterBounds(geom).mosaic().select(0).rename("m1")
+    ten = ee.Image("USGS/3DEP/10m").select(0).rename("m10")
+    img = one.addBands(ten)
+    for s0 in range(0, len(lat), chunk):
+        idx = range(s0, min(s0 + chunk, len(lat)))
+        fc = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([float(lon[i]), float(lat[i])]), {"i": i})
+                                   for i in idx])
+        for f in img.reduceRegions(fc, ee.Reducer.first(), 1).getInfo()["features"]:
+            pr = f["properties"]
+            if pr.get("m1") is not None:
+                g[pr["i"]], src[pr["i"]] = pr["m1"] * 3.28084, "3DEP 1 m"
+            elif pr.get("m10") is not None:
+                g[pr["i"]], src[pr["i"]] = pr["m10"] * 3.28084, "3DEP 10 m"
+    return g, src

@@ -28,7 +28,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from backend.gauges import gauge_depth_for_points  # noqa: E402
+from backend.gauges import gauge_depth_for_points, sample_ground_ft  # noqa: E402
 from pipeline.config import EVENTS  # noqa: E402
 
 OUT = ROOT / "outputs"
@@ -69,7 +69,7 @@ def main():
     print(f"  {near.sum()} of {len(lat)} properties within reach of a gauged main stem")
     ground = np.full(len(lat), np.nan)
     if near.any():
-        ground[near] = sample_3dep_ft(lat[near], lon[near], bbox)
+        ground[near], _ = sample_ground_ft(lat[near], lon[near], bbox)
     depth = np.where(near & np.isfinite(ground), np.maximum(0.0, pre["wse_ft"] - ground), np.nan)
 
     out = pd.DataFrame({

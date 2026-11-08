@@ -39,13 +39,22 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "validation"))
 
-from backend.gauges import gauge_depth_for_points  # noqa: E402
+from backend.gauges import gauge_depth_for_points, sample_ground_ft  # noqa: E402
 
 EVENTS = {
     "brazos": {
         "bbox": [-95.9, 29.45, -95.6, 29.72],
         "window": ["2017-08-25", "2017-09-15"],
         "sar_reference": "outputs/hwm_check_brazos.json",
+    },
+    "florence": {
+        "bbox": None,                     # pre-registered: all riverine marks, no region chosen
+        "window": ["2018-09-13", "2018-10-05"],
+        "stn_event": 283,
+        "environment": "Riverine",
+        "max_gauges": 400,
+        "sar_reference": None,
+        "prereg": "docs/PREREG_GAUGE_FLORENCE.md",
     },
     "harvey": {
         "bbox": [-95.88, 29.66, -95.46, 30.00],
@@ -107,19 +116,31 @@ def main():
     cfg = EVENTS[a.event]
     import hwm_check as h
 
+    if cfg.get("stn_event"):
+        from stn_api import fetch_event_hwms
+        allm = fetch_event_hwms(cfg["stn_event"], OUT / f"usgs_hwm_event{cfg['stn_event']}.json")
+    else:
+        allm = h.fetch_hwms()
+    marks = [m for m in allm
+             if m.get("latitude_dd") is not None and m.get("longitude_dd") is not None
+             and m.get("height_above_gnd") not in (None, 0, 0.0)
+             and (not cfg.get("environment") or m.get("hwm_environment") == cfg["environment"])]
     bb = cfg["bbox"]
-    marks = [m for m in h.fetch_hwms()
-             if bb[0] <= m["longitude_dd"] <= bb[2] and bb[1] <= m["latitude_dd"] <= bb[3]
-             and m.get("height_above_gnd") not in (None, 0, 0.0)]
+    if bb is None:
+        bb = [min(m["longitude_dd"] for m in marks) - 0.02, min(m["latitude_dd"] for m in marks) - 0.02,
+              max(m["longitude_dd"] for m in marks) + 0.02, max(m["latitude_dd"] for m in marks) + 0.02]
+    else:
+        marks = [m for m in marks if bb[0] <= m["longitude_dd"] <= bb[2] and bb[1] <= m["latitude_dd"] <= bb[3]]
     lat = np.array([m["latitude_dd"] for m in marks])
     lon = np.array([m["longitude_dd"] for m in marks])
     surv = np.array([m["height_above_gnd"] for m in marks], float)
     sites = np.array([m["site_id"] for m in marks])
     # Same function the product uses, with the distance cap lifted so the
     # report can show how accuracy falls off away from gauged channels.
-    res = gauge_depth_for_points(lat, lon, bb, *cfg["window"], max_dist_m=1e9)
+    res = gauge_depth_for_points(lat, lon, bb, *cfg["window"], max_dist_m=1e9,
+                                 max_gauges=cfg.get("max_gauges", 60))
     wse, dist = res["wse_ft"], res["dist_to_channel_m"]
-    ground = ground_ft_3dep(lat, lon, bb)
+    ground, ground_src = sample_ground_ft(lat, lon, bb)
     depth = np.where(np.isfinite(wse), np.maximum(0.0, wse - ground), np.nan)
     river = [{"name": k, "gauges": v} for k, v in res["rivers_used"].items()]
 
@@ -130,8 +151,8 @@ def main():
     summaries.append(summarize(depth, surv, sites, np.ones(len(marks), bool), "all marks"))
 
     sar = None
-    ref = ROOT / cfg["sar_reference"]
-    if ref.exists():
+    ref = ROOT / cfg["sar_reference"] if cfg.get("sar_reference") else None
+    if ref is not None and ref.exists():
         s = json.loads(ref.read_text())
         head = next((x for x in s.get("summaries", []) if x.get("label") == "radius 50 m"), None)
         if head:
@@ -143,6 +164,9 @@ def main():
                   "main-stem channel (nearest channel per point), minus USGS 3DEP 1 m ground",
         "ground_truth": "USGS STN high water marks, height_above_gnd (zero-height marks dropped)",
         "rivers_used": river,
+        "n_marks_total": int(len(marks)),
+        "ground_source_counts": {str(k): int(v) for k, v in zip(*np.unique(ground_src.astype(str), return_counts=True))},
+        "prereg": cfg.get("prereg"),
         "summaries": summaries,
         "sar_detector_same_marks_50m": sar,
         "caveats": [

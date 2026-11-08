@@ -9,10 +9,13 @@ names that hwm_check.py and gauge_depth_check.py were written against, so
 cached files from either API look the same.
 """
 import json
-import urllib.request
 from pathlib import Path
 
+import requests
+
 API = "https://api.waterdata.usgs.gov/stnservices"
+# The service rejects urllib's default agent (HTTP 403); identify ourselves.
+HEADERS = {"User-Agent": "altis-validation/1.0 (flood research)", "Accept": "application/json"}
 
 
 def _f(v):
@@ -46,15 +49,17 @@ def normalise(rec: dict) -> dict:
 
 
 def events() -> list:
-    with urllib.request.urlopen(f"{API}/events/", timeout=120) as r:
-        return json.loads(r.read().decode())
+    r = requests.get(f"{API}/events/", headers=HEADERS, timeout=120)
+    r.raise_for_status()
+    return r.json()
 
 
 def fetch_event_hwms(event_id: int, cache: Path, refresh: bool = False) -> list:
     if cache.exists() and not refresh:
         return [normalise(r) for r in json.loads(cache.read_text())]
-    with urllib.request.urlopen(f"{API}/hwms/?event={int(event_id)}", timeout=300) as r:
-        data = [normalise(x) for x in json.loads(r.read().decode())]
+    r = requests.get(f"{API}/hwms/", params={"event": int(event_id)}, headers=HEADERS, timeout=300)
+    r.raise_for_status()
+    data = [normalise(x) for x in r.json()]
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(data))
     return data
