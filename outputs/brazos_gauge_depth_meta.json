@@ -1,0 +1,192 @@
+{
+ "event": "brazos",
+ "window": [
+  "2017-08-25",
+  "2017-09-15"
+ ],
+ "rivers_used": {
+  "Brazos River": [
+   {
+    "lid": "BAWT2",
+    "name": "Brazos River above San Felipe",
+    "peak_stage_ft": 129.0,
+    "peak_time": "2017-08-29T08:30:00Z",
+    "peak_category": "moderate",
+    "peak_wse_navd88_ft": 129.0
+   },
+   {
+    "lid": "RMOT2",
+    "name": "Brazos River at Richmond",
+    "peak_stage_ft": 55.19,
+    "peak_time": "2017-09-01T05:15:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 81.92
+   },
+   {
+    "lid": "ROST2",
+    "name": "Brazos River near Rosharon",
+    "peak_stage_ft": 52.65,
+    "peak_time": "2017-08-29T21:30:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 51.45
+   }
+  ],
+  "Bear Creek": [
+   {
+    "lid": "BBAT2",
+    "name": "Bear Creek at Barker",
+    "peak_stage_ft": 114.71,
+    "peak_time": "2017-08-27T00:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 114.71
+   }
+  ],
+  "Buffalo Bayou": [
+   {
+    "lid": "BBST2",
+    "name": "Buffalo Bayou at Shepherd Drive",
+    "peak_stage_ft": 41.9,
+    "peak_time": "2017-08-28T12:30:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 41.9
+   },
+   {
+    "lid": "PPTT2",
+    "name": "Buffalo Bayou at Piney Point Village",
+    "peak_stage_ft": 62.84,
+    "peak_time": "2017-08-31T00:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 62.84
+   }
+  ],
+  "Big Creek": [
+   {
+    "lid": "BCNT2",
+    "name": "Big Creek near Needville",
+    "peak_stage_ft": 21.71,
+    "peak_time": "2017-08-28T02:45:00Z",
+    "peak_category": "moderate",
+    "peak_wse_navd88_ft": 80.57
+   }
+  ],
+  "Cypress Creek": [
+   {
+    "lid": "CCGT2",
+    "name": "Cypress Creek near Cypress",
+    "peak_stage_ft": 129.97,
+    "peak_time": "2017-08-28T00:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 129.97
+   },
+   {
+    "lid": "KHOT2",
+    "name": "Cypress Creek near Hockley",
+    "peak_stage_ft": 162.85,
+    "peak_time": "2017-08-28T08:30:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 162.85
+   }
+  ],
+  "Greens Bayou": [
+   {
+    "lid": "GBHT2",
+    "name": "Greens Bayou at Houston",
+    "peak_stage_ft": 62.88,
+    "peak_time": "2017-08-28T05:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 62.88
+   },
+   {
+    "lid": "HGBT2",
+    "name": "Greens Bayou near Houston",
+    "peak_stage_ft": 85.84,
+    "peak_time": "2017-08-27T12:45:00Z",
+    "peak_category": "minor",
+    "peak_wse_navd88_ft": 85.84
+   }
+  ],
+  "Brays Bayou": [
+   {
+    "lid": "GSST2",
+    "name": "Brays Bayou at Gessner Drive",
+    "peak_stage_ft": 60.0,
+    "peak_time": "2017-08-27T00:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 60.0
+   },
+   {
+    "lid": "HBMT2",
+    "name": "Brays Bayou at Houston",
+    "peak_stage_ft": 45.67,
+    "peak_time": "2017-08-27T17:30:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 45.67
+   }
+  ],
+  "White Oak Bayou": [
+   {
+    "lid": "HGTT2",
+    "name": "White Oak Bayou at Houston",
+    "peak_stage_ft": 45.6,
+    "peak_time": "2017-08-28T00:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 45.6
+   }
+  ],
+  "West Fork San Jacinto River": [
+   {
+    "lid": "HMMT2",
+    "name": "West Fork San Jacinto River near Humble",
+    "peak_stage_ft": 69.18,
+    "peak_time": "2017-08-29T00:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 69.18
+   }
+  ],
+  "Sims Bayou": [
+   {
+    "lid": "HSIT2",
+    "name": "Sims Bayou at Houston",
+    "peak_stage_ft": 26.56,
+    "peak_time": "2017-08-27T13:00:00Z",
+    "peak_category": "minor",
+    "peak_wse_navd88_ft": 26.56
+   }
+  ],
+  "Langham Creek": [
+   {
+    "lid": "LLYT2",
+    "name": "Langham Creek near Addicks",
+    "peak_stage_ft": 111.85,
+    "peak_time": "2017-08-28T05:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 111.85
+   }
+  ],
+  "San Bernard River": [
+   {
+    "lid": "OCNT2",
+    "name": "San Bernard River near Old Ocean",
+    "peak_stage_ft": 30.16,
+    "peak_time": "2017-09-02T00:00:00Z",
+    "peak_category": "major",
+    "peak_wse_navd88_ft": 30.16
+   }
+  ],
+  "Clear Creek": [
+   {
+    "lid": "PRLT2",
+    "name": "Clear Creek above Telephone Road",
+    "peak_stage_ft": 47.4,
+    "peak_time": "2017-08-29T09:48:00Z",
+    "peak_category": "minor",
+    "peak_wse_navd88_ft": 47.4
+   }
+  ]
+ },
+ "n_properties": 4000,
+ "n_in_reach": 1756,
+ "n_depth_gt_0": 550,
+ "method": "gauge crest WSE along NLDI main stem minus 3DEP 1 m ground",
+ "validation": "outputs/gauge_depth_check_brazos.json"
+}

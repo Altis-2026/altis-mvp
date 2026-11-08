@@ -65,7 +65,32 @@ def load_event_data(event_id: str) -> pd.DataFrame | None:
     # Drop rows without coordinates
     df = df.dropna(subset=['latitude', 'longitude'])
 
+    df = attach_gauge_depth(df, event_id)
+
     _event_cache[event_id] = df
+    return df
+
+
+GAUGE_CONFLICT_MIN_FT = 1.0   # river crest implies >= this much water...
+RADAR_DRY_MAX_PCT = 5.0       # ...where radar saw (almost) none
+
+
+def attach_gauge_depth(df: pd.DataFrame, event_id: str) -> pd.DataFrame:
+    """Merge the river-gauge depth (pipeline/05_gauge_depth.py) when present,
+    and flag gauge-radar conflicts: properties the river crest says were under
+    >= 1 ft of water but the radar called dry. These are the likeliest missed
+    claims, so they are surfaced for review; the triage class is not changed
+    automatically."""
+    path = OUTPUT_DIR / f"{event_id}_gauge_depth.csv"
+    if not path.exists() or 'property_id' not in df.columns:
+        return df
+    g = pd.read_csv(path)
+    keep = ['property_id', 'gauge_depth_ft', 'gauge_wse_ft', 'gauge_dist_m', 'gauge_river']
+    df = df.drop(columns=[c for c in keep[1:] if c in df.columns]).merge(
+        g[[c for c in keep if c in g.columns]], on='property_id', how='left')
+    radar_dry = pd.to_numeric(df.get('pct_flooded'), errors='coerce').fillna(0) <= RADAR_DRY_MAX_PCT
+    gauge_wet = pd.to_numeric(df['gauge_depth_ft'], errors='coerce').fillna(0) >= GAUGE_CONFLICT_MIN_FT
+    df['gauge_conflict'] = (radar_dry & gauge_wet).astype(int)
     return df
 
 
@@ -85,6 +110,7 @@ def get_event_stats(df: pd.DataFrame) -> dict:
         'remote_total':     remote_total,
         'estimated_savings': remote_total * 750,
         'pct_remote':       round(remote_total / total * 100, 1) if total > 0 else 0,
+        'gauge_conflicts':  int(df['gauge_conflict'].sum()) if 'gauge_conflict' in df.columns else None,
     }
 
 

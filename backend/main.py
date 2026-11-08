@@ -109,6 +109,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Free public-data integrations (satellite passes, river gauges, event library).
+from backend.free_data_api import router as free_data_router  # noqa: E402
+app.include_router(free_data_router)
+
 # GEE tile URL cache (generated once per server start if GEE available)
 _tile_cache: dict = {}
 
