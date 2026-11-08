@@ -159,6 +159,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   const gaugeDepth = num(property.gauge_depth_ft);
   const gaugeDist  = num(property.gauge_dist_m);
   const gaugeConflict = property.gauge_conflict == 1;
+  const gaugeNear = gaugeDist != null && gaugeDist <= 1000;   // depth skill measured best within 1 km
   const floodZone = property.flood_zone && property.flood_zone !== 'null' ? property.flood_zone : null;
 
   // Phase 2 structure attributes. Each stays null when unknown so the drawer
@@ -464,19 +465,21 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                   {gaugeConflict ? 'River gauge disagrees with radar' : 'River gauge estimate'}
                 </span>
                 <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                  {gaugeDepth.toFixed(1)} ft
+                  {gaugeNear ? `${gaugeDepth.toFixed(1)} ft` : gaugeDepth > 0 ? `~${Math.round(gaugeDepth)} ft` : '0 ft'}
                 </strong>
               </div>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
                 The {property.gauge_river || 'river'} crest, carried along the channel to this spot
                 {gaugeDist != null ? ` (${(gaugeDist / 1000).toFixed(1)} km from the channel)` : ''}, puts the
                 peak water surface {gaugeDepth > 0 ? `${gaugeDepth.toFixed(1)} ft above this ground level` : 'below this ground level'}.
+                {!gaugeNear && gaugeDepth > 0 && ' Beyond 1 km from the channel this reliably says water reached here, but the depth itself is rough.'}
                 {gaugeConflict && ' Radar saw no water here, so this is a possible missed claim: worth a review before closing.'}
               </div>
               <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
                 NOAA gauge crest + USGS 1 m lidar ground. Models main-river flooding only, not rain ponding.
-                Against surveyed USGS high-water marks it found water at far more flooded sites than radar,
-                with depth errors of a few feet.
+                Tested against USGS surveyed high-water marks on three storms (including a pre-registered test on
+                Hurricane Florence): it found water at most flooded sites near gauged rivers, far more than radar;
+                depth is within a few feet near the channel and rougher farther out.
               </div>
             </div>
           )}

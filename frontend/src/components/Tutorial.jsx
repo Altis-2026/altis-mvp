@@ -66,7 +66,7 @@ const STEPS = [
     target: 'panel',
     placement: 'right',
     title: '5 · Work the dispatch queue',
-    body: 'Properties ranked by severity × coverage, so the top row is the first field visit worth making. Click any row to open that property.',
+    body: 'Properties ranked by severity × coverage, so the top row is the first field visit worth making. A separate lane lists possible missed claims, where river gauges show water the radar did not. Click any row to open that property.',
     enter: (c) => { c.closeProperty(); c.setPanel('dispatch'); c.ensureEvent(); },
   },
   {
@@ -75,7 +75,7 @@ const STEPS = [
     placement: 'left',
     wait: true,
     title: '6 · Inspect a property',
-    body: 'Everything about one property: the triage decision and its confidence, aerial view, before/after radar you can drag to compare, flood depth with an uncertainty range, an estimated reserve, and a one-click claim-file note. Scroll the drawer to see it all; Esc closes it.',
+    body: 'Everything about one property: the triage decision and its confidence, aerial view, before/after radar you can drag to compare, flood depth with an uncertainty range, a river-gauge estimate that can catch water the radar missed, an estimated reserve, and a one-click claim-file note. Scroll the drawer to see it all; Esc closes it.',
     enter: (c) => { c.setPanel(null); c.ensureEvent(); c.openTopProperty(); },
   },
   {
@@ -108,7 +108,7 @@ const STEPS = [
     target: 'panel',
     placement: 'right',
     title: '10 · Reports and ROI',
-    body: 'Download an audit-ready PDF for the event or a catastrophe report for your portfolio, check the ROI calculator against your own cost per field trip, and review validation results.',
+    body: 'Download an audit-ready PDF for the event or a catastrophe report for your portfolio, check the ROI calculator against your own cost per field trip, see similar past floods and what their insured claims paid, and review validation results.',
     enter: (c) => { c.closeProperty(); c.setPanel('reports'); },
   },
   {
