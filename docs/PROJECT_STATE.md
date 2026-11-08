@@ -14,6 +14,29 @@ Companion documents:
 
 ---
 
+## 00. NOVEMBER 2026 UPDATE: FREE-DATA UPGRADES (read with §0–§3)
+
+A session on 2026-11-08 added free-data upgrades; full record and next steps
+in `docs/ROADMAP_FREE_UPGRADES.md`. The headline that changes §2b/§3:
+
+- **River-gauge physics depth beats radar at surveyed sites.** NWS crest stage
+  + NAVD88 datum, interpolated along the NLDI channel, minus 3DEP 1 m ground
+  (`validation/gauge_depth_check.py`). Brazos: water found at 7/18 surveyed
+  sites (95% CI 20–61%) vs radar 0/18. Harvey: 16/48 (22–47%) vs radar 3/48,
+  bias −0.3 ft vs −2.7 ft. Harvey exposed a reservoir-pool bug, so it is now
+  development data; **a clean third-event test is owed before quoting this as
+  general (roadmap B1).** Riverine floodplains only.
+- **Extent benchmark on independent hand labels** (Sen1Floods11): per-chip
+  Otsu IoU 0.21 / precision 0.23 on test; learned LightGBM 0.63, but no clear
+  gain over a fixed rule on a never-seen country (Bolivia).
+- New product pieces: gauge–radar conflict flag (possible missed claims,
+  precision unmeasured), satellite pass tracker (median revisit ~7.5 days at
+  Houston), event library + analogs (history, not a forecast), NHC cone
+  exposure, 40-source registry with licence notes (Global Flood Database and
+  FABDEM are non-commercial).
+
+---
+
 ## 0. THE NETWORK TASK IS DONE — READ THIS BEFORE §2 AND §3
 
 §7 item 0 (source real per-property ground truth) **has been executed.** A
