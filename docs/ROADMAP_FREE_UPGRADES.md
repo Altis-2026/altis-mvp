@@ -88,6 +88,29 @@ Flood Database from the event library.
 
 ---
 
+## Part B+. Loss calculation: next steps (free first)
+
+1. **Carrier calibration pilot** (needs outreach): fit the same model on a carrier's
+   own settled claims for one event; replaces NFIP assumptions and is the biggest
+   accuracy gain available. Re-run `validation/loss_model_check.py` on their data.
+2. **Re-test on reserved storms** (free): Ian 2022, Sally 2020, Michael 2018 were
+   held back; run the unchanged model once, pre-registered, for a second independent
+   check of the storm-total error and of storm calibration.
+3. **Fix contents** (free): contents distributions are far more skewed and
+   limit-capped; try a per-coverage structure and validate by leave-one-storm-out
+   BEFORE any held-out look; until then contents stay flagged.
+4. **Flood duration**: not in public claims; collect it in the carrier pilot, then
+   replace the placeholder multiplier.
+5. **Depth error end to end**: feed the model our own radar/gauge depth at USGS
+   high-water-mark sites and report the combined error (today the dollar test uses
+   true depth and the depth tests are separate).
+6. **Private-market terms**: add coinsurance, ACV depreciation schedules, sub-limits
+   and endorsements as optional per-policy fields once a carrier supplies examples.
+7. **Claim propensity**: P(claim | depth) from NFIP policies-in-force (OpenFEMA
+   NfipPolicies) to turn "if claimed" estimates into expected portfolio loss.
+
+---
+
 ## Part C. Paid or outreach, only after Part B shows where the gaps are
 1. Carrier pilot with claim outcomes (per-address labels: the single biggest unlock).
 2. FEMA ISAA request for non-redacted NFIP claims (drafted in `docs/FEMA_DATA_REQUEST.md`).

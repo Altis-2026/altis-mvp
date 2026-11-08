@@ -34,6 +34,24 @@ in `docs/ROADMAP_FREE_UPGRADES.md`. The headline that changes §2b/§3:
 - **Analogs v2 (inflation + rainfall), pre-registered and run once: did NOT meet
   the forecast bar** (error 0.201 vs baseline 0.229, CI -0.061..+0.025). Shown as
   history with its measured error band. See `docs/PREREG_ANALOGS_V2.md`.
+- **Carrier-style insured loss (`docs/LOSS_CALCULATION.md`, protocol and results in
+  `docs/PREREG_LOSS_MODEL.md`).** The dollar calculation now applies the policy's
+  deductible, valuation basis and limit to a damage distribution learned from
+  111,794 real NFIP claims. Scored once on four later storms (Florence, Imelda,
+  Ida, Helene), each claim fed its true depth: mean storm-total error 17.6% vs
+  24.3% for an average-reserve guess and 33.3% for the old method; claim-level
+  error better than the old method in 8/8 cells. **The pre-registered criteria
+  were NOT all met** (C2 missed by one tied cell, C3 met 5 of 8; storm
+  calibration C4 passed 8/8). Learning the storm's scale from settled claims
+  brings the total to ~9% / 6% / 2.5% after 50 / 200 / 1,000 claims. Individual
+  claims remain rough (46-92% of dollars). **Contents are NOT validated**
+  (overshoot 40-87% uncalibrated): excluded from the headline, flagged. Uncalibrated
+  storm totals can be ~30% off. Flood duration is not in public claims, so the
+  placeholder duration multiplier cannot be fitted. A depth of 0 in the claims
+  means unrecorded, and FEMA's `waterDepth` mixes feet and inches (use interior/
+  exterior depth). The old `fit_damage_curves.py` conclusions used the mixed field.
+- The $750 vs $450 cost-per-visit disagreement is fixed: one constant
+  (`ASSUMED_COST_PER_FIELD_VISIT_USD = 450`) and one shared editable UI value.
 - New product pieces: gauge–radar conflict flag (possible missed claims,
   precision unmeasured), satellite pass tracker (median revisit ~7.5 days at
   Houston), event library + analogs (history, not a forecast), NHC cone

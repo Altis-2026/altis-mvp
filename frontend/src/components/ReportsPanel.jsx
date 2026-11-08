@@ -133,10 +133,11 @@ export default function ReportsPanel({
   };
 
   const downloadReport = async () => {
-    if (!reportEventId || downloading) return;
+    // The audit PDF describes the event currently loaded, never a default one.
+    if (!selectedEvent || downloading) return;
     setDownloading(true);
     try {
-      _saveBlob(await api.downloadEventReport(reportEventId), `altis_audit_${reportEventId}.pdf`);
+      _saveBlob(await api.downloadEventReport(selectedEvent), `altis_audit_${selectedEvent}.pdf`);
     } catch (err) {
       setReportError(err?.detail || 'Could not download the report.');
     } finally {
@@ -214,17 +215,19 @@ export default function ReportsPanel({
 
         <button
           onClick={downloadReport}
-          disabled={!reportEventId || downloading}
+          disabled={!selectedEvent || downloading}
           style={{
-            ...exportBtnStyle(!reportEventId || downloading),
+            ...exportBtnStyle(!selectedEvent || downloading),
             display: 'flex', alignItems: 'center', gap: 8,
-            color: (!reportEventId || downloading) ? 'var(--text-disabled)' : 'var(--teal)',
-            background: (!reportEventId || downloading) ? 'var(--wa-02)' : 'rgba(168,212,230,0.08)',
+            color: (!selectedEvent || downloading) ? 'var(--text-disabled)' : 'var(--teal)',
+            background: (!selectedEvent || downloading) ? 'var(--wa-02)' : 'rgba(168,212,230,0.08)',
             border: '1px solid rgba(168,212,230,0.2)',
           }}
         >
           <span style={{ fontSize: '0.9rem' }}>📄</span>
-          {downloading ? 'Downloading…' : 'Download audit PDF'} {events.find(e => e.id === reportEventId)?.label ? `(${events.find(e => e.id === reportEventId).label})` : ''}
+          {downloading ? 'Downloading…'
+            : !selectedEvent ? 'Audit PDF: select an event first'
+            : `Download audit PDF (${events.find(e => e.id === selectedEvent)?.label || selectedEvent})`}
         </button>
         <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', margin: '-2px 2px 0 2px', lineHeight: 1.4 }}>
           Methodology, scene sources + dates, triage table, top dispatch priorities,
