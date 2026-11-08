@@ -141,8 +141,8 @@ def test_storm_factor_refuses_tiny_samples():
 
 
 def test_match_rows_uses_original_prediction_and_skips_duplicates():
-    rows = [{"property_id": "A", "policy_number": "1", "severity_mid_usd": 10, "total_mid_usd": 10, "uncal_total_mid_usd": 8},
-            {"property_id": "B", "policy_number": "2", "severity_mid_usd": 20, "total_mid_usd": 20}]
+    rows = [{"property_id": "A", "policy_number": "1", "severity_mid_usd": 10, "uncal_severity_mid_usd": 8},
+            {"property_id": "B", "policy_number": "2", "severity_mid_usd": 20}]
     pred, paid, ids = lc.match_rows(rows, [{"policy_number": "1", "paid_amount": "$9"},
                                            {"property_id": "A", "paid_amount": 50},       # duplicate of A
                                            {"policy_number": "2", "paid_amount": 25},
@@ -177,6 +177,10 @@ def test_live_net_loss_uses_policy_terms_and_degrades_without_model(monkeypatch)
     net = lp._net_loss(prop, None, row, 0.25, None)
     assert net and net["mid"] > 0 and net["depth_basis"] == "above_ground"
     assert set(net["terms_provenance"].values()) == {"provided"}
+    assert net["outside_calibration_region"] is True                                    # no coordinates -> flagged
+    us = lp._net_loss({**prop, "latitude": 29.7, "longitude": -95.4}, None, row, 0.25, None)
+    au = lp._net_loss({**prop, "latitude": -28.8, "longitude": 153.3}, None, row, 0.25, None)
+    assert us["outside_calibration_region"] is False and au["outside_calibration_region"] is True
     assert lp._net_loss({"coverage_amount": 0}, None, row, 0.25, None) is None          # no coverage
     assert lp._net_loss(prop, None, {"max_depth_ft": 0.0}, 0.25, None) is None           # no flooding
     monkeypatch.setattr(lm, "load_model", lambda *a, **k: None)

@@ -46,7 +46,7 @@ export default function LossCalibrationCard({ portfolioId, exposure, onDone }) {
     <div style={{ marginTop: 22 }}>
       <div style={sec}>Calibrate to settled claims</div>
       <div style={{ ...muted, marginBottom: 8 }}>
-        Paste claims your team has already settled (policy number, total paid). Altis learns this storm's
+        Paste building claims your team has already settled (policy number, building amount paid; contents are not calibrated). Altis learns this storm's
         dollar scale and rescales the rest of the book. Typical accuracy of the storm total: about 9% after 50
         settled claims, 6% after 200, 2.5% after 1,000 (tested on four held-out storms).
       </div>
@@ -57,7 +57,7 @@ export default function LossCalibrationCard({ portfolioId, exposure, onDone }) {
       )}
       <textarea
         value={text} onChange={e => setText(e.target.value)} rows={4}
-        placeholder={'policy_number,paid_amount\nPOL-1042,18250\nPOL-1077,4120'}
+        placeholder={'policy_number,building_paid\nPOL-1042,18250\nPOL-1077,4120'}
         style={{
           width: '100%', boxSizing: 'border-box', padding: '8px 10px', fontSize: '0.72rem',
           fontFamily: 'var(--font-mono, monospace)', background: 'var(--input-bg)', color: 'var(--text-primary)',

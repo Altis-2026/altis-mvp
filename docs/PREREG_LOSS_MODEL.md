@@ -161,3 +161,27 @@ recorded depth, so this isolates the DOLLAR CALCULATION from flood detection.
 - The 10th-90th percentile claim band held 70% to 90% of actuals (nominal 80%).
 - **Scope:** given the true depth. Real use adds the flood-depth error measured
   elsewhere, and it is conditional on a claim being filed.
+
+---
+
+## Addendum: contents coverage (promised in the protocol, run afterwards)
+
+The protocol said contents accuracy would be reported, but the main scoring
+script scored buildings only. `validation/loss_model_contents_check.py` closes
+that gap on the same held-out storms with the same model; nothing was changed
+after the building result. Output: `outputs/loss_model_contents_check.json`.
+
+| | Contents model | Average-reserve guess |
+|---|---|---|
+| Mean error of the storm total, uncalibrated | **54.5%** | 12.8% |
+| Storm total over the 8 cells | **1.09x to 1.87x** of paid (always high) | 0.80x to 1.24x |
+| Claim-level error lower than average-reserve | 5 of 8 cells, mostly marginal | |
+| After 200 settled claims: median total error | 5% to 9% | |
+
+**Reading:** the contents estimate overshoots paid contents by 40% to 87%
+before calibration, and is worse than the simple average. Calibration on
+settled claims repairs it. So contents are **not validated**: they are kept out
+of the headline loss total, flagged `contents_validated: false`, and the
+calibration step compares BUILDING payments to BUILDING predictions only.
+Likely causes (not tested): contents distributions are far more skewed and
+limit-capped than buildings, and contents claim records mix coverage types.

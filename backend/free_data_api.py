@@ -192,7 +192,8 @@ def cone_replay(event_id: str, storm: str = Query(..., pattern=r"^[a-zA-Z]{2}\d{
 def calibrate_losses(portfolio_id: str, body: dict):
     """Learn this storm's dollar scale from settled claims and rescale the
     book's loss estimates. Body: {"settled": [{"policy_number" | "property_id",
-    "paid_amount": 12345.0}, ...]}. Paid = total settled (building + contents)."""
+    "paid_amount": 12345.0}, ...]}. paid_amount = the BUILDING payment (contents are
+    not yet calibrated)."""
     from backend.database import (get_analysis_results, save_analysis_results,
                                   get_analysis_meta, save_analysis_meta)
     from backend.loss_calibration import storm_factor, match_rows, apply_factor

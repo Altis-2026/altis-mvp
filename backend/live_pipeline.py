@@ -75,6 +75,12 @@ def _net_loss(prop, nsi, row, sev_ci, duration_days):
                            segment=seg, model=model)
     if not out:
         return None
+    # The model is calibrated on US NFIP claims; say so when it is applied elsewhere.
+    lat, lon = prop.get('latitude'), prop.get('longitude')
+    try:
+        out['outside_calibration_region'] = not (17 <= float(lat) <= 72 and -170 <= float(lon) <= -65)
+    except (TypeError, ValueError):
+        out['outside_calibration_region'] = True
     ccov = float(prop.get('contents_coverage_amount') or t.get('contents_coverage_amount') or 0)
     if ccov > 0:
         cval = ccov * model.get('fallbacks', {}).get('contents_value_over_coverage', 0.97)
@@ -676,6 +682,7 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'net_terms_provenance': net['terms_provenance'] if net else None,
             'net_support_claims': net['support_claims'] if net else None,
             'net_depth_basis':   net['depth_basis'] if net else None,
+            'net_outside_calibration_region': net.get('outside_calibration_region') if net else None,
             'gross_physical_mid_usd': sev['mid'] if sev else None,
             # ── Phase 3: which curve produced the number, what depth it was
             #    indexed on, and contents kept SEPARATE from structure because
@@ -688,8 +695,12 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'contents_mid_usd':      (net['contents']['mid'] if net and net.get('contents') else (sev.get('contents_mid') if sev else None)),
             'contents_high_usd':     (net['contents']['high'] if net and net.get('contents') else (sev.get('contents_high') if sev else None)),
             'contents_damage_pct':   (net['contents']['expected_damage_pct'] if net and net.get('contents') else (sev.get('contents_damage_pct') if sev else None)),
-            'total_mid_usd':         ((net['mid'] + (net['contents']['mid'] if net.get('contents') else 0)) if net
-                                      else (sev.get('total_mid') if sev else None)),
+            # Headline = BUILDING only on the calibrated path. The contents
+            # estimate overshoots paid contents by 39-87% before calibration on
+            # held-out storms (outputs/loss_model_contents_check.json), so it is
+            # reported separately and flagged, never summed into the total.
+            'total_mid_usd':         (net['mid'] if net else (sev.get('total_mid') if sev else None)),
+            'contents_validated':    (False if net and net.get('contents') else None),
             'adjuster_note':     _note(prop.get('address', ''), row, impact_class),
             'color':             COLOR_MAP.get(impact_class, '#6B8FA3'),
         })

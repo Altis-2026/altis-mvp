@@ -71,8 +71,8 @@ def apply_factor(rows: list, factor: float, matched_ids: set) -> dict:
 def match_rows(rows: list, settled: list) -> tuple[list, list, set]:
     """Pair settled payments with stored predictions by property_id, else policy_number.
 
-    Prediction used is the ORIGINAL total (building + contents). Returns
-    (pred, paid, matched_property_ids)."""
+    `paid_amount` is the BUILDING payment; the prediction used is the ORIGINAL
+    (uncalibrated) building estimate. Returns (pred, paid, matched_property_ids)."""
     by_pid = {r.get("property_id"): r for r in rows}
     by_pol = {str(r.get("policy_number")): r for r in rows if r.get("policy_number")}
     pred, paid, ids = [], [], set()
@@ -84,7 +84,8 @@ def match_rows(rows: list, settled: list) -> tuple[list, list, set]:
         r = by_pid.get(s.get("property_id")) or by_pol.get(str(s.get("policy_number")))
         if not r or r.get("severity_mid_usd") is None or r["property_id"] in ids:
             continue
-        base = r.get("uncal_total_mid_usd", r.get("total_mid_usd", r.get("severity_mid_usd")))
+        # BUILDING prediction vs the building payment: contents are not calibrated.
+        base = r.get("uncal_severity_mid_usd", r.get("severity_mid_usd"))
         if base is None:
             continue
         pred.append(float(base)); paid.append(amt); ids.add(r["property_id"])

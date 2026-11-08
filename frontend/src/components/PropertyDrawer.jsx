@@ -664,6 +664,12 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                     The range reflects depth uncertainty. The estimate is for a claim that is filed
                     {grossMid != null ? `; the gross physical damage before policy terms is $${grossMid.toLocaleString()} on the older national curve.` : '.'}
                   </div>
+                  {property.net_outside_calibration_region && (
+                    <div style={{ fontSize: '0.64rem', color: '#FFB347', marginTop: 5, lineHeight: 1.45 }}>
+                      Outside the United States: this model is calibrated on US flood-insurance claims and has not
+                      been validated here. Treat it as indicative until calibrated to local settled claims.
+                    </div>
+                  )}
                   {assumedTerms.length > 0 && (
                     <div style={{ fontSize: '0.64rem', color: '#FFB347', marginTop: 5, lineHeight: 1.45 }}>
                       Assumed because they were not in the uploaded file: {assumedTerms.join('; ')}. Add these columns for a firmer number.
