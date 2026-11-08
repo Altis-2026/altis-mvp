@@ -1,0 +1,305 @@
+{
+ "dataset": "Sen1Floods11 hand-labelled (Bonafilia et al. 2020), official splits",
+ "task": "single-image water extent (no pre-event baseline)",
+ "unit": "pixel metrics pooled over chips; CIs bootstrap over chips",
+ "dualpol_thresholds_db": {
+  "vv": -9.5,
+  "vh": -23.5,
+  "chosen_on": "train"
+ },
+ "learned": {
+  "model": "LightGBM",
+  "features": [
+   "vv",
+   "vh",
+   "vv_minus_vh",
+   "vv_mean3",
+   "vv_std3",
+   "vh_mean3",
+   "vh_std3",
+   "vv_mean7",
+   "vv_std7",
+   "vh_mean7",
+   "vh_std7",
+   "vv_mean15",
+   "vv_std15",
+   "vh_mean15",
+   "vh_std15",
+   "chip_vv_p10",
+   "chip_vv_p50",
+   "chip_vh_p50",
+   "vv_minus_chip_median"
+  ],
+  "decision_threshold": 0.25,
+  "threshold_chosen_on": "valid",
+  "train_pixels": 1001892,
+  "top_features": [
+   [
+    "vh_mean7",
+    1962793.4
+   ],
+   [
+    "chip_vv_p50",
+    317968.9
+   ],
+   [
+    "chip_vv_p10",
+    314820.5
+   ],
+   [
+    "vh_mean3",
+    263932.9
+   ],
+   [
+    "vh_std15",
+    258864.5
+   ],
+   [
+    "chip_vh_p50",
+    214861.4
+   ],
+   [
+    "vh_mean15",
+    205951.5
+   ],
+   [
+    "vv_mean15",
+    93958.1
+   ]
+  ]
+ },
+ "results": {
+  "test": {
+   "fixed_vv": {
+    "n_chips": 90,
+    "iou": 0.4358,
+    "precision": 0.6182,
+    "recall": 0.5962,
+    "f1": 0.607,
+    "iou_ci95": [
+     0.3196,
+     0.5405
+    ],
+    "precision_ci95": [
+     0.4949,
+     0.7127
+    ],
+    "recall_ci95": [
+     0.4452,
+     0.7424
+    ]
+   },
+   "otsu_vv": {
+    "n_chips": 90,
+    "iou": 0.2101,
+    "precision": 0.2296,
+    "recall": 0.7126,
+    "f1": 0.3473,
+    "iou_ci95": [
+     0.1464,
+     0.2794
+    ],
+    "precision_ci95": [
+     0.1561,
+     0.3104
+    ],
+    "recall_ci95": [
+     0.6261,
+     0.8049
+    ]
+   },
+   "dualpol": {
+    "n_chips": 90,
+    "iou": 0.5107,
+    "precision": 0.7479,
+    "recall": 0.6168,
+    "f1": 0.6761,
+    "iou_ci95": [
+     0.4094,
+     0.5887
+    ],
+    "precision_ci95": [
+     0.6351,
+     0.8315
+    ],
+    "recall_ci95": [
+     0.5066,
+     0.6963
+    ]
+   },
+   "learned": {
+    "n_chips": 90,
+    "iou": 0.6259,
+    "precision": 0.7769,
+    "recall": 0.763,
+    "f1": 0.7699,
+    "iou_ci95": [
+     0.5055,
+     0.723
+    ],
+    "precision_ci95": [
+     0.6799,
+     0.8348
+    ],
+    "recall_ci95": [
+     0.6316,
+     0.8754
+    ]
+   }
+  },
+  "test_by_country": {
+   "Ghana": {
+    "fixed_vv": 0.4279,
+    "otsu_vv": 0.1084,
+    "dualpol": 0.4507,
+    "learned": 0.5618
+   },
+   "India": {
+    "fixed_vv": 0.6727,
+    "otsu_vv": 0.3777,
+    "dualpol": 0.599,
+    "learned": 0.6466
+   },
+   "Mekong": {
+    "fixed_vv": 0.7775,
+    "otsu_vv": 0.3092,
+    "dualpol": 0.7274,
+    "learned": 0.8201
+   },
+   "Nigeria": {
+    "fixed_vv": 0.6988,
+    "otsu_vv": 0.294,
+    "dualpol": 0.7121,
+    "learned": 0.7767
+   },
+   "Pakistan": {
+    "fixed_vv": 0.1456,
+    "otsu_vv": 0.1756,
+    "dualpol": 0.1513,
+    "learned": 0.1668
+   },
+   "Paraguay": {
+    "fixed_vv": 0.3415,
+    "otsu_vv": 0.1265,
+    "dualpol": 0.377,
+    "learned": 0.546
+   },
+   "Somalia": {
+    "fixed_vv": 0.1693,
+    "otsu_vv": 0.1143,
+    "dualpol": 0.2509,
+    "learned": 0.4959
+   },
+   "Spain": {
+    "fixed_vv": 0.6342,
+    "otsu_vv": 0.3659,
+    "dualpol": 0.6395,
+    "learned": 0.7205
+   },
+   "Sri-Lanka": {
+    "fixed_vv": 0.2421,
+    "otsu_vv": 0.2252,
+    "dualpol": 0.6127,
+    "learned": 0.7834
+   },
+   "USA": {
+    "fixed_vv": 0.2012,
+    "otsu_vv": 0.0728,
+    "dualpol": 0.3811,
+    "learned": 0.5435
+   }
+  },
+  "bolivia": {
+   "fixed_vv": {
+    "n_chips": 15,
+    "iou": 0.5752,
+    "precision": 0.8338,
+    "recall": 0.6497,
+    "f1": 0.7303,
+    "iou_ci95": [
+     0.4237,
+     0.6462
+    ],
+    "precision_ci95": [
+     0.636,
+     0.9169
+    ],
+    "recall_ci95": [
+     0.5419,
+     0.6981
+    ]
+   },
+   "otsu_vv": {
+    "n_chips": 15,
+    "iou": 0.3493,
+    "precision": 0.3782,
+    "recall": 0.8201,
+    "f1": 0.5177,
+    "iou_ci95": [
+     0.1485,
+     0.5342
+    ],
+    "precision_ci95": [
+     0.1534,
+     0.604
+    ],
+    "recall_ci95": [
+     0.7763,
+     0.8538
+    ]
+   },
+   "dualpol": {
+    "n_chips": 15,
+    "iou": 0.539,
+    "precision": 0.8751,
+    "recall": 0.5839,
+    "f1": 0.7005,
+    "iou_ci95": [
+     0.3877,
+     0.6292
+    ],
+    "precision_ci95": [
+     0.6964,
+     0.9463
+    ],
+    "recall_ci95": [
+     0.4466,
+     0.6609
+    ]
+   },
+   "learned": {
+    "n_chips": 15,
+    "iou": 0.6067,
+    "precision": 0.8089,
+    "recall": 0.7082,
+    "f1": 0.7552,
+    "iou_ci95": [
+     0.3662,
+     0.7639
+    ],
+    "precision_ci95": [
+     0.6717,
+     0.8557
+    ],
+    "recall_ci95": [
+     0.4301,
+     0.9098
+    ]
+   }
+  },
+  "bolivia_by_country": {
+   "Bolivia": {
+    "fixed_vv": 0.5752,
+    "otsu_vv": 0.3493,
+    "dualpol": 0.539,
+    "learned": 0.6067
+   }
+  }
+ },
+ "caveats": [
+  "Tests single-image detection only; the pipeline's multi-temporal change logic needs pre-event imagery this dataset lacks.",
+  "Water includes permanent water bodies, as in the dataset's labels.",
+  "Chips are mostly rural/agricultural floodplains; dense urban flooding is under-represented.",
+  "Bolivia is a never-seen country: the fairest test of generalisation."
+ ]
+}
