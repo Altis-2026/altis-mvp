@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import AnalogsCard from './AnalogsCard.jsx';
+import LossCalibrationCard from './LossCalibrationCard.jsx';
 import { api } from '../services/api.js';
 import { downloadCSV } from '../utils/csv.js';
 
@@ -101,6 +102,7 @@ export default function ReportsPanel({
   events = [], selectedEvent, eventLabel, eventProperties = [],
   portfolioId, portfolioLabel, portfolioProperties = [],
   portfolioCenter = null, liveEventDate = null,
+  costPerVisit = 450, onCostPerVisit, onLossesCalibrated, liveMeta = null,
 }) {
   const [reportEventId, setReportEventId] = useState(selectedEvent || events[0]?.id || '');
   // Follow the event the user is looking at; fall back to the first event once
@@ -257,7 +259,14 @@ export default function ReportsPanel({
 
         {/* ROI section — the per-event business case, computed from the live
             triage numbers on screen. This is the pricing conversation. */}
-        <RoiWidget rows={hasAnalyzedPortfolio ? portfolioProperties : eventProperties} />
+        <RoiWidget rows={hasAnalyzedPortfolio ? portfolioProperties : eventProperties}
+                   tripCost={costPerVisit} onTripCost={onCostPerVisit} />
+
+        {/* Loss estimates exist only for live analyses with coverage amounts. */}
+        {hasAnalyzedPortfolio && portfolioProperties.some(r => r.severity_mid_usd != null) && (
+          <LossCalibrationCard portfolioId={portfolioId} exposure={liveMeta?.exposure}
+                               onDone={onLossesCalibrated} />
+        )}
 
         {/* Historical analogs from the free flood library */}
         {selectedEvent ? <AnalogsCard eventId={selectedEvent} />
@@ -320,8 +329,10 @@ export default function ReportsPanel({
 /* ROI on this event: field visits avoided times trip cost, against Altis
    priced per property. Assumptions are editable on the spot so a skeptical
    claims VP can plug in their own numbers live and watch it recompute. */
-function RoiWidget({ rows = [] }) {
-  const [tripCost, setTripCost] = useState(450);
+function RoiWidget({ rows = [], tripCost = 450, onTripCost }) {
+  // The cost per visit is the app-wide shared assumption (also drives the
+  // scoreboard), so editing it here updates every figure that uses it.
+  const setTripCost = (v) => onTripCost?.(Math.max(0, Number(v) || 0));
   const [perProp,  setPerProp]  = useState(5);
 
   const analyzed = rows.filter(r => r.impact_class);

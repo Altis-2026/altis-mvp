@@ -44,6 +44,47 @@ def gee_available() -> bool:
     return bool(GEE_SERVICE_ACCOUNT_KEY or GEE_SERVICE_ACCOUNT_KEY_JSON)
 
 
+def _net_loss(prop, nsi, row, sev_ci, duration_days):
+    """Net-of-terms expected loss via pipeline.loss_model, or None.
+
+    Terms come from the uploaded policy (deductible, valuation basis, ACV,
+    replacement cost, contents); anything missing is filled by labelled
+    assumptions inside policy_terms and reported in `terms_provenance`.
+    """
+    try:
+        from pipeline import loss_model as lm
+        from pipeline.policy_terms import PolicyTerms
+    except Exception:  # noqa: BLE001
+        return None
+    model = lm.load_model()
+    cov = float(prop.get('coverage_amount') or 0)
+    depth = float(row.get('max_depth_ft') or 0)
+    if not model or cov <= 0 or depth < 0.1:
+        return None
+    t = prop.get('terms') or {}
+    nsi = nsi or {}
+    ffe = _depth_ffe(nsi or None, depth)
+    basis = 'above_first_floor' if ffe is not None else 'above_ground'
+    d = ffe if ffe is not None else depth
+    occ = nsi.get('occtype')
+    basement = str(occ or '').upper().endswith('WB') or str(nsi.get('basement_type') or '') in ('1', '2', '1.0', '2.0')
+    seg = lm.segment_for(occ, basement)
+    terms = PolicyTerms(limit=cov, deductible=t.get('deductible'), valuation=t.get('valuation_basis'),
+                        acv_value=t.get('acv_value'), replacement_cost=t.get('replacement_cost'))
+    out = lm.expected_loss(max(0.0, d), sev_ci, terms, coverage='building', depth_basis=basis,
+                           segment=seg, model=model)
+    if not out:
+        return None
+    ccov = float(prop.get('contents_coverage_amount') or t.get('contents_coverage_amount') or 0)
+    if ccov > 0:
+        cval = ccov * model.get('fallbacks', {}).get('contents_value_over_coverage', 0.97)
+        cterms = PolicyTerms(limit=ccov, deductible=t.get('contents_deductible'), valuation='ACV', acv_value=cval,
+                             replacement_cost=cval)
+        out['contents'] = lm.expected_loss(max(0.0, d), sev_ci, cterms, coverage='contents', depth_basis=basis,
+                                           segment=seg, model=model)
+    return out
+
+
 def _ffh(match):
     """First-floor height (ft) from an NSI match row, or None."""
     if not match:
@@ -542,6 +583,12 @@ def analyze_portfolio_live(props: list, event_date: str = None,
                                                   row['max_depth_ft']),
             duration_days=duration_days)
 
+        # Claims-calibrated NET estimate: what the carrier would pay after the
+        # policy's valuation basis, deductible and limit (pipeline/loss_model.py,
+        # validated on held-out storms in docs/PREREG_LOSS_MODEL.md). Falls back
+        # to the gross national-curve figure when no model/coverage exists.
+        net = _net_loss(prop, _nsi, row, sev_ci, duration_days)
+
         # Subrogation candidate: flooded AND adjacent to permanent water /
         # drainage — worth checking whether third-party infrastructure
         # channeled the water. A screening flag, not a legal determination.
@@ -616,10 +663,20 @@ def analyze_portfolio_live(props: list, event_date: str = None,
                                   and not (isinstance(s.get('hand_ft'), float)
                                            and math.isnan(s['hand_ft']))
                                   else None),
-            'severity_low_usd':  sev['low'] if sev else None,
-            'severity_mid_usd':  sev['mid'] if sev else None,
-            'severity_high_usd': sev['high'] if sev else None,
-            'severity_damage_pct': sev['damage_pct'] if sev else None,
+            # Headline reserve: the NET (after policy terms) claims-calibrated
+            # estimate when available, else the gross national-curve one. The
+            # gross physical figure is always kept separately.
+            'severity_low_usd':  (net['low'] if net else (sev['low'] if sev else None)),
+            'severity_mid_usd':  (net['mid'] if net else (sev['mid'] if sev else None)),
+            'severity_high_usd': (net['high'] if net else (sev['high'] if sev else None)),
+            'severity_damage_pct': (net['expected_damage_pct'] if net else (sev['damage_pct'] if sev else None)),
+            'loss_method':       ('claims_calibrated_net_of_terms' if net else ('national_curve_gross' if sev else None)),
+            'net_claim_p10_usd': net['claim_p10'] if net else None,
+            'net_claim_p90_usd': net['claim_p90'] if net else None,
+            'net_terms_provenance': net['terms_provenance'] if net else None,
+            'net_support_claims': net['support_claims'] if net else None,
+            'net_depth_basis':   net['depth_basis'] if net else None,
+            'gross_physical_mid_usd': sev['mid'] if sev else None,
             # ── Phase 3: which curve produced the number, what depth it was
             #    indexed on, and contents kept SEPARATE from structure because
             #    NFIP settles them as separate coverages and carriers reserve
@@ -627,11 +684,12 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'severity_curve':        sev.get('curve') if sev else None,
             'severity_depth_basis':  sev.get('depth_basis') if sev else None,
             'severity_duration_mult': sev.get('duration_multiplier') if sev else None,
-            'contents_low_usd':      sev.get('contents_low') if sev else None,
-            'contents_mid_usd':      sev.get('contents_mid') if sev else None,
-            'contents_high_usd':     sev.get('contents_high') if sev else None,
-            'contents_damage_pct':   sev.get('contents_damage_pct') if sev else None,
-            'total_mid_usd':         sev.get('total_mid') if sev else None,
+            'contents_low_usd':      (net['contents']['low'] if net and net.get('contents') else (sev.get('contents_low') if sev else None)),
+            'contents_mid_usd':      (net['contents']['mid'] if net and net.get('contents') else (sev.get('contents_mid') if sev else None)),
+            'contents_high_usd':     (net['contents']['high'] if net and net.get('contents') else (sev.get('contents_high') if sev else None)),
+            'contents_damage_pct':   (net['contents']['expected_damage_pct'] if net and net.get('contents') else (sev.get('contents_damage_pct') if sev else None)),
+            'total_mid_usd':         ((net['mid'] + (net['contents']['mid'] if net.get('contents') else 0)) if net
+                                      else (sev.get('total_mid') if sev else None)),
             'adjuster_note':     _note(prop.get('address', ''), row, impact_class),
             'color':             COLOR_MAP.get(impact_class, '#6B8FA3'),
         })

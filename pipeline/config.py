@@ -9,6 +9,13 @@ load_dotenv()
 PIPELINE_VERSION = '1.0.0'
 
 # ─── GOOGLE EARTH ENGINE ─────────────────────────────────────────────────────
+# ILLUSTRATIVE cost of one field adjuster visit, used for "truck rolls avoided"
+# savings everywhere (scoreboard, ROI calculator, audit PDF, assistant). It is an
+# assumption, not a measurement: the app lets the user replace it with the
+# carrier's own number. 450 is the conservative of the two figures previously
+# hard-coded in different places (450 and 750), so savings are not overstated.
+ASSUMED_COST_PER_FIELD_VISIT_USD = 450
+
 GEE_PROJECT = os.getenv('GEE_PROJECT', 'altis-mvp')
 
 # Path to a GEE service-account JSON key. When set (and the file exists), the
@@ -91,7 +98,7 @@ HARVEY = {
     # (the default everywhere else) captures only water under the roof.
     # See docs/DETECTION_LIMITS.md.
     'exposure_radius_m':  50,
-    'cost_per_inspection': 750,
+    'cost_per_inspection': ASSUMED_COST_PER_FIELD_VISIT_USD,
     'lat':                29.830,
     'lon':               -95.670,
     'zoom':               10,
@@ -145,7 +152,7 @@ BRAZOS = {
     # Same claims-relevant exposure standard as HARVEY — see that entry and
     # docs/DETECTION_LIMITS.md section 6 for the measurements behind it.
     'exposure_radius_m':  50,
-    'cost_per_inspection': 750,
+    'cost_per_inspection': ASSUMED_COST_PER_FIELD_VISIT_USD,
     'lat':                29.585,
     'lon':               -95.755,
     'zoom':               11,
@@ -172,7 +179,7 @@ LISMORE = {
     'study_name':         'Richmond River floodplain: Lismore, Coraki, Woodburn, Broadwater',
     'days_since_event':   3,
     'wse_radius_m':       300,    # riverine flooding
-    'cost_per_inspection': 750,
+    'cost_per_inspection': ASSUMED_COST_PER_FIELD_VISIT_USD,
     'lat':               -28.94,
     'lon':               153.31,
     'zoom':               10,

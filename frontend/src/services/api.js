@@ -70,6 +70,12 @@ export const api = {
   getEventAnalogs: (id)    => get(`/events/${id}/analogs`),
   getWatch:        ()      => get('/watch'),
   getStormExposure: (pid)  => get(`/portfolio/${pid}/storm-exposure`),
+  /* Learn the storm's dollar scale from settled claims and rescale the book. */
+  calibrateLosses: (pid, settled) =>
+    authFetch(`/portfolio/${pid}/calibrate-losses`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settled }),
+    }).then(r => r.json().then(j => (r.ok ? j : Promise.reject({ detail: j.detail })))),
   getAnalogs: ({ lat, lon, date, cause }) => get(`/analogs?lat=${lat}&lon=${lon}`
     + (date ? `&date=${date}` : '') + (cause ? `&cause=${encodeURIComponent(cause)}` : '')),
 

@@ -55,7 +55,7 @@ from backend.ingestion import (
     parse_upload, suggest_column_mapping, apply_mapping,
     build_preview, IngestionError,
 )
-from pipeline.config import EVENTS
+from pipeline.config import EVENTS, ASSUMED_COST_PER_FIELD_VISIT_USD
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
@@ -860,7 +860,7 @@ def _portfolio_stats(results: list) -> dict:
         'dispatch':         dispatch,
         'remote_total':     remote,
         'review':           review,
-        'estimated_savings': remote * 750,
+        'estimated_savings': remote * ASSUMED_COST_PER_FIELD_VISIT_USD,
     }
 
 

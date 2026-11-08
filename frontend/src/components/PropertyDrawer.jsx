@@ -156,6 +156,16 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   const sevLow    = num(property.severity_low_usd);
   const sevMid    = num(property.severity_mid_usd);
   const sevHigh   = num(property.severity_high_usd);
+  // Net-of-policy-terms estimate from the claims-calibrated model, with the
+  // terms that were assumed (not supplied) listed so a guess is never hidden.
+  const netCalibrated = property.loss_method === 'claims_calibrated_net_of_terms';
+  const claimP10 = num(property.net_claim_p10_usd);
+  const claimP90 = num(property.net_claim_p90_usd);
+  const grossMid = num(property.gross_physical_mid_usd);
+  const assumedTerms = Object.entries(property.net_terms_provenance || {})
+    .filter(([, v]) => typeof v === 'string' && v.startsWith('assumed'))
+    .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v.replace(/^assumed:\s*/, '')}`);
+  const stormFactor = num(property.storm_factor);
   const gaugeDepth = num(property.gauge_depth_ft);
   const gaugeDist  = num(property.gauge_dist_m);
   const gaugeConflict = property.gauge_conflict == 1;
@@ -627,7 +637,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               padding: '13px 15px',
             }}>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#D4B068', textTransform: 'uppercase', marginBottom: 5 }}>
-                Estimated Claim Severity
+                {netCalibrated ? 'Estimated Insured Loss (net of policy terms)' : 'Estimated Claim Severity'}
               </div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                 {sevMid != null ? `$${sevMid.toLocaleString()}` : `$${sevLow.toLocaleString()} – $${sevHigh.toLocaleString()}`}
@@ -637,10 +647,39 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                   range ${sevLow.toLocaleString()} – ${sevHigh.toLocaleString()}
                 </div>
               )}
-              <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
-                Depth-damage curve × dwelling coverage; range reflects depth uncertainty.
-                Reserving aid, not an adjuster estimate.
-              </div>
+              {netCalibrated ? (
+                <>
+                  {claimP10 != null && claimP90 != null && (
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+                      a single claim at this depth: ${claimP10.toLocaleString()} – ${claimP90.toLocaleString()} (10th–90th percentile)
+                    </div>
+                  )}
+                  {stormFactor != null && (
+                    <div style={{ fontSize: '0.66rem', color: 'var(--teal)', marginTop: 4 }}>
+                      Calibrated to this storm's settled claims (×{stormFactor}).
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.45 }}>
+                    Built from 100,000+ real settled flood claims, then your deductible, valuation basis and limit.
+                    The range reflects depth uncertainty. The estimate is for a claim that is filed
+                    {grossMid != null ? `; the gross physical damage before policy terms is $${grossMid.toLocaleString()} on the older national curve.` : '.'}
+                  </div>
+                  {assumedTerms.length > 0 && (
+                    <div style={{ fontSize: '0.64rem', color: '#FFB347', marginTop: 5, lineHeight: 1.45 }}>
+                      Assumed because they were not in the uploaded file: {assumedTerms.join('; ')}. Add these columns for a firmer number.
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.45 }}>
+                    Tested on four later storms: before calibration a storm's total was typically within about 20%,
+                    individual claims are rough. Reserving aid, not an adjuster estimate.
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
+                  Depth-damage curve × dwelling coverage; range reflects depth uncertainty.
+                  Reserving aid, not an adjuster estimate.
+                </div>
+              )}
             </div>
           )}
 

@@ -184,3 +184,37 @@ def cone_replay(event_id: str, storm: str = Query(..., pattern=r"^[a-zA-Z]{2}\d{
         e = exposure_in_rings(props, cone)
         out.append({"advisory": adv, "n_in_cone": e["n_in_cone"], "n_total": e["n_total"]})
     return {"event_id": event_id, "storm": storm, "replay": out}
+
+
+# ── Storm calibration from settled claims ────────────────────────────────────
+
+@router.post("/portfolio/{portfolio_id}/calibrate-losses")
+def calibrate_losses(portfolio_id: str, body: dict):
+    """Learn this storm's dollar scale from settled claims and rescale the
+    book's loss estimates. Body: {"settled": [{"policy_number" | "property_id",
+    "paid_amount": 12345.0}, ...]}. Paid = total settled (building + contents)."""
+    from backend.database import (get_analysis_results, save_analysis_results,
+                                  get_analysis_meta, save_analysis_meta)
+    from backend.loss_calibration import storm_factor, match_rows, apply_factor
+    rows = get_analysis_results(portfolio_id, "live")
+    if not rows or not any(r.get("severity_mid_usd") is not None for r in rows):
+        raise HTTPException(404, "No live analysis with loss estimates for this portfolio. Run live analysis first.")
+    settled = body.get("settled") or []
+    if not isinstance(settled, list) or not settled:
+        raise HTTPException(400, "Provide a non-empty 'settled' list.")
+    pred, paid, ids = match_rows(rows, settled[:50000])
+    res = storm_factor(pred, paid)
+    if not res["ok"]:
+        raise HTTPException(422, f"{res['reason']} (matched {res['n']} of {len(settled)}).")
+    totals = apply_factor(rows, res["factor"], ids)
+    save_analysis_results(portfolio_id, "live", [r for r in rows if r.get("impact_class")])
+    meta = get_analysis_meta(portfolio_id, "live") or {}
+    exp = meta.get("exposure") or {}
+    exp.update(totals)
+    exp["storm_calibration"] = {"factor": res["factor"], "ci95": res["ci95"], "n_settled": res["n"]}
+    meta["exposure"] = exp
+    save_analysis_meta(portfolio_id, "live", meta)
+    return {**res, "matched": res["n"], "submitted": len(settled), "new_totals": totals,
+            "note": ("Early-settling claims skew small, so a factor from few claims can be biased low; the "
+                     "interval covers sampling error only. Validated: after 200 settled claims the storm "
+                     "total was typically within 6% (docs/PREREG_LOSS_MODEL.md).")}

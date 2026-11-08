@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from pipeline.config import ASSUMED_COST_PER_FIELD_VISIT_USD
+
 BASE_DIR = Path(__file__).parent.parent
 OUTPUT_DIR = BASE_DIR / 'outputs'
 
@@ -119,7 +121,7 @@ def build_event_report(event_id: str, df, stats: dict) -> bytes:
         f"affected area from Sentinel-1 SAR. <b>{stats.get('remote_total', 0):,}</b> "
         f"were resolved remotely (no truck roll), avoiding an estimated "
         f"<b>${savings:,}</b> in inspection cost at "
-        f"${cfg.get('cost_per_inspection', 750)}/inspection. "
+        f"${cfg.get('cost_per_inspection', ASSUMED_COST_PER_FIELD_VISIT_USD)}/inspection (an assumption). "
         f"<b>{stats.get('dispatch', 0):,}</b> were flagged for field dispatch and "
         f"<b>{stats.get('review', 0):,}</b> routed to manual review.", body))
 

@@ -19,7 +19,8 @@ def test_portfolio_stats_counts_each_category():
 def test_portfolio_stats_estimated_savings_is_per_remote_property():
     results = [{"impact_class": "Remote-Approve"}, {"impact_class": "Remote-Deny"}]
     stats = _portfolio_stats(results)
-    assert stats["estimated_savings"] == 2 * 750
+    from pipeline.config import ASSUMED_COST_PER_FIELD_VISIT_USD
+    assert stats["estimated_savings"] == 2 * ASSUMED_COST_PER_FIELD_VISIT_USD
 
 
 def test_portfolio_stats_empty_results():

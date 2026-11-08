@@ -108,7 +108,9 @@ def main():
     out = build_model(df, TRAIN, structure)
     v = df[(df.buildingPropertyValue > 10000) & (df.totalBuildingInsuranceCoverage > 0)]
     rc = df[(df.buildingReplacementCost > 10000) & (df.buildingPropertyValue > 10000)]
-    out["fallbacks"] = {"acv_value_over_coverage": round(float((v.buildingPropertyValue / v.totalBuildingInsuranceCoverage).median()), 3),
+    cv = df[(df.contentsPropertyValue > 1000) & (df.totalContentsInsuranceCoverage > 0)]
+    out["fallbacks"] = {"contents_value_over_coverage": round(float((cv.contentsPropertyValue / cv.totalContentsInsuranceCoverage).median()), 3),
+                        "acv_value_over_coverage": round(float((v.buildingPropertyValue / v.totalBuildingInsuranceCoverage).median()), 3),
                         "rc_over_acv": round(float((rc.buildingReplacementCost / rc.buildingPropertyValue).median()), 3),
                         "modal_building_deductible_code": df.buildingDeductibleCode.astype(str).mode().iat[0]}
     out["note"] = "Fitted on training storms only; see docs/PREREG_LOSS_MODEL.md"

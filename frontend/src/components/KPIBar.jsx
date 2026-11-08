@@ -40,13 +40,14 @@ function money(v) {
 
 import { useIsNarrow } from '../hooks/useIsMobile.js';
 
-export default function KPIBar({ stats, exposure, leftInset = 72, drawerOpen = false }) {
+export default function KPIBar({ stats, exposure, leftInset = 72, drawerOpen = false, costPerVisit = 450 }) {
   const narrow = useIsNarrow();
   if (!stats && !exposure) return null;
 
-  const savings = stats?.estimated_savings
-    ? `$${(stats.estimated_savings / 1000).toFixed(0)}k`
-    : '$0';
+  // One shared, editable assumption (set in Reports), so this number can never
+  // disagree with the ROI calculator or the assistant.
+  const savings = stats?.remote_total ? money(stats.remote_total * costPerVisit) : '$0';
+  const perVisitNote = `at $${Number(costPerVisit).toLocaleString()}/visit (assumption, editable in Reports)`;
 
   return (
     <div
@@ -100,9 +101,9 @@ export default function KPIBar({ stats, exposure, leftInset = 72, drawerOpen = f
           />
           <KPI
             label="Savings vs Full Deployment"
-            value={money(remote * 750)}
+            value={money(remote * costPerVisit)}
             color="var(--teal)"
-            sub={`${remote.toLocaleString()} truck rolls avoided`}
+            sub={`${remote.toLocaleString()} truck rolls avoided ${perVisitNote}`}
           />
         </>
           );
@@ -128,7 +129,7 @@ export default function KPIBar({ stats, exposure, leftInset = 72, drawerOpen = f
             label="Savings vs Full Deployment"
             value={savings}
             color="var(--teal)"
-            sub={`${stats.remote_total?.toLocaleString()} truck rolls avoided`}
+            sub={`${stats.remote_total?.toLocaleString()} truck rolls avoided ${perVisitNote}`}
           />
         </>
       )}

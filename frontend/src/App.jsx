@@ -51,6 +51,20 @@ export default function App() {
   const [showUpload,       setShowUpload]       = useState(false);
   const [loading,          setLoading]          = useState(false);
 
+  /* ── One shared, editable assumption: the cost of a field visit. It drives
+     the scoreboard, the ROI calculator and the assistant so they can never
+     disagree. Illustrative until the carrier enters its own figure. ───── */
+  const [costPerVisit, setCostPerVisit] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem('altis_cost_per_visit'));
+      return v > 0 ? v : 450;
+    } catch { return 450; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('altis_cost_per_visit', String(costPerVisit)); }
+    catch { /* storage unavailable: the value just is not remembered */ }
+  }, [costPerVisit]);
+
   /* ── Sidebar ──────────────────────────────────────────────────── */
   const [activePanel, setActivePanel] = useState(null);
   const leftInset = RAIL_WIDTH + (activePanel ? PANEL_WIDTH : 0);
@@ -167,6 +181,18 @@ export default function App() {
       }
     }
   }, [refreshPortfolios]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Reload stored live results (after calibrating to settled claims) ── */
+  const reloadLiveResults = useCallback(async () => {
+    if (!portfolioId) return;
+    try {
+      const saved = await api.getResults(portfolioId, 'live');
+      if (saved?.results?.some(r => r.impact_class)) {
+        setPortfolioProps(saved.results);
+        setLiveMeta(saved.meta || null);
+      }
+    } catch { /* keep what is on screen */ }
+  }, [portfolioId]);
 
   /* ── Select a saved portfolio from the sidebar ───────────────── */
   const handlePortfolioSelect = useCallback(async (id) => {
@@ -370,7 +396,8 @@ export default function App() {
       )}
 
       {(stats || liveMeta?.exposure) && (
-        <KPIBar stats={stats} exposure={liveMeta?.exposure} leftInset={leftInset} drawerOpen={drawerOpen} />
+        <KPIBar stats={stats} exposure={liveMeta?.exposure} leftInset={leftInset} drawerOpen={drawerOpen}
+                costPerVisit={costPerVisit} />
       )}
 
       <Sidebar activePanel={activePanel} onSetPanel={setActivePanel} compareCount={compareList.length}>
@@ -443,6 +470,10 @@ export default function App() {
             portfolioId={portfolioId}
             portfolioLabel={activePortfolio?.id}
             portfolioProperties={portfolioProps}
+            costPerVisit={costPerVisit}
+            onCostPerVisit={setCostPerVisit}
+            onLossesCalibrated={reloadLiveResults}
+            liveMeta={liveMeta}
             portfolioCenter={portfolioBbox ? [(portfolioBbox[0] + portfolioBbox[2]) / 2, (portfolioBbox[1] + portfolioBbox[3]) / 2] : null}
             liveEventDate={liveEventDate}
           />
@@ -489,7 +520,8 @@ export default function App() {
       {!grid && (
         <ChatBar
           eventMeta={selectedEventMeta}
-          eventStats={stats}
+          eventStats={stats ? { ...stats, estimated_savings: (stats.remote_total || 0) * costPerVisit,
+                                cost_per_visit_assumption: costPerVisit } : stats}
           selectedProperty={selectedProperty}
           portfolioId={portfolioAnalyzed ? portfolioId : null}
           panelOpen={!!activePanel}

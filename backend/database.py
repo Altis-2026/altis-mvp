@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from pipeline.config import ASSUMED_COST_PER_FIELD_VISIT_USD
 from pathlib import Path
 
 BASE_DIR    = Path(__file__).parent.parent
@@ -108,7 +109,7 @@ def get_event_stats(df: pd.DataFrame) -> dict:
         'remote_deny':      remote_deny,
         'review':           review,
         'remote_total':     remote_total,
-        'estimated_savings': remote_total * 750,
+        'estimated_savings': remote_total * ASSUMED_COST_PER_FIELD_VISIT_USD,
         'pct_remote':       round(remote_total / total * 100, 1) if total > 0 else 0,
         'gauge_conflicts':  int(df['gauge_conflict'].sum()) if 'gauge_conflict' in df.columns else None,
     }
