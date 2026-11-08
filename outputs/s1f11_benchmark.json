@@ -301,5 +301,56 @@
   "Water includes permanent water bodies, as in the dataset's labels.",
   "Chips are mostly rural/agricultural floodplains; dense urban flooding is under-represented.",
   "Bolivia is a never-seen country: the fairest test of generalisation."
- ]
+ ],
+ "pipeline_guarded_otsu": {
+  "guard_db": [
+   -22.0,
+   -12.0
+  ],
+  "fallback_db": -16.0,
+  "speckle_radius_px": 5,
+  "results": {
+   "test": {
+    "n_chips": 90,
+    "iou": 0.4392,
+    "precision": 0.6326,
+    "recall": 0.5896,
+    "f1": 0.6104,
+    "iou_ci95": [
+     0.3142,
+     0.5607
+    ],
+    "precision_ci95": [
+     0.4772,
+     0.7756
+    ],
+    "recall_ci95": [
+     0.4358,
+     0.7378
+    ],
+    "n_fallback": 51
+   },
+   "bolivia": {
+    "n_chips": 15,
+    "iou": 0.6853,
+    "precision": 0.8418,
+    "recall": 0.7865,
+    "f1": 0.8132,
+    "iou_ci95": [
+     0.4646,
+     0.7945
+    ],
+    "precision_ci95": [
+     0.6158,
+     0.9293
+    ],
+    "recall_ci95": [
+     0.5972,
+     0.8674
+    ],
+    "n_fallback": 7
+   }
+  },
+  "note": "threshold step only; slope/HAND/permanent-water/baseline layers not reproducible on these chips"
+ }
 }
