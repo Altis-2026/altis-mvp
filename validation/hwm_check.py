@@ -127,18 +127,18 @@ DEFAULT_RADIUS_M = 50
 # ─── ground truth ────────────────────────────────────────────────────────────
 
 def fetch_hwms(refresh=False):
-    """Surveyed high water marks for the event, from cache unless --refresh."""
+    """Surveyed high water marks for the event, from cache unless --refresh.
+
+    USGS moved STN in 2026 (old STNServices URLs now redirect to a web app);
+    downloads go through stn_api.py, which normalises the new field names
+    back to the legacy ones used below.
+    """
+    from stn_api import fetch_event_hwms
     if HWM_CACHE.exists() and not refresh:
         print(f"  HWMs from cache: {HWM_CACHE.name}")
-        return json.loads(HWM_CACHE.read_text())
-
-    url = STN_HWM_URL.format(event=STN_EVENT_ID)
-    print(f"  Downloading {url} ...", flush=True)
-    with urllib.request.urlopen(url, timeout=300) as r:
-        data = json.loads(r.read().decode())
-    HWM_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    HWM_CACHE.write_text(json.dumps(data))
-    print(f"  {len(data)} marks cached → {HWM_CACHE.name}")
+    data = fetch_event_hwms(STN_EVENT_ID, HWM_CACHE, refresh=refresh)
+    if refresh:
+        print(f"  {len(data)} marks cached → {HWM_CACHE.name}")
     return data
 
 
