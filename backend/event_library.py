@@ -38,7 +38,7 @@ _cache: dict = {}
 CAUSE_GROUPS = ("tropical_cyclone", "heavy_rain", "monsoon", "snowmelt", "dam_break", "coastal", "other")
 RELATED = {frozenset(("heavy_rain", "monsoon")): 0.5, frozenset(("tropical_cyclone", "coastal")): 0.6,
            frozenset(("tropical_cyclone", "heavy_rain")): 0.3}
-WEIGHTS = {"cause": 3.0, "distance": 2.0, "season": 1.0, "size": 1.0, "duration": 1.0}
+WEIGHTS = {"cause": 3.0, "distance": 2.0, "season": 1.0, "size": 1.0, "duration": 1.0, "rain": 1.0}
 
 
 def cause_group(text: Optional[str]) -> str:
@@ -98,6 +98,47 @@ def _from_fema(e: dict) -> dict:
     }
 
 
+def _cpi_table() -> dict:
+    """Month -> CPI-U (FRED CPIAUCSL, 1982-84 = 100), cached in outputs/library."""
+    if "cpi" in _cache:
+        return _cache["cpi"]
+    t = {}
+    p = LIB_DIR / "cpi_u.csv"
+    if p.exists():
+        for line in p.read_text().splitlines()[1:]:
+            d, _, v = line.partition(",")
+            try:
+                t[d[:7]] = float(v)
+            except ValueError:
+                pass
+    _cache["cpi"] = t
+    return t
+
+
+def inflation_factor(start: Optional[str]) -> Optional[float]:
+    """Multiplier converting dollars at the event's date to latest-month dollars."""
+    t = _cpi_table()
+    if not t or not start:
+        return None
+    latest = t[max(t)]
+    base = t.get(start[:7])
+    return round(latest / base, 4) if base else None
+
+
+def _real_dollars(nfip: Optional[dict], start: Optional[str]) -> Optional[dict]:
+    """Copy of an NFIP outcome dict with payouts also in constant dollars."""
+    if not nfip:
+        return nfip
+    f = inflation_factor(start)
+    out = dict(nfip)
+    if f:
+        for k in ("median_paid_usd", "mean_paid_usd"):
+            if nfip.get(k) is not None:
+                out[k + "_real"] = round(nfip[k] * f)
+        out["inflation_factor"] = f
+    return out
+
+
 def load_library(refresh: bool = False) -> list[dict]:
     stamp = tuple((f.name, f.stat().st_mtime) for f in sorted(LIB_DIR.glob("*.json"))) if LIB_DIR.exists() else ()
     if _cache.get("lib") is not None and _cache.get("stamp") == stamp and not refresh:
@@ -117,6 +158,11 @@ def load_library(refresh: bool = False) -> list[dict]:
     runs_p = LIB_DIR / "altis_runs.json"
     if runs_p.exists():
         recs += json.loads(runs_p.read_text())
+    rain_p = LIB_DIR / "rainfall.json"
+    rain = json.loads(rain_p.read_text()) if rain_p.exists() else {}
+    for r in recs:
+        r["rain_mm"] = rain.get(r["id"])
+        r["nfip"] = _real_dollars(r.get("nfip"), r.get("start"))
     recs = [r for r in recs if r.get("centroid") and None not in r["centroid"]]
     _cache["lib"] = recs
     _cache["stamp"] = stamp
@@ -159,7 +205,7 @@ def _ratio_sim(x, y) -> Optional[float]:
 def find_analogs(lat: float, lon: float, event_date: Optional[str] = None, cause: Optional[str] = None,
                  flooded_km2: Optional[float] = None, duration_days: Optional[float] = None,
                  k: int = 8, exclude_ids: tuple = (), us_only: bool = False,
-                 exclude_same_event: bool = True) -> dict:
+                 exclude_same_event: bool = True, rain_mm: Optional[float] = None) -> dict:
     lib = load_library()
     q_cause = cause if cause in CAUSE_GROUPS else (cause_group(cause) if cause else None)
     scored = []
@@ -196,6 +242,11 @@ def find_analogs(lat: float, lon: float, event_date: Optional[str] = None, cause
         s = _ratio_sim(duration_days, r.get("duration_days"))
         if s is not None:
             parts["duration"] = s
+        s = _ratio_sim(rain_mm, r.get("rain_mm"))
+        if s is not None:
+            parts["rain"] = s
+            if s > 0.8:
+                why.append(f"similar rainfall ({r['rain_mm']:.0f} mm)")
         wsum = sum(WEIGHTS[p] for p in parts)
         score = sum(WEIGHTS[p] * v for p, v in parts.items()) / wsum if wsum else 0.0
         scored.append((score, dkm, r, why))
@@ -204,10 +255,10 @@ def find_analogs(lat: float, lon: float, event_date: Optional[str] = None, cause
     analogs = [{**{kk: r.get(kk) for kk in ("id", "source", "name", "start", "end", "duration_days", "cause",
                                              "cause_group", "country", "flooded_km2", "severity", "dead",
                                              "displaced", "nfip")},
-                "similarity": round(s, 3), "distance_km": round(d), "why": why}
+                "similarity": round(s, 3), "distance_km": round(d), "why": why, "rain_mm": r.get("rain_mm")}
                for s, d, r, why in top]
     return {"query": {"lat": lat, "lon": lon, "date": event_date, "cause_group": q_cause,
-                      "flooded_km2": flooded_km2, "duration_days": duration_days},
+                      "flooded_km2": flooded_km2, "duration_days": duration_days, "rain_mm": rain_mm},
             "analogs": analogs, "priors": priors_from(analogs), "library": library_stats(),
             "note": ("Historical analogs ranked by cause, location, season and (when known) size and "
                      "duration. They are evidence about events like this one, not a forecast of it.")}
@@ -232,7 +283,8 @@ def priors_from(analogs: list[dict]) -> Optional[dict]:
         return vals[-1][0]
 
     return {"based_on": len(rows), "events": [a["name"] for a in rows],
-            "median_paid_per_claim_usd": wmed("median_paid_usd"),
+            "median_paid_per_claim_usd": wmed("median_paid_usd_real") or wmed("median_paid_usd"),
+            "dollars": "constant (latest-month) US dollars, CPI-U adjusted" if wmed("median_paid_usd_real") else "nominal",
             "share_of_claims_paid": wmed("share_paid"),
             "median_water_depth_in": wmed("median_water_depth_in"),
             "median_flood_duration_h": wmed("median_flood_duration_h"),
