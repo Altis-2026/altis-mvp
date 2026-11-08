@@ -1,0 +1,21 @@
+{
+ "brazos": {
+  "radar_dry": 3965,
+  "flagged": 461,
+  "mean_zip_claim_rate_flagged": 0.0131,
+  "mean_zip_claim_rate_unflagged": 0.019,
+  "n_zips": 14,
+  "spearman_share_flagged_vs_rate": -0.19,
+  "p_value": 0.515
+ },
+ "harvey": {
+  "radar_dry": 3722,
+  "flagged": 170,
+  "mean_zip_claim_rate_flagged": 0.0505,
+  "mean_zip_claim_rate_unflagged": 0.0375,
+  "n_zips": 38,
+  "spearman_share_flagged_vs_rate": 0.238,
+  "p_value": 0.151
+ },
+ "reading": "Inconclusive. Brazos points the wrong way (flagged properties sit in lower-claim zips), Harvey the right way; neither correlation is significant. Zip resolution cannot verify a per-house flag; per-address claims are needed (FEMA ISAA or a carrier pilot)."
+}

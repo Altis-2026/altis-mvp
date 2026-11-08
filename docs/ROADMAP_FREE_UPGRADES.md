@@ -41,6 +41,7 @@ Flood Database from the event library.
 - **Risk:** coastal-surge events are out of scope (no river gauge controls surge). Pick river floods.
 
 ### B2. Measure the gauge-conflict flag's precision
+- **Status (2026-11-08):** zip-level proxy run (`validation/gauge_conflict_zip_check.py`): **inconclusive**. Brazos flagged properties sit in *lower*-claim zips (1.3% vs 1.9%, rho = -0.19, p = 0.52, 14 zips); Harvey higher (5.1% vs 3.8%, rho = 0.24, p = 0.15). Zip resolution cannot settle a per-house flag; this needs per-address outcomes (Part C items 1-2). The UI keeps the 'unverified' wording.
 - **Why:** 462 Brazos properties are flagged as possible missed claims. A carrier will ask how many are real.
 - **How:** OpenFEMA NFIP claims are zip-level, so compare claim rates in flagged vs unflagged properties within the same zips (`validation/nfip_claims.py` already joins them). The FEMA ISAA non-redacted request (PROJECT_STATE §7) would allow per-address checking.
 - **Ships if:** flagged properties show a clearly higher claim rate than unflagged ones in the same zips.
