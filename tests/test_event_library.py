@@ -57,3 +57,10 @@ def test_runs_are_recorded_and_searchable(lib):
     ids = [r["id"] for r in el.load_library()]
     assert "altis-1" in ids
     assert el.library_stats()["by_source"]["altis"] == 1
+
+
+def test_commercial_mode_drops_non_commercial_sources(lib, monkeypatch):
+    monkeypatch.setenv("ALTIS_COMMERCIAL_SOURCES_ONLY", "1")
+    el._cache.clear()
+    assert not any(r["source"] == "gfd" for r in el.load_library())
+    assert el.library_stats()["commercial_sources_only"] is True

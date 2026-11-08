@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -104,7 +105,11 @@ def load_library(refresh: bool = False) -> list[dict]:
     recs = []
     gfd_p, nfip_p = LIB_DIR / "gfd_events.json", LIB_DIR / "nfip_outcomes.json"
     nfip = json.loads(nfip_p.read_text()) if nfip_p.exists() else {}
-    if gfd_p.exists():
+    # The Global Flood Database is CC BY-NC. A commercial deployment sets
+    # ALTIS_COMMERCIAL_SOURCES_ONLY=1 to keep only public-domain sources
+    # (FEMA declarations + NFIP claims) until its licence is cleared.
+    commercial_only = os.getenv("ALTIS_COMMERCIAL_SOURCES_ONLY") == "1"
+    if gfd_p.exists() and not commercial_only:
         recs += [_from_gfd(e, nfip) for e in json.loads(gfd_p.read_text())]
     fema_p = LIB_DIR / "fema_events.json"
     if fema_p.exists():
@@ -125,6 +130,7 @@ def library_stats() -> dict:
         by_src[r["source"]] = by_src.get(r["source"], 0) + 1
     with_outcomes = sum(1 for r in lib if r.get("nfip") and r["nfip"].get("n_claims"))
     return {"n_events": len(lib), "by_source": by_src, "with_nfip_outcomes": with_outcomes,
+            "commercial_sources_only": os.getenv("ALTIS_COMMERCIAL_SOURCES_ONLY") == "1",
             "span": [min((r["start"] for r in lib if r.get("start")), default=None),
                      max((r["start"] for r in lib if r.get("start")), default=None)]}
 
