@@ -79,6 +79,11 @@ def main():
                                           "baseline": round(float(np.median(s_base)), 4),
                                           "diff_ci95": boot_ci(s_an, s_base, rng)},
             "share_paid_spearman_analogs": round(float(spearmanr(pred_share, act_share).statistic), 3),
+            # Descriptive only (does not enter the decision): how far off past estimates were.
+            "error_quantiles": {
+                "payout_log10_abs": {q: round(float(np.quantile(e_an, q / 100)), 4) for q in (50, 80, 90)},
+                "share_paid_abs": {q: round(float(np.quantile(s_an, q / 100)), 4) for q in (50, 80, 90)},
+            },
         }
         print(mode, json.dumps(results[mode]), flush=True)
     hi = results["full"]["payout_median_abs_err_log10"]["diff_ci95"][1]

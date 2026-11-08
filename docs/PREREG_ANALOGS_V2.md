@@ -40,3 +40,40 @@ rainfall total is part of the similarity?
   below 0.** Otherwise the UI keeps "history, not a forecast".
 - Run exactly once. No change to weights, k, windows or filters after seeing
   results; any further idea is a new pre-registration.
+
+---
+
+## Result (single run, 2026-11-08, after this file and the code were committed)
+
+Output: `outputs/analog_backtest.json` (headline numbers verified identical when
+descriptive error quantiles were added afterwards). 231 events, leave-one-out.
+
+| | Analogs | Baseline | Difference, 95% CI |
+|---|---|---|---|
+| **Primary: payout error (median abs log10, real dollars)** | 0.201 | 0.229 | **-0.061 to +0.025** |
+| Share-paid error (abs) | 0.057 | 0.063 | -0.017 to +0.003 |
+| Rank correlation, payout / share paid | 0.34 / 0.39 | n/a | n/a |
+
+Ablations (payout error diff CI): full without rainfall -0.059..+0.020;
+location only -0.060..+0.020; cause only +0.020..+0.107 (worse than baseline).
+
+**Decision rule: NOT MET.** The primary CI includes 0, so analogs are **not**
+presented as a forecast. They remain labelled history.
+
+What changed versus v1 (nominal, no rain; error 0.257 vs baseline 0.259):
+analog error fell to 0.201 and baseline error to 0.229. Most of the gain is
+from putting payouts in constant dollars (it helps both sides); rainfall adds a
+small further gain on share paid (0.065 -> 0.057) and payout (0.205 -> 0.201).
+The point estimate now favours analogs by about 12%, but the sample cannot
+distinguish that from chance.
+
+Product consequence (descriptive, not part of the decision): every analog
+estimate is now shown in today's dollars with its measured error band
+(typically off by about 1.6x; within 2.6x in 80% of past events), plus the
+baseline's typical error (1.7x), and the "history, not a forecast" label
+stays. The flag flips automatically if a future pre-registered run passes.
+
+Not allowed by this protocol, and so not done: tuning weights, k or windows.
+Next candidates, each a NEW pre-registration: storm wind/surge for coastal
+events (Katrina and Sandy have little rain), exposure at risk instead of claim
+counts, and more events (NFIP back to 1978 for events before 2000).

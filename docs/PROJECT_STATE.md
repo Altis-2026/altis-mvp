@@ -31,6 +31,9 @@ in `docs/ROADMAP_FREE_UPGRADES.md`. The headline that changes §2b/§3:
 - **Extent benchmark on independent hand labels** (Sen1Floods11): per-chip
   Otsu IoU 0.21 / precision 0.23 on test; learned LightGBM 0.63, but no clear
   gain over a fixed rule on a never-seen country (Bolivia).
+- **Analogs v2 (inflation + rainfall), pre-registered and run once: did NOT meet
+  the forecast bar** (error 0.201 vs baseline 0.229, CI -0.061..+0.025). Shown as
+  history with its measured error band. See `docs/PREREG_ANALOGS_V2.md`.
 - New product pieces: gauge–radar conflict flag (possible missed claims,
   precision unmeasured), satellite pass tracker (median revisit ~7.5 days at
   Houston), event library + analogs (history, not a forecast), NHC cone

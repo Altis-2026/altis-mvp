@@ -2,35 +2,80 @@
  "full": {
   "n_events": 231,
   "payout_median_abs_err_log10": {
-   "analogs": 0.2573,
-   "baseline": 0.2586,
+   "analogs": 0.2008,
+   "baseline": 0.2291,
    "diff_ci95": [
-    -0.0372,
-    0.0312
+    -0.0611,
+    0.025
    ]
   },
-  "payout_spearman_analogs": 0.239,
+  "payout_spearman_analogs": 0.337,
+  "share_paid_median_abs_err": {
+   "analogs": 0.057,
+   "baseline": 0.063,
+   "diff_ci95": [
+    -0.0165,
+    0.003
+   ]
+  },
+  "share_paid_spearman_analogs": 0.386,
+  "error_quantiles": {
+   "payout_log10_abs": {
+    "50": 0.2008,
+    "80": 0.4099,
+    "90": 0.51
+   },
+   "share_paid_abs": {
+    "50": 0.057,
+    "80": 0.127,
+    "90": 0.171
+   }
+  }
+ },
+ "full_no_rain": {
+  "n_events": 231,
+  "payout_median_abs_err_log10": {
+   "analogs": 0.2051,
+   "baseline": 0.2291,
+   "diff_ci95": [
+    -0.0588,
+    0.0196
+   ]
+  },
+  "payout_spearman_analogs": 0.329,
   "share_paid_median_abs_err": {
    "analogs": 0.065,
    "baseline": 0.063,
    "diff_ci95": [
-    -0.008,
+    -0.0085,
     0.0105
    ]
   },
-  "share_paid_spearman_analogs": 0.351
+  "share_paid_spearman_analogs": 0.351,
+  "error_quantiles": {
+   "payout_log10_abs": {
+    "50": 0.2051,
+    "80": 0.3805,
+    "90": 0.4975
+   },
+   "share_paid_abs": {
+    "50": 0.065,
+    "80": 0.123,
+    "90": 0.164
+   }
+  }
  },
  "location_only": {
   "n_events": 231,
   "payout_median_abs_err_log10": {
-   "analogs": 0.2513,
-   "baseline": 0.2586,
+   "analogs": 0.2051,
+   "baseline": 0.2291,
    "diff_ci95": [
-    -0.0431,
-    0.0324
+    -0.06,
+    0.0197
    ]
   },
-  "payout_spearman_analogs": 0.237,
+  "payout_spearman_analogs": 0.329,
   "share_paid_median_abs_err": {
    "analogs": 0.064,
    "baseline": 0.063,
@@ -39,28 +84,59 @@
     0.0105
    ]
   },
-  "share_paid_spearman_analogs": 0.291
+  "share_paid_spearman_analogs": 0.291,
+  "error_quantiles": {
+   "payout_log10_abs": {
+    "50": 0.2051,
+    "80": 0.4105,
+    "90": 0.5136
+   },
+   "share_paid_abs": {
+    "50": 0.064,
+    "80": 0.134,
+    "90": 0.173
+   }
+  }
  },
  "cause_only": {
   "n_events": 231,
   "payout_median_abs_err_log10": {
-   "analogs": 0.3179,
-   "baseline": 0.2586,
+   "analogs": 0.2884,
+   "baseline": 0.2291,
    "diff_ci95": [
-    0.0046,
-    0.1038
+    0.0195,
+    0.107
    ]
   },
-  "payout_spearman_analogs": -0.067,
+  "payout_spearman_analogs": -0.043,
   "share_paid_median_abs_err": {
    "analogs": 0.085,
    "baseline": 0.063,
    "diff_ci95": [
     0.0045,
-    0.042
+    0.04
    ]
   },
-  "share_paid_spearman_analogs": 0.221
+  "share_paid_spearman_analogs": 0.221,
+  "error_quantiles": {
+   "payout_log10_abs": {
+    "50": 0.2884,
+    "80": 0.5312,
+    "90": 0.6448
+   },
+   "share_paid_abs": {
+    "50": 0.085,
+    "80": 0.18,
+    "90": 0.211
+   }
+  }
+ },
+ "version": 2,
+ "dollars": "constant latest-month dollars (CPI-U)",
+ "decision": {
+  "rule": "forecast only if the primary diff CI lies entirely below 0",
+  "primary_ci_upper": 0.025,
+  "forecast_grade": false
  },
  "reading_guide": "diff_ci95 is analogs minus baseline error: entirely below 0 means analogs are reliably better; straddling 0 means not shown to help."
 }

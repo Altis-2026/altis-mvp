@@ -32,6 +32,7 @@ from typing import Optional
 import numpy as np
 
 LIB_DIR = Path(__file__).resolve().parent.parent / "outputs" / "library"
+BACKTEST_PATH = Path(__file__).resolve().parent.parent / "outputs" / "analog_backtest.json"
 _lock = threading.Lock()
 _cache: dict = {}
 
@@ -96,6 +97,40 @@ def _from_fema(e: dict) -> dict:
         "nfip": n if n.get("n_claims") is not None and "error" not in n else None,
         "states": e.get("states"),
     }
+
+
+def event_rain_mm(lat: float, lon: float, start: Optional[str]) -> Optional[float]:
+    """7-day IMERG rainfall total (mm, 50 km mean) at a point, same definition as
+    pipeline/library/add_rainfall.py. Cached per place and date. None when the
+    date is too recent for the final-run product, outside coverage, or Earth
+    Engine is unavailable: callers then simply skip the rainfall term."""
+    if not start:
+        return None
+    qdir = LIB_DIR / "queries"
+    path = qdir / "rainfall_queries.json"
+    key = f"{lat:.2f},{lon:.2f},{start[:10]}"
+    cache = json.loads(path.read_text()) if path.exists() else {}
+    if key in cache:
+        return cache[key]
+    try:
+        from backend.live_pipeline import init_ee
+        if not init_ee():
+            return None
+        import ee
+        s0 = ee.Date(start[:10])
+        img = (ee.ImageCollection("NASA/GPM_L3/IMERG_V07").select("precipitation")
+               .filterDate(s0, s0.advance(7, "day")).sum().multiply(0.5))
+        v = img.reduceRegion(ee.Reducer.mean(), ee.Geometry.Point([lon, lat]).buffer(50000), 10000,
+                             maxPixels=int(1e9)).get("precipitation").getInfo()
+    except Exception as e:  # noqa: BLE001 — optional enrichment
+        print(f"  [library] rainfall lookup failed: {e}")
+        return None
+    if v is None or v <= 0:
+        return None          # too recent / no data: do not cache, may exist later
+    qdir.mkdir(parents=True, exist_ok=True)
+    cache[key] = round(float(v), 1)
+    path.write_text(json.dumps(cache))
+    return cache[key]
 
 
 def _cpi_table() -> dict:
@@ -282,13 +317,54 @@ def priors_from(analogs: list[dict]) -> Optional[dict]:
                 return v
         return vals[-1][0]
 
-    return {"based_on": len(rows), "events": [a["name"] for a in rows],
+    out = {"based_on": len(rows), "events": [a["name"] for a in rows],
             "median_paid_per_claim_usd": wmed("median_paid_usd_real") or wmed("median_paid_usd"),
             "dollars": "constant (latest-month) US dollars, CPI-U adjusted" if wmed("median_paid_usd_real") else "nominal",
             "share_of_claims_paid": wmed("share_paid"),
             "median_water_depth_in": wmed("median_water_depth_in"),
             "median_flood_duration_h": wmed("median_flood_duration_h"),
             "source": "OpenFEMA NFIP claims in the analog events (similarity-weighted medians)"}
+    out.update(_with_backtest(out))
+    return out
+
+
+def backtest_summary() -> Optional[dict]:
+    """What the leave-one-out backtest (validation/analog_backtest.py) says about
+    how far off analog estimates were, and whether they are forecast-grade."""
+    try:
+        b = json.loads(BACKTEST_PATH.read_text())
+        full = b["full"]
+        q = full["error_quantiles"]
+        return {
+            "n_events": full["n_events"],
+            "forecast_grade": bool(b["decision"]["forecast_grade"]),
+            "payout_typical_factor": round(10 ** q["payout_log10_abs"]["50"], 2),
+            "payout_80pct_factor": round(10 ** q["payout_log10_abs"]["80"], 2),
+            "baseline_typical_factor": round(10 ** full["payout_median_abs_err_log10"]["baseline"], 2),
+            "share_paid_typical_abs": q["share_paid_abs"]["50"],
+            "share_paid_80pct_abs": q["share_paid_abs"]["80"],
+            "diff_ci95_log10": full["payout_median_abs_err_log10"]["diff_ci95"],
+        }
+    except (OSError, KeyError, ValueError):
+        return None
+
+
+def _with_backtest(pr: dict) -> dict:
+    """Attach the measured error band so an estimate never appears without it."""
+    bt = backtest_summary()
+    if not bt:
+        return {"backtest": None}
+    pay = pr.get("median_paid_per_claim_usd")
+    share = pr.get("share_of_claims_paid")
+    band = {}
+    if pay:
+        f = bt["payout_80pct_factor"]
+        band["payout_range_80pct_usd"] = [round(pay / f), round(pay * f)]
+    if share is not None:
+        w = bt["share_paid_80pct_abs"]
+        band["share_paid_range_80pct"] = [round(max(0.0, share - w), 3), round(min(1.0, share + w), 3)]
+    return {"backtest": bt, **band}
+
 
 
 def record_altis_run(name: str, lat: float, lon: float, event_date: Optional[str], cause: Optional[str],

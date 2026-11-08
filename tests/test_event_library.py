@@ -64,3 +64,29 @@ def test_commercial_mode_drops_non_commercial_sources(lib, monkeypatch):
     el._cache.clear()
     assert not any(r["source"] == "gfd" for r in el.load_library())
     assert el.library_stats()["commercial_sources_only"] is True
+
+
+def test_constant_dollar_priors_and_error_band(lib, tmp_path, monkeypatch):
+    (lib / "cpi_u.csv").write_text("observation_date,CPIAUCSL\n2008-09-01,100.0\n2026-09-01,200.0\n")
+    bt = tmp_path / "bt.json"
+    bt.write_text(json.dumps({"full": {"n_events": 10, "payout_median_abs_err_log10": {"baseline": 0.3, "diff_ci95": [-0.1, 0.05]},
+                                       "error_quantiles": {"payout_log10_abs": {"50": 0.2, "80": 0.4, "90": 0.5},
+                                                           "share_paid_abs": {"50": 0.05, "80": 0.1, "90": 0.15}}},
+                              "decision": {"forecast_grade": False}}))
+    monkeypatch.setattr(el, "BACKTEST_PATH", bt)
+    el._cache.clear()
+    r = el.find_analogs(29.75, -95.5, "2017-08-27", "hurricane", k=3)
+    pr = r["priors"]
+    assert pr["median_paid_per_claim_usd"] == 40000          # 20,000 in 2008 dollars x 2.0
+    assert pr["backtest"]["forecast_grade"] is False
+    lo, hi = pr["payout_range_80pct_usd"]
+    assert lo < 40000 < hi and abs(hi / 40000 - 10 ** 0.4) < 0.01
+    assert pr["share_paid_range_80pct"] == [0.7, 0.9]
+
+
+def test_rainfall_term_prefers_similar_storms(lib):
+    (lib / "rainfall.json").write_text(json.dumps({"gfd-1": 600.0, "gfd-3": 50.0}))
+    el._cache.clear()
+    a = el.find_analogs(29.7, -95.55, "2017-06-01", "heavy rain", k=3, rain_mm=580)
+    top = {x["id"]: x for x in a["analogs"]}
+    assert top["gfd-1"]["similarity"] > top["gfd-3"]["similarity"] or any("rainfall" in w for w in top["gfd-1"]["why"])

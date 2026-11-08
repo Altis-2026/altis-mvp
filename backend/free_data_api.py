@@ -106,25 +106,32 @@ def event_gauges(event_id: str):
 # ── Flood event library: historical analogs ──────────────────────────────────
 
 EVENT_CAUSE = {"harvey": "hurricane", "brazos": "hurricane", "lismore": "heavy rain"}
+# The library and the backtest date events by when the STORM began (FEMA incident start),
+# not by when the radar analysis window opens (ev["event_date"], days later). Rainfall and
+# season must be computed from the storm start or the wettest days fall outside the window.
+EVENT_STORM_START = {"harvey": "2017-08-23", "brazos": "2017-08-23", "lismore": "2022-02-23"}
 
 
 @router.get("/analogs")
 def analogs(lat: float = Query(..., ge=-90, le=90), lon: float = Query(..., ge=-180, le=180),
-            date: Optional[str] = None, cause: Optional[str] = None,
+            date: Optional[str] = Query(None, description="when the storm/flood BEGAN (not the radar window)"), cause: Optional[str] = None,
             flooded_km2: Optional[float] = None, duration_days: Optional[float] = None,
             k: int = Query(8, ge=1, le=25)):
     """Most similar past floods, with their real outcomes where known."""
-    from backend.event_library import find_analogs
-    return find_analogs(lat, lon, date, cause, flooded_km2, duration_days, k=k)
+    from backend.event_library import find_analogs, event_rain_mm
+    return find_analogs(lat, lon, date, cause, flooded_km2, duration_days, k=k,
+                        rain_mm=event_rain_mm(lat, lon, date))
 
 
 @router.get("/events/{event_id}/analogs")
 def event_analogs(event_id: str, k: int = Query(8, ge=1, le=25)):
-    from backend.event_library import find_analogs
+    from backend.event_library import find_analogs, event_rain_mm
     ev = EVENTS.get(event_id)
     if not ev:
         raise HTTPException(404, f"Unknown event '{event_id}'.")
-    return find_analogs(ev["lat"], ev["lon"], ev["event_date"], EVENT_CAUSE.get(event_id), k=k)
+    start = EVENT_STORM_START.get(event_id, ev["event_date"])
+    return find_analogs(ev["lat"], ev["lon"], start, EVENT_CAUSE.get(event_id), k=k,
+                        rain_mm=event_rain_mm(ev["lat"], ev["lon"], start))
 
 
 @router.get("/library/stats")

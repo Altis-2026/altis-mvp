@@ -40,14 +40,33 @@ export default function AnalogsCard({ eventId, lat, lon, date, cause }) {
                           border: '1px solid rgba(168,212,230,0.18)', marginBottom: 10 }}>
               <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', marginBottom: 6 }}>
                 What insured claims looked like in the {pr.based_on} closest analogs with NFIP data
+                {pr.dollars?.startsWith('constant') ? ' (today’s dollars)' : ''}
               </div>
               <Stat label="Median payout per claim" value={money(pr.median_paid_per_claim_usd)} />
+              {pr.payout_range_80pct_usd && (
+                <Stat label="Past estimates like this landed within"
+                      value={`${money(pr.payout_range_80pct_usd[0])} – ${money(pr.payout_range_80pct_usd[1])}`} />
+              )}
               <Stat label="Share of claims paid"
                     value={pr.share_of_claims_paid != null ? `${Math.round(pr.share_of_claims_paid * 100)}%` : '—'} />
+              {pr.share_paid_range_80pct && (
+                <Stat label="Past estimates landed within"
+                      value={`${Math.round(pr.share_paid_range_80pct[0] * 100)}% – ${Math.round(pr.share_paid_range_80pct[1] * 100)}%`} />
+              )}
               <Stat label="Median water in building"
                     value={pr.median_water_depth_in != null ? `${pr.median_water_depth_in} in` : '—'} />
               <Stat label="Median flood duration"
                     value={pr.median_flood_duration_h != null ? `${pr.median_flood_duration_h} h` : '—'} />
+              {pr.backtest && (
+                <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.45 }}>
+                  Backtested on {pr.backtest.n_events} past US floods: the payout estimate was typically off by
+                  about {pr.backtest.payout_typical_factor}× (a national-average guess: {pr.backtest.baseline_typical_factor}×),
+                  and 80% of the time within {pr.backtest.payout_80pct_factor}×.{' '}
+                  {pr.backtest.forecast_grade
+                    ? 'This beat the national-average guess with statistical confidence.'
+                    : 'The improvement over the national average is not statistically established yet, so treat this as history, not a forecast.'}
+                </div>
+              )}
             </div>
           )}
           {shown.map(a => (
