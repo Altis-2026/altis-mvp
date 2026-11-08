@@ -35,6 +35,7 @@ Flood Database from the event library.
 ## Part B. Next, in priority order (all free)
 
 ### B1. A clean third-event test of the gauge method (highest priority)
+- **Status (2026-11-08): DONE, PASSED** the pre-registered criteria on Hurricane Florence (`docs/PREREG_GAUGE_FLORENCE.md`): within the 3 km product rule, water found at 130/221 sites (59%, CI 52-65%), bias +1.0 ft. Depth magnitude skill is weak at 3 km (r = 0.04) and moderate within 1 km (r = 0.32). **Follow-ups:** (a) show depth as a band or 'water reached here' beyond 1 km; (b) run radar on a Florence sub-area for a head-to-head; (c) test a slope-aware WSE (water surface falls away from the channel across the floodplain) to fix the distance-growing overestimate, pre-registered on a fourth event.
 - **Why:** gauge depth is the first method in the project to beat radar at surveyed sites, but Harvey was used to fix a bug, so only Brazos is a clean test. One more independent event decides whether this is a product feature or a Texas coincidence.
 - **How:** pick a riverine US event with many USGS high-water marks and NWS gauges with NAVD88 datums, chosen *before* looking at results. Candidates: Hurricane Florence 2018 (NC rivers), 2016 Louisiana floods (Amite/Comite), Hurricane Ida 2021 (NJ/PA rivers), 2019 Missouri/Nebraska floods. Run `validation/gauge_depth_check.py` unchanged (add an `EVENTS` entry only), then `validation/hwm_check.py` for the radar comparison.
 - **Ships if:** gauge recall beats radar recall with non-overlapping 95% CIs, and depth bias is within ±1.5 ft.

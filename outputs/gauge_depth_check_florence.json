@@ -1,0 +1,7133 @@
+{
+ "event": "florence",
+ "method": "gauge crest WSE (NWPS/NWIS, NAVD88) interpolated along each gauged NLDI main-stem channel (nearest channel per point), minus USGS 3DEP 1 m ground",
+ "ground_truth": "USGS STN high water marks, height_above_gnd (zero-height marks dropped)",
+ "rivers_used": [
+  {
+   "name": "Abbotts Creek",
+   "gauges": [
+    {
+     "lid": "ABBN7",
+     "name": "Abbotts Creek near Lexington",
+     "peak_stage_ft": 18.83,
+     "peak_time": "2018-09-17T18:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 637.09
+    }
+   ]
+  },
+  {
+   "name": "Waccamaw River",
+   "gauges": [
+    {
+     "lid": "ACWS1",
+     "name": "Waccamaw River above Conway",
+     "peak_stage_ft": 19.82,
+     "peak_time": "2018-09-24T01:45:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 19.82
+    },
+    {
+     "lid": "BUCS1",
+     "name": "Waccamaw River near Bucksport",
+     "peak_stage_ft": 26.67,
+     "peak_time": "2018-09-27T21:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 11.04
+    },
+    {
+     "lid": "CNWS1",
+     "name": "Waccamaw River near Conway",
+     "peak_stage_ft": 21.16,
+     "peak_time": "2018-09-26T04:45:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 15.02
+    },
+    {
+     "lid": "FREN7",
+     "name": "Waccamaw River at Freeland",
+     "peak_stage_ft": 22.67,
+     "peak_time": "2018-09-20T04:00:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 37.13
+    },
+    {
+     "lid": "HAGS1",
+     "name": "Waccamaw River at Hagley Landing",
+     "peak_stage_ft": 20.38,
+     "peak_time": "2018-09-30T18:15:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 4.7
+    }
+   ]
+  },
+  {
+   "name": "Crabtree Creek",
+   "gauges": [
+    {
+     "lid": "ADRN7",
+     "name": "Crabtree Creek at Anderson Drive",
+     "peak_stage_ft": 13.0,
+     "peak_time": "2018-09-15T15:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 199.5
+    },
+    {
+     "lid": "CRBN7",
+     "name": "Crabtree Creek at Capitol Blvd (US Rt 1)",
+     "peak_stage_ft": 10.5,
+     "peak_time": "2018-09-15T14:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 192.86
+    },
+    {
+     "lid": "EBNN7",
+     "name": "Crabtree Creek at Ebenezer Church Rd",
+     "peak_stage_ft": 11.71,
+     "peak_time": "2018-09-17T09:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 235.61
+    }
+   ]
+  },
+  {
+   "name": "Black River",
+   "gauges": [
+    {
+     "lid": "ADRS1",
+     "name": "Black River near Andrews",
+     "peak_stage_ft": 22.57,
+     "peak_time": "2018-09-23T14:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 5.34
+    },
+    {
+     "lid": "BRPS1",
+     "name": "Black River near  Plantersville",
+     "peak_stage_ft": 15.7,
+     "peak_time": "2018-09-16T21:45:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 3.64
+    },
+    {
+     "lid": "BRRS1",
+     "name": "Black River at SC Highway 51 near Rhems",
+     "peak_stage_ft": 14.65,
+     "peak_time": "2018-09-16T00:15:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 3.98
+    },
+    {
+     "lid": "KINS1",
+     "name": "Black River at Kingstree",
+     "peak_stage_ft": 10.4,
+     "peak_time": "2018-09-20T01:45:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 34.88
+    }
+   ]
+  },
+  {
+   "name": "South Anna River",
+   "gauges": [
+    {
+     "lid": "AHLV2",
+     "name": "South Anna River near Ashland",
+     "peak_stage_ft": 11.71,
+     "peak_time": "2018-09-21T17:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 94.41
+    }
+   ]
+  },
+  {
+   "name": "Ahoskie Creek",
+   "gauges": [
+    {
+     "lid": "AHSN7",
+     "name": "Ahoskie Creek at Ahoskie",
+     "peak_stage_ft": 6.31,
+     "peak_time": "2018-09-17T01:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 22.61
+    }
+   ]
+  },
+  {
+   "name": "Greenbrier River",
+   "gauges": [
+    {
+     "lid": "ALDW2",
+     "name": "Greenbrier River at Alderson",
+     "peak_stage_ft": 12.81,
+     "peak_time": "2018-09-28T18:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 1541.81
+    },
+    {
+     "lid": "BUCW2",
+     "name": "Greenbrier River at Buckeye",
+     "peak_stage_ft": 10.27,
+     "peak_time": "2018-09-28T06:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 2095.97
+    },
+    {
+     "lid": "DRBW2",
+     "name": "Greenbrier River at Durbin",
+     "peak_stage_ft": 5.29,
+     "peak_time": "2018-09-28T03:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 2704.71
+    },
+    {
+     "lid": "HLLW2",
+     "name": "Greenbrier River at Hilldale",
+     "peak_stage_ft": 16.2,
+     "peak_time": "2018-09-28T23:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 1404.56
+    }
+   ]
+  },
+  {
+   "name": "Allen Creek",
+   "gauges": [
+    {
+     "lid": "ALKV2",
+     "name": "Allen Creek at BOYDTON-ALLEN CREEK",
+     "peak_stage_ft": 19.08,
+     "peak_time": "2018-09-17T22:15:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 234.59
+    }
+   ]
+  },
+  {
+   "name": "New River",
+   "gauges": [
+    {
+     "lid": "ALSV2",
+     "name": "New River at Allisonia",
+     "peak_stage_ft": 11.52,
+     "peak_time": "2018-09-17T19:15:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1859.68
+    },
+    {
+     "lid": "GLLV2",
+     "name": "New River at Glen Lyn",
+     "peak_stage_ft": 13.42,
+     "peak_time": "2018-09-18T00:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 1503.15
+    },
+    {
+     "lid": "GUMN7",
+     "name": "New River near Gum Branch",
+     "peak_stage_ft": 25.76,
+     "peak_time": "2018-09-15T15:15:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 24.36
+    },
+    {
+     "lid": "HINW2",
+     "name": "New River at Hinton",
+     "peak_stage_ft": 8.24,
+     "peak_time": "2018-09-28T22:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1363.06
+    }
+   ]
+  },
+  {
+   "name": "Roanoke River",
+   "gauges": [
+    {
+     "lid": "ALTV2",
+     "name": "Roanoke River at Altavista",
+     "peak_stage_ft": 16.6,
+     "peak_time": "2018-09-23T08:15:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 518.87
+    },
+    {
+     "lid": "GNVV2",
+     "name": "Roanoke River at Glenvar",
+     "peak_stage_ft": 13.43,
+     "peak_time": "2018-09-17T17:15:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1077.27
+    },
+    {
+     "lid": "HFXN7",
+     "name": "Roanoke River at Halifax",
+     "peak_stage_ft": 42.45,
+     "peak_time": "2018-10-03T06:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 41.45
+    },
+    {
+     "lid": "HMLN7",
+     "name": "Roanoke River at Hamilton",
+     "peak_stage_ft": 17.68,
+     "peak_time": "2018-10-05T20:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 16.58
+    },
+    {
+     "lid": "JAMN7",
+     "name": "Roanoke River at Jamesville",
+     "peak_stage_ft": 4.04,
+     "peak_time": "2018-09-14T08:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 3.04
+    },
+    {
+     "lid": "LAAV2",
+     "name": "Roanoke River at Lafayette",
+     "peak_stage_ft": 10.26,
+     "peak_time": "2018-09-17T15:50:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1184.14
+    }
+   ]
+  },
+  {
+   "name": "Swift Creek",
+   "gauges": [
+    {
+     "lid": "APSN7",
+     "name": "Swift Creek near Apex",
+     "peak_stage_ft": 8.56,
+     "peak_time": "2018-09-17T12:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 299.93
+    }
+   ]
+  },
+  {
+   "name": "Ararat River",
+   "gauges": [
+    {
+     "lid": "ARRN7",
+     "name": "Ararat River at Ararat",
+     "peak_stage_ft": 8.78,
+     "peak_time": "2018-09-17T07:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 889.4
+    }
+   ]
+  },
+  {
+   "name": "Slate River",
+   "gauges": [
+    {
+     "lid": "ARVV2",
+     "name": "Slate River near Arvonia",
+     "peak_stage_ft": 11.26,
+     "peak_time": "2018-09-18T02:00:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 250.04
+    }
+   ]
+  },
+  {
+   "name": "Walker Creek",
+   "gauges": [
+    {
+     "lid": "BANV2",
+     "name": "Walker Creek at Bane",
+     "peak_stage_ft": 8.52,
+     "peak_time": "2018-09-28T11:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1674.0
+    }
+   ]
+  },
+  {
+   "name": "Smith River",
+   "gauges": [
+    {
+     "lid": "BASV2",
+     "name": "Smith River at Bassett",
+     "peak_stage_ft": 5.58,
+     "peak_time": "2018-09-23T06:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 757.86
+    },
+    {
+     "lid": "EDSN7",
+     "name": "Smith River at Eden",
+     "peak_stage_ft": 11.88,
+     "peak_time": "2018-09-17T16:45:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 550.68
+    }
+   ]
+  },
+  {
+   "name": "Back Creek",
+   "gauges": [
+    {
+     "lid": "BCKV2",
+     "name": "Back Creek near Dundee",
+     "peak_stage_ft": 12.38,
+     "peak_time": "2018-09-17T00:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 834.48
+    },
+    {
+     "lid": "BKCN7",
+     "name": "Back Creek at Caldwell Rd near Harrisburg",
+     "peak_stage_ft": 9.29,
+     "peak_time": "2018-09-16T18:15:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 600.42
+    }
+   ]
+  },
+  {
+   "name": "Briar Creek",
+   "gauges": [
+    {
+     "lid": "BCLN7",
+     "name": "Briar Creek at Colony Road",
+     "peak_stage_ft": 12.15,
+     "peak_time": "2018-09-16T12:35:00.000-04:00",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 610.17
+    },
+    {
+     "lid": "BRIN7",
+     "name": "Briar Creek below Edward's Branch",
+     "peak_stage_ft": 11.6,
+     "peak_time": "2018-09-16T19:10:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 639.12
+    },
+    {
+     "lid": "BRPN7",
+     "name": "Briar Creek at Providence road",
+     "peak_stage_ft": 12.71,
+     "peak_time": "2018-09-16T00:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 620.23
+    }
+   ]
+  },
+  {
+   "name": "Buck Creek",
+   "gauges": [
+    {
+     "lid": "BCLS1",
+     "name": "Buck Creek near Longs",
+     "peak_stage_ft": 19.77,
+     "peak_time": "2018-09-21T14:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 25.07
+    }
+   ]
+  },
+  {
+   "name": "North Buffalo Creek",
+   "gauges": [
+    {
+     "lid": "BCMN7",
+     "name": "North Buffalo Creek at SR2819 near McCleansville",
+     "peak_stage_ft": 21.45,
+     "peak_time": "2018-09-17T14:30:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 668.94
+    }
+   ]
+  },
+  {
+   "name": "Buffalo Creek (SC)",
+   "gauges": [
+    {
+     "lid": "BCPS1",
+     "name": "Buffalo Creek (SC) near Mt. Pisgah",
+     "peak_stage_ft": 8.48,
+     "peak_time": "2018-09-16T15:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 357.98
+    }
+   ]
+  },
+  {
+   "name": "Black Creek (SC)",
+   "gauges": [
+    {
+     "lid": "BCRS1",
+     "name": "Black Creek (SC) near Quinby",
+     "peak_stage_ft": 17.36,
+     "peak_time": "2018-09-18T02:00:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 74.82
+    },
+    {
+     "lid": "CSFS1",
+     "name": "Black Creek (SC) below Chesterfield",
+     "peak_stage_ft": 11.99,
+     "peak_time": "2018-09-17T11:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 309.31
+    },
+    {
+     "lid": "HTSS1",
+     "name": "Black Creek (SC) above Hartsville",
+     "peak_stage_ft": 12.22,
+     "peak_time": "2018-09-18T18:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 188.85
+    }
+   ]
+  },
+  {
+   "name": "Jackson River",
+   "gauges": [
+    {
+     "lid": "BCVV2",
+     "name": "Jackson River near Bacova",
+     "peak_stage_ft": 10.0,
+     "peak_time": "2018-09-28T03:45:00.000-04:00",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1649.07
+    },
+    {
+     "lid": "CVGV2",
+     "name": "Jackson River at Covington",
+     "peak_stage_ft": 11.24,
+     "peak_time": "2018-09-28T04:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1217.18
+    }
+   ]
+  },
+  {
+   "name": "James River (VA)",
+   "gauges": [
+    {
+     "lid": "BECV2",
+     "name": "James River (VA) at Bent Creek",
+     "peak_stage_ft": 13.83,
+     "peak_time": "2018-09-29T04:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 394.24
+    },
+    {
+     "lid": "CARV2",
+     "name": "James River (VA) at Cartersville",
+     "peak_stage_ft": 20.02,
+     "peak_time": "2018-09-18T12:15:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 187.12
+    },
+    {
+     "lid": "FTMV2",
+     "name": "James River (VA) at Fort Monroe (IN MLLW)",
+     "peak_stage_ft": 4.59,
+     "peak_time": "2018-09-13T23:18:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 2.89
+    },
+    {
+     "lid": "HRKV2",
+     "name": "James River (VA) at Holcomb Rock",
+     "peak_stage_ft": 20.06,
+     "peak_time": "2018-09-28T20:15:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 567.89
+    },
+    {
+     "lid": "JRKV2",
+     "name": "James River (VA) at KANAWHA CANAL near Richmond",
+     "peak_stage_ft": 11.1,
+     "peak_time": "2018-09-17T19:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 116.2
+    },
+    {
+     "lid": "LIRV2",
+     "name": "James River (VA) at Lick Run",
+     "peak_stage_ft": 17.2,
+     "peak_time": "2018-09-28T09:30:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 994.83
+    }
+   ]
+  },
+  {
+   "name": "Pee Dee River",
+   "gauges": [
+    {
+     "lid": "BENS1",
+     "name": "Pee Dee River near Bennettsville",
+     "peak_stage_ft": 92.92,
+     "peak_time": "2018-09-18T18:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 91.98
+    },
+    {
+     "lid": "CHES1",
+     "name": "Pee Dee River at Cheraw",
+     "peak_stage_ft": 46.6,
+     "peak_time": "2018-09-18T07:15:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 102.62
+    }
+   ]
+  },
+  {
+   "name": "Buffalo Creek (VA)",
+   "gauges": [
+    {
+     "lid": "BFCV2",
+     "name": "Buffalo Creek (VA) near HAMPDEN SYDNEY",
+     "peak_stage_ft": 7.3,
+     "peak_time": "2018-09-18T00:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 346.1
+    }
+   ]
+  },
+  {
+   "name": "Big Swamp",
+   "gauges": [
+    {
+     "lid": "BGSN7",
+     "name": "Big Swamp near Tarheel",
+     "peak_stage_ft": 17.25,
+     "peak_time": "2018-09-17T12:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 116.45
+    }
+   ]
+  },
+  {
+   "name": "N.E. Cape Fear River",
+   "gauges": [
+    {
+     "lid": "BGWN7",
+     "name": "N.E. Cape Fear River near Burgaw",
+     "peak_stage_ft": 25.58,
+     "peak_time": "2018-09-19T16:30:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 24.61
+    },
+    {
+     "lid": "CHIN7",
+     "name": "N.E. Cape Fear River near Chinquapin",
+     "peak_stage_ft": 25.77,
+     "peak_time": "2018-09-17T00:00:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 42.07
+    }
+   ]
+  },
+  {
+   "name": "Lynches River",
+   "gauges": [
+    {
+     "lid": "BISS1",
+     "name": "Lynches River above Bishopville",
+     "peak_stage_ft": 18.22,
+     "peak_time": "2018-09-19T01:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 173.13
+    },
+    {
+     "lid": "EFFS1",
+     "name": "Lynches River at Effingham",
+     "peak_stage_ft": 16.81,
+     "peak_time": "2018-09-22T20:00:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 74.2
+    }
+   ]
+  },
+  {
+   "name": "Back Creek (Bath Co. VA)",
+   "gauges": [
+    {
+     "lid": "BKCV2",
+     "name": "Back Creek (Bath Co. VA) near Mountain Grove",
+     "peak_stage_ft": 6.9,
+     "peak_time": "2018-09-28T04:30:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 1708.23
+    },
+    {
+     "lid": "BKSV2",
+     "name": "Back Creek (Bath Co. VA) near Sunrise (abv PSS)",
+     "peak_stage_ft": 6.46,
+     "peak_time": "2018-09-28T03:00:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 2206.27
+    }
+   ]
+  },
+  {
+   "name": "Walnut Creek (NC)",
+   "gauges": [
+    {
+     "lid": "BKJN7",
+     "name": "Walnut Creek (NC) at Buck Jones Road",
+     "peak_stage_ft": 6.59,
+     "peak_time": "2018-09-16T13:10:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 375.09
+    }
+   ]
+  },
+  {
+   "name": "North River",
+   "gauges": [
+    {
+     "lid": "BKTV2",
+     "name": "North River near Burketown",
+     "peak_stage_ft": 17.61,
+     "peak_time": "2018-09-17T23:30:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1120.51
+    }
+   ]
+  },
+  {
+   "name": "Blackwater River",
+   "gauges": [
+    {
+     "lid": "BLAV2",
+     "name": "Blackwater River near Rocky Mount",
+     "peak_stage_ft": 12.59,
+     "peak_time": "2018-09-17T13:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 888.55
+    }
+   ]
+  },
+  {
+   "name": "Mattaponi River",
+   "gauges": [
+    {
+     "lid": "BLHV2",
+     "name": "Mattaponi River near Beulahville",
+     "peak_stage_ft": 9.34,
+     "peak_time": "2018-09-29T02:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 20.81
+    },
+    {
+     "lid": "BWLV2",
+     "name": "Mattaponi River at Bowling Green",
+     "peak_stage_ft": 6.72,
+     "peak_time": "2018-09-20T13:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 91.05
+    }
+   ]
+  },
+  {
+   "name": "Black River (SC)",
+   "gauges": [
+    {
+     "lid": "BLIS1",
+     "name": "Black River (SC) at I-95 near Manning",
+     "peak_stage_ft": 15.76,
+     "peak_time": "2018-09-21T08:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 83.8
+    }
+   ]
+  },
+  {
+   "name": "Flat River",
+   "gauges": [
+    {
+     "lid": "BMAN7",
+     "name": "Flat River at Bahama",
+     "peak_stage_ft": 12.28,
+     "peak_time": "2018-09-17T22:45:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 358.08
+    }
+   ]
+  },
+  {
+   "name": "Knap of the Reeds Creek",
+   "gauges": [
+    {
+     "lid": "BNRN7",
+     "name": "Knap of the Reeds Creek near Butner, NC",
+     "peak_stage_ft": 9.94,
+     "peak_time": "2018-09-17T00:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 264.5
+    }
+   ]
+  },
+  {
+   "name": "Bolin Creek",
+   "gauges": [
+    {
+     "lid": "BOCN7",
+     "name": "Bolin Creek at Village Drive",
+     "peak_stage_ft": 10.41,
+     "peak_time": "2018-09-17T12:15:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 344.35
+    }
+   ]
+  },
+  {
+   "name": "Bullpasture River",
+   "gauges": [
+    {
+     "lid": "BPRV2",
+     "name": "Bullpasture River at Williamsville",
+     "peak_stage_ft": 7.06,
+     "peak_time": "2018-09-28T01:45:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 1617.06
+    }
+   ]
+  },
+  {
+   "name": "N Second Creek",
+   "gauges": [
+    {
+     "lid": "BRBN7",
+     "name": "N Second Creek above Statesville Blvd (US 70) 4 S Woodleaf",
+     "peak_stage_ft": 15.87,
+     "peak_time": "2018-09-17T17:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 658.4
+    }
+   ]
+  },
+  {
+   "name": "Lumber River",
+   "gauges": [
+    {
+     "lid": "BRDN7",
+     "name": "Lumber River at Boardman",
+     "peak_stage_ft": 14.36,
+     "peak_time": "2018-09-18T20:15:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 85.49
+    }
+   ]
+  },
+  {
+   "name": "Brush Creek",
+   "gauges": [
+    {
+     "lid": "BRSN7",
+     "name": "Brush Creek at Muirfield Rd in Greensboro",
+     "peak_stage_ft": 11.08,
+     "peak_time": "2018-09-17T06:45:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 789.78
+    }
+   ]
+  },
+  {
+   "name": "Meherrin River",
+   "gauges": [
+    {
+     "lid": "BRTV2",
+     "name": "Meherrin River near BRYANTS CORNER",
+     "peak_stage_ft": 15.42,
+     "peak_time": "2018-09-22T12:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 44.94
+    },
+    {
+     "lid": "EPOV2",
+     "name": "Meherrin River at Emporia",
+     "peak_stage_ft": 21.0,
+     "peak_time": "2018-09-20T09:30:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 87.01
+    },
+    {
+     "lid": "LAWV2",
+     "name": "Meherrin River near Lawrenceville",
+     "peak_stage_ft": 22.37,
+     "peak_time": "2018-09-19T14:30:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 157.77
+    }
+   ]
+  },
+  {
+   "name": "Big Shoe Heel Creek",
+   "gauges": [
+    {
+     "lid": "BSHN7",
+     "name": "Big Shoe Heel Creek near Laurinburg",
+     "peak_stage_ft": 9.49,
+     "peak_time": "2018-09-17T16:15:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 170.59
+    }
+   ]
+  },
+  {
+   "name": "Mayo Creek",
+   "gauges": [
+    {
+     "lid": "BTHN7",
+     "name": "Mayo Creek at Bethel Hill",
+     "peak_stage_ft": 7.73,
+     "peak_time": "2018-09-17T21:00:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 345.63
+    }
+   ]
+  },
+  {
+   "name": "Buckhorn Creek (NC)",
+   "gauges": [
+    {
+     "lid": "BUCN7",
+     "name": "Buckhorn Creek (NC) near Corinth",
+     "peak_stage_ft": 13.75,
+     "peak_time": "2018-09-17T09:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 167.45
+    }
+   ]
+  },
+  {
+   "name": "Maury River",
+   "gauges": [
+    {
+     "lid": "BVSV2",
+     "name": "Maury River near Buena Vista",
+     "peak_stage_ft": 12.06,
+     "peak_time": "2018-09-28T13:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 857.8
+    }
+   ]
+  },
+  {
+   "name": "Haw River",
+   "gauges": [
+    {
+     "lid": "BYNN7",
+     "name": "Haw River near Bynum",
+     "peak_stage_ft": 17.42,
+     "peak_time": "2018-09-17T00:00:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 299.93
+    },
+    {
+     "lid": "HAWN7",
+     "name": "Haw River at Haw River",
+     "peak_stage_ft": 26.27,
+     "peak_time": "2018-09-17T23:15:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 497.07
+    },
+    {
+     "lid": "HRMN7",
+     "name": "Haw River near Moncure",
+     "peak_stage_ft": 16.92,
+     "peak_time": "2018-09-18T06:00:00.000-04:00",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 172.32
+    }
+   ]
+  },
+  {
+   "name": "Campbell Creek (NC)",
+   "gauges": [
+    {
+     "lid": "CAMN7",
+     "name": "Campbell Creek (NC) at Idlewild road",
+     "peak_stage_ft": 5.29,
+     "peak_time": "2018-09-16T14:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 669.21
+    }
+   ]
+  },
+  {
+   "name": "Cane Creek",
+   "gauges": [
+    {
+     "lid": "CANN7",
+     "name": "Cane Creek near Carrboro",
+     "peak_stage_ft": 5.98,
+     "peak_time": "2018-09-17T09:45:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 513.67
+    }
+   ]
+  },
+  {
+   "name": "Rocky River NC",
+   "gauges": [
+    {
+     "lid": "CCRN7",
+     "name": "Rocky River NC at SR1300 near Crutchfield",
+     "peak_stage_ft": 9.01,
+     "peak_time": "2018-09-17T01:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 620.1
+    },
+    {
+     "lid": "IBFN7",
+     "name": "Rocky River NC near ROCKY RIVER/ ABV IRISH BUFFALO CK",
+     "peak_stage_ft": 23.21,
+     "peak_time": "2018-09-17T09:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 517.47
+    }
+   ]
+  },
+  {
+   "name": "Congaree River",
+   "gauges": [
+    {
+     "lid": "CFMS1",
+     "name": "Congaree River above Fort Motte",
+     "peak_stage_ft": 81.84,
+     "peak_time": "2018-09-17T03:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 81.84
+    }
+   ]
+  },
+  {
+   "name": "Clarke Creek NC",
+   "gauges": [
+    {
+     "lid": "CKCN7",
+     "name": "Clarke Creek NC near HARRISBURG",
+     "peak_stage_ft": 9.97,
+     "peak_time": "2018-09-17T00:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 618.27
+    }
+   ]
+  },
+  {
+   "name": "Chickahominy River",
+   "gauges": [
+    {
+     "lid": "CKHV2",
+     "name": "Chickahominy River near Providence Forge",
+     "peak_stage_ft": 8.66,
+     "peak_time": "2018-09-22T02:30:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 13.43
+    }
+   ]
+  },
+  {
+   "name": "Clear Creek (NC)",
+   "gauges": [
+    {
+     "lid": "CLCN7",
+     "name": "Clear Creek (NC) at SR3181",
+     "peak_stage_ft": 10.02,
+     "peak_time": "2018-09-16T23:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 568.31
+    }
+   ]
+  },
+  {
+   "name": "St. Clement Creek",
+   "gauges": [
+    {
+     "lid": "CLMM2",
+     "name": "St. Clement Creek near Clements",
+     "peak_stage_ft": 2.19,
+     "peak_time": "2018-09-23T14:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 7.64
+    }
+   ]
+  },
+  {
+   "name": "Rapidan River",
+   "gauges": [
+    {
+     "lid": "CLPV2",
+     "name": "Rapidan River near Culpeper",
+     "peak_stage_ft": 9.16,
+     "peak_time": "2018-09-28T14:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 249.46
+    }
+   ]
+  },
+  {
+   "name": "Neuse River",
+   "gauges": [
+    {
+     "lid": "CLYN7",
+     "name": "Neuse River near Clayton",
+     "peak_stage_ft": 10.62,
+     "peak_time": "2018-09-16T06:15:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 138.12
+    },
+    {
+     "lid": "FTBN7",
+     "name": "Neuse River at Fort Barnwell",
+     "peak_stage_ft": 18.0,
+     "peak_time": "2018-09-23T04:30:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 16.6
+    },
+    {
+     "lid": "GLDN7",
+     "name": "Neuse River near Goldsboro",
+     "peak_stage_ft": 27.6,
+     "peak_time": "2018-09-19T04:00:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 69.5
+    },
+    {
+     "lid": "KINN7",
+     "name": "Neuse River at Kinston",
+     "peak_stage_ft": 25.78,
+     "peak_time": "2018-09-21T23:15:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 35.48
+    }
+   ]
+  },
+  {
+   "name": "Wateree River",
+   "gauges": [
+    {
+     "lid": "CMDS1",
+     "name": "Wateree River near Camden",
+     "peak_stage_ft": 17.04,
+     "peak_time": "2018-09-16T17:00:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 131.54
+    }
+   ]
+  },
+  {
+   "name": "Coddle Creek",
+   "gauges": [
+    {
+     "lid": "CODN7",
+     "name": "Coddle Creek at SR 1612 NR DAVIDSON",
+     "peak_stage_ft": 13.39,
+     "peak_time": "2018-09-16T21:45:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 668.51
+    }
+   ]
+  },
+  {
+   "name": "Gauley River",
+   "gauges": [
+    {
+     "lid": "COGW2",
+     "name": "Gauley River at Camden-On-Gauley",
+     "peak_stage_ft": 10.32,
+     "peak_time": "2018-09-28T05:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 2013.82
+    },
+    {
+     "lid": "CRAW2",
+     "name": "Gauley River near Craigsville",
+     "peak_stage_ft": 16.54,
+     "peak_time": "2018-09-28T06:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1886.15
+    }
+   ]
+  },
+  {
+   "name": "Cowpasture River",
+   "gauges": [
+    {
+     "lid": "COWV2",
+     "name": "Cowpasture River near Clifton Forge",
+     "peak_stage_ft": 12.0,
+     "peak_time": "2018-09-28T13:15:00.000-04:00",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1019.02
+    }
+   ]
+  },
+  {
+   "name": "Cape Fear River",
+   "gauges": [
+    {
+     "lid": "CPFN7",
+     "name": "Cape Fear River at Lock 1",
+     "peak_stage_ft": 30.68,
+     "peak_time": "2018-09-21T19:45:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 26.68
+    },
+    {
+     "lid": "FAYN7",
+     "name": "Cape Fear River at Fayetteville",
+     "peak_stage_ft": 61.58,
+     "peak_time": "2018-09-19T10:00:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 81.22
+    },
+    {
+     "lid": "LLLN7",
+     "name": "Cape Fear River at Lillington",
+     "peak_stage_ft": 21.27,
+     "peak_time": "2018-09-18T09:00:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 124.9
+    }
+   ]
+  },
+  {
+   "name": "Gar Creek",
+   "gauges": [
+    {
+     "lid": "CRFN7",
+     "name": "Gar Creek at SR 2074 NR CROFT #6531",
+     "peak_stage_ft": 3.9,
+     "peak_time": "2018-09-16T19:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 662.51
+    }
+   ]
+  },
+  {
+   "name": "Craig Creek",
+   "gauges": [
+    {
+     "lid": "CRGV2",
+     "name": "Craig Creek at Parr",
+     "peak_stage_ft": 9.72,
+     "peak_time": "2018-09-28T16:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1001.89
+    }
+   ]
+  },
+  {
+   "name": "Crabtree Swamp",
+   "gauges": [
+    {
+     "lid": "CSCS1",
+     "name": "Crabtree Swamp at Conway",
+     "peak_stage_ft": 25.31,
+     "peak_time": "2018-09-26T04:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 15.98
+    }
+   ]
+  },
+  {
+   "name": "Catawba River",
+   "gauges": [
+    {
+     "lid": "CTBS1",
+     "name": "Catawba River above Catawba",
+     "peak_stage_ft": 16.31,
+     "peak_time": "2018-09-17T00:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 457.34
+    }
+   ]
+  },
+  {
+   "name": "Catawba Creek",
+   "gauges": [
+    {
+     "lid": "CTWV2",
+     "name": "Catawba Creek near Catawba",
+     "peak_stage_ft": 4.78,
+     "peak_time": "2018-09-28T02:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1304.47
+    }
+   ]
+  },
+  {
+   "name": "Cub Creek",
+   "gauges": [
+    {
+     "lid": "CUBV2",
+     "name": "Cub Creek at Phenix",
+     "peak_stage_ft": 8.99,
+     "peak_time": "2018-09-18T12:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 378.39
+    }
+   ]
+  },
+  {
+   "name": "Tinker Creek",
+   "gauges": [
+    {
+     "lid": "DAEV2",
+     "name": "Tinker Creek near Daleville",
+     "peak_stage_ft": 4.58,
+     "peak_time": "2018-09-28T01:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1221.51
+    }
+   ]
+  },
+  {
+   "name": "Little Yadkin River",
+   "gauges": [
+    {
+     "lid": "DALN7",
+     "name": "Little Yadkin River near Dalton",
+     "peak_stage_ft": 7.29,
+     "peak_time": "2018-09-17T01:15:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 821.4
+    }
+   ]
+  },
+  {
+   "name": "Deep Creek",
+   "gauges": [
+    {
+     "lid": "DECV2",
+     "name": "Deep Creek near MANNBORO",
+     "peak_stage_ft": 10.02,
+     "peak_time": "2018-09-18T16:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 187.22
+    }
+   ]
+  },
+  {
+   "name": "Dragon Swamp",
+   "gauges": [
+    {
+     "lid": "DGSV2",
+     "name": "Dragon Swamp near MASCOT",
+     "peak_stage_ft": 5.07,
+     "peak_time": "2018-09-27T01:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 25.37
+    }
+   ]
+  },
+  {
+   "name": "Little Pee Dee River",
+   "gauges": [
+    {
+     "lid": "DLLS1",
+     "name": "Little Pee Dee River near Dillon",
+     "peak_stage_ft": 19.46,
+     "peak_time": "2018-09-18T00:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 93.52
+    },
+    {
+     "lid": "GALS1",
+     "name": "Little Pee Dee River near Galivants Ferry",
+     "peak_stage_ft": 17.21,
+     "peak_time": "2018-09-21T13:30:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 39.55
+    }
+   ]
+  },
+  {
+   "name": "Dunlap Creek",
+   "gauges": [
+    {
+     "lid": "DLPV2",
+     "name": "Dunlap Creek near Covington",
+     "peak_stage_ft": 7.84,
+     "peak_time": "2018-09-28T04:45:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 1302.13
+    }
+   ]
+  },
+  {
+   "name": "Blackwater River (VA)",
+   "gauges": [
+    {
+     "lid": "DNDV2",
+     "name": "Blackwater River (VA) at Dendron",
+     "peak_stage_ft": 33.54,
+     "peak_time": "2018-09-14T00:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 33.54
+    },
+    {
+     "lid": "FKLV2",
+     "name": "Blackwater River (VA) near FRANKLIN",
+     "peak_stage_ft": 2.68,
+     "peak_time": "2018-09-17T18:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 2.68
+    },
+    {
+     "lid": "FKNV2",
+     "name": "Blackwater River (VA) above Franklin",
+     "peak_stage_ft": 6.02,
+     "peak_time": "2018-09-17T13:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 6.02
+    }
+   ]
+  },
+  {
+   "name": "South River",
+   "gauges": [
+    {
+     "lid": "DOOV2",
+     "name": "South River near Dooms",
+     "peak_stage_ft": 12.97,
+     "peak_time": "2018-09-17T18:30:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1258.97
+    },
+    {
+     "lid": "HARV2",
+     "name": "South River at Harriston",
+     "peak_stage_ft": 12.32,
+     "peak_time": "2018-09-17T23:00:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 1141.52
+    }
+   ]
+  },
+  {
+   "name": "North Anna River",
+   "gauges": [
+    {
+     "lid": "DOSV2",
+     "name": "North Anna River at Doswell",
+     "peak_stage_ft": 13.49,
+     "peak_time": "2018-09-19T04:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 48.79
+    },
+    {
+     "lid": "HRCV2",
+     "name": "North Anna River at HART CORNER NR DOSWELL",
+     "peak_stage_ft": 14.61,
+     "peak_time": "2018-09-19T01:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 52.91
+    }
+   ]
+  },
+  {
+   "name": "Dan River",
+   "gauges": [
+    {
+     "lid": "DVLV2",
+     "name": "Dan River at STP near Danville",
+     "peak_stage_ft": 22.96,
+     "peak_time": "2018-09-18T23:30:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 387.6
+    },
+    {
+     "lid": "FRNN7",
+     "name": "Dan River near Francisco",
+     "peak_stage_ft": 11.1,
+     "peak_time": "2018-09-17T07:45:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 842.5
+    }
+   ]
+  },
+  {
+   "name": "Williams River (WV)",
+   "gauges": [
+    {
+     "lid": "DYRW2",
+     "name": "Williams River (WV) at Dyer",
+     "peak_stage_ft": 7.3,
+     "peak_time": "2018-09-28T02:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 2201.2
+    }
+   ]
+  },
+  {
+   "name": "Ellerbe Creek (NC)",
+   "gauges": [
+    {
+     "lid": "ECRN7",
+     "name": "Ellerbe Creek (NC) at Club Blvd in Durham",
+     "peak_stage_ft": 10.11,
+     "peak_time": "2018-09-17T13:15:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 304.91
+    },
+    {
+     "lid": "GORN7",
+     "name": "Ellerbe Creek (NC) near Gorman",
+     "peak_stage_ft": 12.96,
+     "peak_time": "2018-09-17T16:45:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 265.77
+    }
+   ]
+  },
+  {
+   "name": "Fishing Creek",
+   "gauges": [
+    {
+     "lid": "EFDN7",
+     "name": "Fishing Creek near Enfield",
+     "peak_stage_ft": 10.93,
+     "peak_time": "2018-09-18T08:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 84.13
+    }
+   ]
+  },
+  {
+   "name": "Yadkin River",
+   "gauges": [
+    {
+     "lid": "ELKN7",
+     "name": "Yadkin River at Elkin",
+     "peak_stage_ft": 17.74,
+     "peak_time": "2018-09-17T08:15:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 883.42
+    },
+    {
+     "lid": "ENNN7",
+     "name": "Yadkin River at Enon",
+     "peak_stage_ft": 21.65,
+     "peak_time": "2018-09-17T19:30:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 723.05
+    }
+   ]
+  },
+  {
+   "name": "Eno River",
+   "gauges": [
+    {
+     "lid": "ENON7",
+     "name": "Eno River at Durham",
+     "peak_stage_ft": 23.06,
+     "peak_time": "2018-09-17T14:15:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 292.98
+    },
+    {
+     "lid": "HBSN7",
+     "name": "Eno River near Huckleberry Springs",
+     "peak_stage_ft": 14.34,
+     "peak_time": "2018-09-17T15:00:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 354.34
+    },
+    {
+     "lid": "HLSN7",
+     "name": "Eno River at Hillsborough",
+     "peak_stage_ft": 14.86,
+     "peak_time": "2018-09-17T18:45:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 501.56
+    }
+   ]
+  },
+  {
+   "name": "East River",
+   "gauges": [
+    {
+     "lid": "ERVW2",
+     "name": "East River at Willowton",
+     "peak_stage_ft": 7.83,
+     "peak_time": "2018-09-28T00:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1591.63
+    }
+   ]
+  },
+  {
+   "name": "Big Otter River",
+   "gauges": [
+    {
+     "lid": "EVGV2",
+     "name": "Big Otter River near Evington",
+     "peak_stage_ft": 13.43,
+     "peak_time": "2018-09-23T08:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 554.52
+    }
+   ]
+  },
+  {
+   "name": "Rappahannock River",
+   "gauges": [
+    {
+     "lid": "FDBV2",
+     "name": "Rappahannock River above Fredericksburg",
+     "peak_stage_ft": 9.23,
+     "peak_time": "2018-09-28T20:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 72.92
+    }
+   ]
+  },
+  {
+   "name": "Falling River",
+   "gauges": [
+    {
+     "lid": "FLRV2",
+     "name": "Falling River near Naruna",
+     "peak_stage_ft": 7.07,
+     "peak_time": "2018-09-17T16:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 418.67
+    }
+   ]
+  },
+  {
+   "name": "Fourmile Creek (NC)",
+   "gauges": [
+    {
+     "lid": "FMCN7",
+     "name": "Fourmile Creek (NC) at Elm Lane",
+     "peak_stage_ft": 15.87,
+     "peak_time": "2018-09-16T20:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 544.56
+    }
+   ]
+  },
+  {
+   "name": "Fine Creek",
+   "gauges": [
+    {
+     "lid": "FNCV2",
+     "name": "Fine Creek near FINE CREEK MILLS",
+     "peak_stage_ft": 3.0,
+     "peak_time": "2018-09-17T19:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 158.7
+    }
+   ]
+  },
+  {
+   "name": "Appomattox River",
+   "gauges": [
+    {
+     "lid": "FRMV2",
+     "name": "Appomattox River at Farmville",
+     "peak_stage_ft": 15.38,
+     "peak_time": "2018-09-18T13:45:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 296.48
+    }
+   ]
+  },
+  {
+   "name": "Little River",
+   "gauges": [
+    {
+     "lid": "FTHN7",
+     "name": "Little River below Tributary at Fairntosh",
+     "peak_stage_ft": 16.04,
+     "peak_time": "2018-09-17T14:45:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 279.64
+    }
+   ]
+  },
+  {
+   "name": "Aquia Creek",
+   "gauges": [
+    {
+     "lid": "GACV2",
+     "name": "Aquia Creek near Garrisonville",
+     "peak_stage_ft": 4.14,
+     "peak_time": "2018-09-28T06:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 123.82
+    }
+   ]
+  },
+  {
+   "name": "Goose Creek",
+   "gauges": [
+    {
+     "lid": "GCKN7",
+     "name": "Goose Creek at Hwy 1524 nr Indian Trail",
+     "peak_stage_ft": 5.28,
+     "peak_time": "2018-09-16T11:50:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 601.86
+    },
+    {
+     "lid": "HDSV2",
+     "name": "Goose Creek near Huddleston",
+     "peak_stage_ft": 16.5,
+     "peak_time": "2018-09-23T04:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 608.81
+    },
+    {
+     "lid": "INDN7",
+     "name": "Goose Creek at SR1525 nr Indian Trail",
+     "peak_stage_ft": 9.84,
+     "peak_time": "2018-09-16T15:15:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 559.66
+    }
+   ]
+  },
+  {
+   "name": "Reedy Creek",
+   "gauges": [
+    {
+     "lid": "GIBN7",
+     "name": "Reedy Creek near Gibsonville",
+     "peak_stage_ft": 18.51,
+     "peak_time": "2018-09-18T00:00:00Z",
+     "peak_category": "moderate",
+     "peak_wse_navd88_ft": 644.51
+    }
+   ]
+  },
+  {
+   "name": "White Oak Creek",
+   "gauges": [
+    {
+     "lid": "GLVN7",
+     "name": "White Oak Creek at Green Level",
+     "peak_stage_ft": 11.07,
+     "peak_time": "2018-09-17T11:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 247.47
+    }
+   ]
+  },
+  {
+   "name": "St. Marys River",
+   "gauges": [
+    {
+     "lid": "GMRM2",
+     "name": "St. Marys River at Great Mills",
+     "peak_stage_ft": 3.07,
+     "peak_time": "2018-09-23T15:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 9.93
+    }
+   ]
+  },
+  {
+   "name": "Calfpasture River",
+   "gauges": [
+    {
+     "lid": "GOHV2",
+     "name": "Calfpasture River at Goshen",
+     "peak_stage_ft": 10.97,
+     "peak_time": "2018-09-28T10:15:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 1393.23
+    }
+   ]
+  },
+  {
+   "name": "Reed Creek",
+   "gauges": [
+    {
+     "lid": "GRHV2",
+     "name": "Reed Creek at Grahams Forge",
+     "peak_stage_ft": 3.55,
+     "peak_time": "2018-09-28T14:15:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1927.73
+    }
+   ]
+  },
+  {
+   "name": "Middle River",
+   "gauges": [
+    {
+     "lid": "GROV2",
+     "name": "Middle River near Grottoes",
+     "peak_stage_ft": 17.83,
+     "peak_time": "2018-09-18T11:30:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1078.73
+    }
+   ]
+  },
+  {
+   "name": "Little  River",
+   "gauges": [
+    {
+     "lid": "GRYV2",
+     "name": "Little  River at Graysontown",
+     "peak_stage_ft": 8.49,
+     "peak_time": "2018-09-17T20:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 1824.11
+    }
+   ]
+  },
+  {
+   "name": "Banister River",
+   "gauges": [
+    {
+     "lid": "HALV2",
+     "name": "Banister River at Halifax",
+     "peak_stage_ft": 25.46,
+     "peak_time": "2018-09-24T00:00:00Z",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 340.16
+    }
+   ]
+  },
+  {
+   "name": "Harris Creek",
+   "gauges": [
+    {
+     "lid": "HCRV2",
+     "name": "Harris Creek below Route 130 Near Monroe",
+     "peak_stage_ft": 7.96,
+     "peak_time": "2018-09-17T09:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 616.7
+    }
+   ]
+  },
+  {
+   "name": "East Fork of Deep River",
+   "gauges": [
+    {
+     "lid": "HIPN7",
+     "name": "East Fork of Deep River near High Point",
+     "peak_stage_ft": 12.52,
+     "peak_time": "2018-09-17T05:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 771.62
+    }
+   ]
+  },
+  {
+   "name": "Holiday Creek",
+   "gauges": [
+    {
+     "lid": "HLCV2",
+     "name": "Holiday Creek at nr. Andersonville",
+     "peak_stage_ft": 3.64,
+     "peak_time": "2018-09-17T11:00:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 475.74
+    }
+   ]
+  },
+  {
+   "name": "Drowning Creek",
+   "gauges": [
+    {
+     "lid": "HOFN7",
+     "name": "Drowning Creek at Hoffman",
+     "peak_stage_ft": 11.49,
+     "peak_time": "2018-09-17T23:15:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 280.62
+    }
+   ]
+  },
+  {
+   "name": "Contentnea Creek",
+   "gauges": [
+    {
+     "lid": "HOKN7",
+     "name": "Contentnea Creek at Hookerton",
+     "peak_stage_ft": 18.98,
+     "peak_time": "2018-09-20T15:45:00Z",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 33.11
+    }
+   ]
+  },
+  {
+   "name": "Horsepen Creek",
+   "gauges": [
+    {
+     "lid": "HPNN7",
+     "name": "Horsepen Creek at US-220 Near Greensboro",
+     "peak_stage_ft": 11.94,
+     "peak_time": "2018-09-17T06:45:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 752.14
+    }
+   ]
+  },
+  {
+   "name": "Hanging Rock Creek",
+   "gauges": [
+    {
+     "lid": "HRKS1",
+     "name": "Hanging Rock Creek near Kershaw",
+     "peak_stage_ft": 6.55,
+     "peak_time": "2018-09-16T14:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 347.49
+    }
+   ]
+  },
+  {
+   "name": "Birch River",
+   "gauges": [
+    {
+     "lid": "HRLW2",
+     "name": "Birch River at Herold",
+     "peak_stage_ft": 10.7,
+     "peak_time": "2018-09-27T23:00:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 942.4
+    }
+   ]
+  },
+  {
+   "name": "Hunting Creek",
+   "gauges": [
+    {
+     "lid": "HUNN7",
+     "name": "Hunting Creek below E Houstonville Rd. 3 NNE Harmony",
+     "peak_stage_ft": 13.68,
+     "peak_time": "2018-09-17T00:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 747.86
+    }
+   ]
+  },
+  {
+   "name": "Hardware River",
+   "gauges": [
+    {
+     "lid": "HWRV2",
+     "name": "Hardware River below BRIERY RUN NR SCOTTSVILLE",
+     "peak_stage_ft": 14.06,
+     "peak_time": "2018-09-18T00:00:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 309.16
+    }
+   ]
+  },
+  {
+   "name": "Indian Creek (WV)",
+   "gauges": [
+    {
+     "lid": "INCW2",
+     "name": "Indian Creek (WV) at Red Sulphur Springs",
+     "peak_stage_ft": 7.19,
+     "peak_time": "2018-09-28T03:30:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 1525.29
+    }
+   ]
+  },
+  {
+   "name": "South Fork Quantico Creek",
+   "gauges": [
+    {
+     "lid": "INHV2",
+     "name": "South Fork Quantico Creek near Independent Hill",
+     "peak_stage_ft": 6.26,
+     "peak_time": "2018-09-28T07:15:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 244.09
+    }
+   ]
+  },
+  {
+   "name": "Irwin Creek",
+   "gauges": [
+    {
+     "lid": "IRSN7",
+     "name": "Irwin Creek at Statesville Ave, in Lincoln Heights",
+     "peak_stage_ft": 6.65,
+     "peak_time": "2018-09-16T10:25:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 662.69
+    }
+   ]
+  },
+  {
+   "name": "Irvins Creek",
+   "gauges": [
+    {
+     "lid": "ISNN7",
+     "name": "Irvins Creek at Sam Newell Road",
+     "peak_stage_ft": 9.61,
+     "peak_time": "2018-09-16T15:45:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 622.17
+    }
+   ]
+  },
+  {
+   "name": "Santee River",
+   "gauges": [
+    {
+     "lid": "JAMS1",
+     "name": "Santee River near Jamestown",
+     "peak_stage_ft": 10.63,
+     "peak_time": "2018-09-18T00:00:00Z",
+     "peak_category": "minor",
+     "peak_wse_navd88_ft": 9.77
+    }
+   ]
+  },
+  {
+   "name": "Johns Creek",
+   "gauges": [
+    {
+     "lid": "JCRV2",
+     "name": "Johns Creek at New Castle",
+     "peak_stage_ft": 8.51,
+     "peak_time": "2018-09-28T08:30:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 1262.58
+    }
+   ]
+  },
+  {
+   "name": "Kerrs Creek",
+   "gauges": [
+    {
+     "lid": "KCKV2",
+     "name": "Kerrs Creek near Lexington",
+     "peak_stage_ft": 7.48,
+     "peak_time": "2018-09-23T04:00:00.000-04:00",
+     "peak_category": "action",
+     "peak_wse_navd88_ft": 988.28
+    }
+   ]
+  },
+  {
+   "name": "Little Lynches River",
+   "gauges": [
+    {
+     "lid": "KEAS1",
+     "name": "Little Lynches River above Kershaw",
+     "peak_stage_ft": 13.78,
+     "peak_time": "2018-09-16T13:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 369.55
+    },
+    {
+     "lid": "KELS1",
+     "name": "Little Lynches River near Kershaw",
+     "peak_stage_ft": 15.58,
+     "peak_time": "2018-09-16T16:45:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 342.5
+    }
+   ]
+  },
+  {
+   "name": "Little Lick Creek",
+   "gauges": [
+    {
+     "lid": "LCRN7",
+     "name": "Little Lick Creek at Oak Grove",
+     "peak_stage_ft": 9.66,
+     "peak_time": "2018-09-17T11:15:00Z",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 288.18
+    }
+   ]
+  },
+  {
+   "name": "Little Hope Creek",
+   "gauges": [
+    {
+     "lid": "LHCN7",
+     "name": "Little Hope Creek above Seneca Pl, in Madison Park",
+     "peak_stage_ft": 6.99,
+     "peak_time": "2018-09-16T14:50:00.000-04:00",
+     "peak_category": "no_flooding",
+     "peak_wse_navd88_ft": 604.31
+    }
+   ]
+  },
+  {
+   "name": "Little River (North Carolina)",
+   "gauges": [
+    {
+     "lid": "LITN7",
+     "name": "Little River (North Carolina) near Star/Troy",
+     "peak_stage_ft": 28.8,
+     "peak_time": "2018-09-17T05:00:00.000-04:00",
+     "peak_category": "major",
+     "peak_wse_navd88_ft": 436.95
+    }
+   ]
+  }
+ ],
+ "n_marks_total": 496,
+ "ground_source_counts": {
+  "3DEP 1 m": 455,
+  "3DEP 10 m": 41
+ },
+ "prereg": "docs/PREREG_GAUGE_FLORENCE.md",
+ "summaries": [
+  {
+   "label": "within 1 km of channel",
+   "n_marks": 138,
+   "n_sites": 133,
+   "site_recall": 0.6165,
+   "site_recall_detected": 82,
+   "site_recall_ci95": [
+    0.5317,
+    0.6948
+   ],
+   "bias_ft": 0.308,
+   "mae_ft": 2.763,
+   "pearson_r": 0.323,
+   "surveyed_mean_ft": 2.946
+  },
+  {
+   "label": "within 3 km of channel",
+   "n_marks": 233,
+   "n_sites": 221,
+   "site_recall": 0.5882,
+   "site_recall_detected": 130,
+   "site_recall_ci95": [
+    0.5224,
+    0.6511
+   ],
+   "bias_ft": 1.008,
+   "mae_ft": 3.653,
+   "pearson_r": 0.035,
+   "surveyed_mean_ft": 2.838
+  },
+  {
+   "label": "within 5 km of channel",
+   "n_marks": 269,
+   "n_sites": 257,
+   "site_recall": 0.6031,
+   "site_recall_detected": 155,
+   "site_recall_ci95": [
+    0.5422,
+    0.661
+   ],
+   "bias_ft": 2.127,
+   "mae_ft": 4.769,
+   "pearson_r": -0.034,
+   "surveyed_mean_ft": 2.88
+  },
+  {
+   "label": "product rule (<= 3 km of a gauged channel)",
+   "n_marks": 233,
+   "n_sites": 221,
+   "site_recall": 0.5882,
+   "site_recall_detected": 130,
+   "site_recall_ci95": [
+    0.5224,
+    0.6511
+   ],
+   "bias_ft": 1.008,
+   "mae_ft": 3.653,
+   "pearson_r": 0.035,
+   "surveyed_mean_ft": 2.838
+  },
+  {
+   "label": "all marks",
+   "n_marks": 496,
+   "n_sites": 470,
+   "site_recall": 0.5723,
+   "site_recall_detected": 269,
+   "site_recall_ci95": [
+    0.5272,
+    0.6163
+   ],
+   "bias_ft": 5.263,
+   "mae_ft": 7.906,
+   "pearson_r": 0.03,
+   "surveyed_mean_ft": 3.023
+  }
+ ],
+ "sar_detector_same_marks_50m": null,
+ "caveats": [
+  "Only valid on the floodplain of the gauged main stem; tributary and ponding marks degrade it.",
+  "No negative class: recall and depth error only, no false-positive rate.",
+  "Small sample: distinct survey sites are the unit; see CIs.",
+  "Distance cut-offs are reported side by side; none was tuned to this result."
+ ],
+ "points": [
+  {
+   "lat": 34.3201145,
+   "lon": -78.5917296,
+   "site": 27026,
+   "surveyed_ft": 3.4,
+   "wse_ft": 37.13,
+   "ground_ft": 49.68185283416748,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 9081.522247084149
+  },
+  {
+   "lat": 34.14593,
+   "lon": -78.868567,
+   "site": 27413,
+   "surveyed_ft": 2.41,
+   "wse_ft": 25.07,
+   "ground_ft": 72.04159894577026,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 16898.755195095346
+  },
+  {
+   "lat": 35.263382,
+   "lon": -77.586663,
+   "site": 27378,
+   "surveyed_ft": 5.12,
+   "wse_ft": 35.828224931094276,
+   "ground_ft": 33.288707071266174,
+   "depth_ft": 2.539517859828102,
+   "dist_to_channel_m": 168.8324237644003
+  },
+  {
+   "lat": 35.380436,
+   "lon": -78.401486,
+   "site": 27310,
+   "surveyed_ft": 5.0,
+   "wse_ft": 113.49452729710359,
+   "ground_ft": 111.16257219772339,
+   "depth_ft": 2.3319550993801954,
+   "dist_to_channel_m": 7714.0171306783
+  },
+  {
+   "lat": 35.400594,
+   "lon": -78.374261,
+   "site": 27307,
+   "surveyed_ft": 2.5,
+   "wse_ft": 113.49452729710359,
+   "ground_ft": 108.31695562835694,
+   "depth_ft": 5.177571668746651,
+   "dist_to_channel_m": 4447.00526490863
+  },
+  {
+   "lat": 35.36848,
+   "lon": -78.307603,
+   "site": 27341,
+   "surveyed_ft": 6.0,
+   "wse_ft": 105.25746958451339,
+   "ground_ft": 93.04625140594483,
+   "depth_ft": 12.211218178568558,
+   "dist_to_channel_m": 4145.848540024281
+  },
+  {
+   "lat": 35.343599,
+   "lon": -78.419992,
+   "site": 27320,
+   "surveyed_ft": 5.0,
+   "wse_ft": 113.49452729710359,
+   "ground_ft": 126.13773749588013,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12018.821319474007
+  },
+  {
+   "lat": 35.32964,
+   "lon": -78.418311,
+   "site": 27324,
+   "surveyed_ft": 5.0,
+   "wse_ft": 112.00300868742605,
+   "ground_ft": 127.2476166921997,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 13266.77128529051
+  },
+  {
+   "lat": 35.0551,
+   "lon": -79.87621,
+   "site": 27116,
+   "surveyed_ft": 5.04,
+   "wse_ft": 102.62,
+   "ground_ft": 181.85836392730712,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 731.8915635103832
+  },
+  {
+   "lat": 34.8158983,
+   "lon": -79.8919253,
+   "site": 27134,
+   "surveyed_ft": 5.5,
+   "wse_ft": 102.62,
+   "ground_ft": 167.19409396316527,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1992.589170469644
+  },
+  {
+   "lat": 35.350858,
+   "lon": -78.303388,
+   "site": 27346,
+   "surveyed_ft": 8.0,
+   "wse_ft": 105.21574591887487,
+   "ground_ft": 90.71077551971436,
+   "depth_ft": 14.504970399160513,
+   "dist_to_channel_m": 5672.98591565434
+  },
+  {
+   "lat": 34.7716295,
+   "lon": -79.3344678,
+   "site": 27062,
+   "surveyed_ft": 4.69,
+   "wse_ft": 85.49,
+   "ground_ft": 188.11062541183472,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 182.17515325212548
+  },
+  {
+   "lat": 35.232744,
+   "lon": -77.141914,
+   "site": 26999,
+   "surveyed_ft": 0.54,
+   "wse_ft": 16.6,
+   "ground_ft": 7.823970311641693,
+   "depth_ft": 8.776029688358308,
+   "dist_to_channel_m": 16997.710347487347
+  },
+  {
+   "lat": 34.770414,
+   "lon": -79.447674,
+   "site": 27122,
+   "surveyed_ft": 2.3,
+   "wse_ft": 170.59,
+   "ground_ft": 195.05596534759522,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5643.677818417113
+  },
+  {
+   "lat": 34.7821111,
+   "lon": -79.527557,
+   "site": 27183,
+   "surveyed_ft": 2.0,
+   "wse_ft": 93.52,
+   "ground_ft": 180.64460681655885,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 72.33427410816185
+  },
+  {
+   "lat": 34.74724,
+   "lon": -79.21343,
+   "site": 27215,
+   "surveyed_ft": 0.4,
+   "wse_ft": 85.49,
+   "ground_ft": 187.40356724609376,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7172.859941532175
+  },
+  {
+   "lat": 34.04663,
+   "lon": -78.03576,
+   "site": 27372,
+   "surveyed_ft": 7.45,
+   "wse_ft": 26.68,
+   "ground_ft": 11.130751630573272,
+   "depth_ft": 15.549248369426728,
+   "dist_to_channel_m": 45294.18225778451
+  },
+  {
+   "lat": 34.66908,
+   "lon": -79.12067,
+   "site": 27249,
+   "surveyed_ft": 0.33,
+   "wse_ft": 85.49,
+   "ground_ft": 148.16230837539672,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5128.534594503017
+  },
+  {
+   "lat": 34.65506,
+   "lon": -79.00233,
+   "site": 27135,
+   "surveyed_ft": 2.87,
+   "wse_ft": 85.49,
+   "ground_ft": 123.97736473022461,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 3345.8022964374686
+  },
+  {
+   "lat": 34.041823,
+   "lon": -78.047323,
+   "site": 27375,
+   "surveyed_ft": 2.0,
+   "wse_ft": 26.68,
+   "ground_ft": 35.705836630172726,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 45276.14373664082
+  },
+  {
+   "lat": 35.146467,
+   "lon": -77.034773,
+   "site": 27025,
+   "surveyed_ft": 4.0,
+   "wse_ft": 16.6,
+   "ground_ft": 5.534641093797684,
+   "depth_ft": 11.065358906202317,
+   "dist_to_channel_m": 30444.74092635725
+  },
+  {
+   "lat": 34.62719,
+   "lon": -79.16663,
+   "site": 27105,
+   "surveyed_ft": 0.96,
+   "wse_ft": 85.49,
+   "ground_ft": 141.40055700912475,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 529.8320153625199
+  },
+  {
+   "lat": 35.406473,
+   "lon": -78.814966,
+   "site": 26915,
+   "surveyed_ft": 2.1,
+   "wse_ft": 124.9,
+   "ground_ft": 122.77932697616578,
+   "depth_ft": 2.120673023834229,
+   "dist_to_channel_m": 127.96898649336352
+  },
+  {
+   "lat": 34.62417,
+   "lon": -79.0457,
+   "site": 27075,
+   "surveyed_ft": 2.24,
+   "wse_ft": 85.49,
+   "ground_ft": 118.90575709335327,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 550.0756854948344
+  },
+  {
+   "lat": 34.62148,
+   "lon": -79.05506,
+   "site": 27080,
+   "surveyed_ft": 0.58,
+   "wse_ft": 85.49,
+   "ground_ft": 122.28339128494262,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 244.64947132446864
+  },
+  {
+   "lat": 34.61327,
+   "lon": -77.587056,
+   "site": 27312,
+   "surveyed_ft": 3.34,
+   "wse_ft": 25.740121321873406,
+   "ground_ft": 38.86240485290527,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 25847.28111961517
+  },
+  {
+   "lat": 35.405381,
+   "lon": -78.022587,
+   "site": 18771,
+   "surveyed_ft": 1.72,
+   "wse_ft": 80.00327145017464,
+   "ground_ft": 72.5199442263031,
+   "depth_ft": 7.483327223871541,
+   "dist_to_channel_m": 4176.936940109785
+  },
+  {
+   "lat": 35.059146,
+   "lon": -78.0411134,
+   "site": 27258,
+   "surveyed_ft": 8.0,
+   "wse_ft": 42.07,
+   "ground_ft": 119.2969513067627,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12634.390498849298
+  },
+  {
+   "lat": 35.3122,
+   "lon": -77.79973,
+   "site": 26930,
+   "surveyed_ft": 0.5,
+   "wse_ft": 52.37122135648214,
+   "ground_ft": 99.26016567001342,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 8804.965239633564
+  },
+  {
+   "lat": 35.32172,
+   "lon": -77.83219,
+   "site": 26948,
+   "surveyed_ft": 0.25,
+   "wse_ft": 59.19053702118228,
+   "ground_ft": 103.8586594683075,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7499.712381352596
+  },
+  {
+   "lat": 35.322181,
+   "lon": -77.833649,
+   "site": 26954,
+   "surveyed_ft": 0.25,
+   "wse_ft": 59.19053702118228,
+   "ground_ft": 101.59242509552001,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7452.685584938103
+  },
+  {
+   "lat": 35.227149,
+   "lon": -77.846018,
+   "site": 27401,
+   "surveyed_ft": 1.36,
+   "wse_ft": 54.51489744734267,
+   "ground_ft": 52.4650925932312,
+   "depth_ft": 2.0498048541114713,
+   "dist_to_channel_m": 241.02438358241824
+  },
+  {
+   "lat": 34.8155022,
+   "lon": -79.8915991,
+   "site": 27134,
+   "surveyed_ft": 8.7,
+   "wse_ft": 102.62,
+   "ground_ft": 177.28519506393434,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2029.2026422174715
+  },
+  {
+   "lat": 34.8159438,
+   "lon": -79.8918771,
+   "site": 27134,
+   "surveyed_ft": 4.92,
+   "wse_ft": 102.62,
+   "ground_ft": 168.56438132400513,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1996.0402969912343
+  },
+  {
+   "lat": 34.820031,
+   "lon": -77.456793,
+   "site": 27096,
+   "surveyed_ft": 1.77,
+   "wse_ft": 24.36,
+   "ground_ft": 16.45786139070511,
+   "depth_ft": 7.902138609294891,
+   "dist_to_channel_m": 5753.5020350186505
+  },
+  {
+   "lat": 35.2636,
+   "lon": -79.35898,
+   "site": 27145,
+   "surveyed_ft": 4.82,
+   "wse_ft": 280.62,
+   "ground_ft": 280.3558028817749,
+   "depth_ft": 0.2641971182251268,
+   "dist_to_channel_m": 25114.195290868764
+  },
+  {
+   "lat": 35.1971703,
+   "lon": -78.9888122,
+   "site": 26905,
+   "surveyed_ft": 1.33,
+   "wse_ft": 89.63866664113428,
+   "ground_ft": 160.48953802688598,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 13901.122487775203
+  },
+  {
+   "lat": 35.197056,
+   "lon": -78.9657032,
+   "site": 26901,
+   "surveyed_ft": 6.02,
+   "wse_ft": 89.63866664113428,
+   "ground_ft": 149.1317646560669,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12043.012231074405
+  },
+  {
+   "lat": 35.342089,
+   "lon": -78.041553,
+   "site": 18746,
+   "surveyed_ft": 0.57,
+   "wse_ft": 72.04204203789385,
+   "ground_ft": 72.5031673173523,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1172.0038152824777
+  },
+  {
+   "lat": 34.9608799,
+   "lon": -78.9419533,
+   "site": 26902,
+   "surveyed_ft": 1.62,
+   "wse_ft": 116.45,
+   "ground_ft": 91.68005658462525,
+   "depth_ft": 24.769943415374755,
+   "dist_to_channel_m": 4391.307297248591
+  },
+  {
+   "lat": 34.73849,
+   "lon": -78.74883,
+   "site": 26967,
+   "surveyed_ft": 3.92,
+   "wse_ft": 60.086928694949904,
+   "ground_ft": 54.57409585289001,
+   "depth_ft": 5.512832842059893,
+   "dist_to_channel_m": 1238.4329740820185
+  },
+  {
+   "lat": 35.378963,
+   "lon": -78.010596,
+   "site": 18748,
+   "surveyed_ft": 0.83,
+   "wse_ft": 72.33208733201785,
+   "ground_ft": 68.24243944129944,
+   "depth_ft": 4.08964789071841,
+   "dist_to_channel_m": 3722.9332359176196
+  },
+  {
+   "lat": 35.216282,
+   "lon": -78.935229,
+   "site": 18704,
+   "surveyed_ft": 8.06,
+   "wse_ft": 91.10477060613576,
+   "ground_ft": 141.5525817111206,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 10840.365837664915
+  },
+  {
+   "lat": 34.961645,
+   "lon": -78.9243248,
+   "site": 26900,
+   "surveyed_ft": 2.14,
+   "wse_ft": 116.45,
+   "ground_ft": 85.25586463630677,
+   "depth_ft": 31.194135363693235,
+   "dist_to_channel_m": 5556.494889235442
+  },
+  {
+   "lat": 35.1940704,
+   "lon": -78.9853602,
+   "site": 18785,
+   "surveyed_ft": 1.0,
+   "wse_ft": 89.63866664113428,
+   "ground_ft": 159.13744807418823,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 13468.457670412188
+  },
+  {
+   "lat": 35.3482,
+   "lon": -77.99481,
+   "site": 18793,
+   "surveyed_ft": 0.69,
+   "wse_ft": 69.34835409477816,
+   "ground_ft": 68.12731642974853,
+   "depth_ft": 1.2210376650296269,
+   "dist_to_channel_m": 1132.3041587080568
+  },
+  {
+   "lat": 35.42691,
+   "lon": -78.01758,
+   "site": 18784,
+   "surveyed_ft": 0.41,
+   "wse_ft": 80.00327145017464,
+   "ground_ft": 81.61841050453187,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 6294.86777224181
+  },
+  {
+   "lat": 35.35355,
+   "lon": -78.007,
+   "site": 18751,
+   "surveyed_ft": 0.44,
+   "wse_ft": 69.64786258351563,
+   "ground_ft": 70.16422466217041,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1978.1860166928084
+  },
+  {
+   "lat": 35.1998591,
+   "lon": -78.9602956,
+   "site": 26903,
+   "surveyed_ft": 5.38,
+   "wse_ft": 89.63866664113428,
+   "ground_ft": 141.5229952786255,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 11788.651485891907
+  },
+  {
+   "lat": 35.339583,
+   "lon": -78.030802,
+   "site": 26904,
+   "surveyed_ft": 0.68,
+   "wse_ft": 71.40965522243616,
+   "ground_ft": 71.14961306152344,
+   "depth_ft": 0.26004216091271815,
+   "dist_to_channel_m": 521.9851659922097
+  },
+  {
+   "lat": 35.375728,
+   "lon": -77.961807,
+   "site": 18773,
+   "surveyed_ft": 0.41,
+   "wse_ft": 69.08181843194507,
+   "ground_ft": 76.13471417495728,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 4880.829207763738
+  },
+  {
+   "lat": 35.193238,
+   "lon": -78.987375,
+   "site": 18675,
+   "surveyed_ft": 8.9,
+   "wse_ft": 89.63866664113428,
+   "ground_ft": 153.31163671691894,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 13595.27390632906
+  },
+  {
+   "lat": 35.056989,
+   "lon": -76.955104,
+   "site": 26916,
+   "surveyed_ft": 3.45,
+   "wse_ft": 16.6,
+   "ground_ft": 6.1924311693334575,
+   "depth_ft": 10.407568830666545,
+   "dist_to_channel_m": 42365.478510080866
+  },
+  {
+   "lat": 35.499912,
+   "lon": -77.0242208,
+   "site": 26924,
+   "surveyed_ft": 4.62,
+   "wse_ft": 16.6,
+   "ground_ft": 3.2880969830656053,
+   "depth_ft": 13.311903016934396,
+   "dist_to_channel_m": 32677.045162526392
+  },
+  {
+   "lat": 35.53746,
+   "lon": -76.62175,
+   "site": 26929,
+   "surveyed_ft": 0.92,
+   "wse_ft": 3.04,
+   "ground_ft": 4.629591857819557,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 38279.656687501025
+  },
+  {
+   "lat": 35.312007,
+   "lon": -77.798608,
+   "site": 26923,
+   "surveyed_ft": 0.5,
+   "wse_ft": 51.99827922030325,
+   "ground_ft": 99.28134174606323,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 8785.061430171045
+  },
+  {
+   "lat": 35.40067,
+   "lon": -77.9575,
+   "site": 18790,
+   "surveyed_ft": 1.46,
+   "wse_ft": 69.08181843194507,
+   "ground_ft": 91.86967132469177,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7559.182808039769
+  },
+  {
+   "lat": 34.9663799,
+   "lon": -78.9171345,
+   "site": 26898,
+   "surveyed_ft": 1.42,
+   "wse_ft": 116.45,
+   "ground_ft": 80.50141003913879,
+   "depth_ft": 35.94858996086121,
+   "dist_to_channel_m": 6297.1676049787175
+  },
+  {
+   "lat": 35.45555,
+   "lon": -77.668894,
+   "site": 26917,
+   "surveyed_ft": 1.96,
+   "wse_ft": 33.11,
+   "ground_ft": 39.53214206192017,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 184.41291550122722
+  },
+  {
+   "lat": 35.3111989,
+   "lon": -78.6944146,
+   "site": 26926,
+   "surveyed_ft": 2.2,
+   "wse_ft": 112.58301550439057,
+   "ground_ft": 103.9874680821991,
+   "depth_ft": 8.595547422191473,
+   "dist_to_channel_m": 138.99114013878875
+  },
+  {
+   "lat": 35.0661463,
+   "lon": -78.8911244,
+   "site": 26909,
+   "surveyed_ft": 2.53,
+   "wse_ft": 84.13379169762514,
+   "ground_ft": 96.8950658050537,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2954.887258795614
+  },
+  {
+   "lat": 35.063175,
+   "lon": -78.888732,
+   "site": 26911,
+   "surveyed_ft": 3.27,
+   "wse_ft": 84.00551747217514,
+   "ground_ft": 90.41255829742431,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2957.7543699743615
+  },
+  {
+   "lat": 35.38593,
+   "lon": -77.956546,
+   "site": 18772,
+   "surveyed_ft": 4.0,
+   "wse_ft": 69.08181843194507,
+   "ground_ft": 82.70247666488648,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 6104.997982972591
+  },
+  {
+   "lat": 35.541333,
+   "lon": -76.624111,
+   "site": 6936,
+   "surveyed_ft": 1.85,
+   "wse_ft": 3.04,
+   "ground_ft": 3.8095711534166337,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 37806.94414845966
+  },
+  {
+   "lat": 35.077428,
+   "lon": -77.064072,
+   "site": 26913,
+   "surveyed_ft": 2.15,
+   "wse_ft": 16.6,
+   "ground_ft": 4.966674125714302,
+   "depth_ft": 11.633325874285699,
+   "dist_to_channel_m": 33878.044554329084
+  },
+  {
+   "lat": 35.078518,
+   "lon": -77.10573,
+   "site": 26914,
+   "surveyed_ft": 3.25,
+   "wse_ft": 16.6,
+   "ground_ft": 7.186082477941513,
+   "depth_ft": 9.413917522058489,
+   "dist_to_channel_m": 31510.614293664854
+  },
+  {
+   "lat": 34.992279,
+   "lon": -76.759294,
+   "site": 26921,
+   "surveyed_ft": 0.47,
+   "wse_ft": 16.6,
+   "ground_ft": 8.570376148538589,
+   "depth_ft": 8.029623851461412,
+   "dist_to_channel_m": 60707.96651371108
+  },
+  {
+   "lat": 35.1861926,
+   "lon": -79.0157895,
+   "site": 26908,
+   "surveyed_ft": 3.45,
+   "wse_ft": 88.2323505071127,
+   "ground_ft": 164.23117044296265,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 15682.742340007273
+  },
+  {
+   "lat": 35.005106,
+   "lon": -76.864135,
+   "site": 26918,
+   "surveyed_ft": 4.25,
+   "wse_ft": 16.6,
+   "ground_ft": 5.217822059135437,
+   "depth_ft": 11.382177940864565,
+   "dist_to_channel_m": 52363.70445648133
+  },
+  {
+   "lat": 35.515411,
+   "lon": -78.348437,
+   "site": 26961,
+   "surveyed_ft": 4.4,
+   "wse_ft": 123.22985320022629,
+   "ground_ft": 113.28945372253418,
+   "depth_ft": 9.940399477692111,
+   "dist_to_channel_m": 26.425051864839034
+  },
+  {
+   "lat": 35.294756,
+   "lon": -77.782625,
+   "site": 26963,
+   "surveyed_ft": 0.1,
+   "wse_ft": 50.00280385934039,
+   "ground_ft": 104.74482568626404,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 6975.136606331289
+  },
+  {
+   "lat": 34.65704,
+   "lon": -78.67649,
+   "site": 26939,
+   "surveyed_ft": 2.2,
+   "wse_ft": 54.65335903873354,
+   "ground_ft": 50.8055052407074,
+   "depth_ft": 3.8478537980261436,
+   "dist_to_channel_m": 1602.5107837673434
+  },
+  {
+   "lat": 34.70784,
+   "lon": -79.89471,
+   "site": 26955,
+   "surveyed_ft": 2.75,
+   "wse_ft": 102.62,
+   "ground_ft": 100.68568354125976,
+   "depth_ft": 1.9343164587402413,
+   "dist_to_channel_m": 1642.876227064646
+  },
+  {
+   "lat": 34.75423,
+   "lon": -78.78013,
+   "site": 26925,
+   "surveyed_ft": 3.14,
+   "wse_ft": 62.0067838512455,
+   "ground_ft": 57.6364793473053,
+   "depth_ft": 4.370304503940204,
+   "dist_to_channel_m": 1034.026577229193
+  },
+  {
+   "lat": 34.70872,
+   "lon": -79.89529,
+   "site": 26952,
+   "surveyed_ft": 1.81,
+   "wse_ft": 102.62,
+   "ground_ft": 102.03211652801514,
+   "depth_ft": 0.5878834719848669,
+   "dist_to_channel_m": 1665.6498925445574
+  },
+  {
+   "lat": 34.722,
+   "lon": -79.861,
+   "site": 26938,
+   "surveyed_ft": 1.55,
+   "wse_ft": 102.62,
+   "ground_ft": 96.46083109191895,
+   "depth_ft": 6.159168908081057,
+   "dist_to_channel_m": 1703.1852387358283
+  },
+  {
+   "lat": 34.716,
+   "lon": -79.864,
+   "site": 26933,
+   "surveyed_ft": 1.1,
+   "wse_ft": 102.62,
+   "ground_ft": 96.67995717201232,
+   "depth_ft": 5.940042827987682,
+   "dist_to_channel_m": 1279.1768797228078
+  },
+  {
+   "lat": 34.695,
+   "lon": -79.904,
+   "site": 26953,
+   "surveyed_ft": 1.0,
+   "wse_ft": 101.86160986542933,
+   "ground_ft": 154.36306894210816,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2762.8281629618805
+  },
+  {
+   "lat": 34.309962,
+   "lon": -79.844812,
+   "site": 14807,
+   "surveyed_ft": 5.33,
+   "wse_ft": 106.96076258944312,
+   "ground_ft": 94.5999583782196,
+   "depth_ft": 12.360804211223524,
+   "dist_to_channel_m": 91.74502189074231
+  },
+  {
+   "lat": 34.70434,
+   "lon": -79.89574,
+   "site": 26958,
+   "surveyed_ft": 1.69,
+   "wse_ft": 102.62,
+   "ground_ft": 106.61250678375244,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1861.829012999484
+  },
+  {
+   "lat": 34.70613,
+   "lon": -79.89565,
+   "site": 26949,
+   "surveyed_ft": 2.73,
+   "wse_ft": 102.62,
+   "ground_ft": 102.54898424476623,
+   "depth_ft": 0.07101575523377335,
+   "dist_to_channel_m": 1786.862845692691
+  },
+  {
+   "lat": 34.3,
+   "lon": -79.83556,
+   "site": 26932,
+   "surveyed_ft": 4.28,
+   "wse_ft": 103.52239183923886,
+   "ground_ft": 91.1015817553711,
+   "depth_ft": 12.420810083867764,
+   "dist_to_channel_m": 153.6098079476139
+  },
+  {
+   "lat": 34.716,
+   "lon": -79.864,
+   "site": 26933,
+   "surveyed_ft": 1.65,
+   "wse_ft": 102.62,
+   "ground_ft": 96.67995717201232,
+   "depth_ft": 5.940042827987682,
+   "dist_to_channel_m": 1279.1768797228078
+  },
+  {
+   "lat": 35.14794,
+   "lon": -77.1088,
+   "site": 26974,
+   "surveyed_ft": 1.02,
+   "wse_ft": 16.6,
+   "ground_ft": 23.33376582414627,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 25319.273822253977
+  },
+  {
+   "lat": 34.66933,
+   "lon": -78.642244,
+   "site": 26966,
+   "surveyed_ft": 2.68,
+   "wse_ft": 53.31872444953325,
+   "ground_ft": 49.26722038410187,
+   "depth_ft": 4.051504065431381,
+   "dist_to_channel_m": 1470.972414026321
+  },
+  {
+   "lat": 35.448756,
+   "lon": -76.609707,
+   "site": 6921,
+   "surveyed_ft": 2.321,
+   "wse_ft": 3.04,
+   "ground_ft": 3.609874858379364,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 47111.40031824201
+  },
+  {
+   "lat": 34.9695662,
+   "lon": -78.9353504,
+   "site": 26897,
+   "surveyed_ft": 4.49,
+   "wse_ft": 116.45,
+   "ground_ft": 93.65558923965455,
+   "depth_ft": 22.794410760345457,
+   "dist_to_channel_m": 5526.1604689901405
+  },
+  {
+   "lat": 34.65162,
+   "lon": -78.6095,
+   "site": 26965,
+   "surveyed_ft": 2.68,
+   "wse_ft": 52.07287321420482,
+   "ground_ft": 48.67038857521057,
+   "depth_ft": 3.4024846389942454,
+   "dist_to_channel_m": 935.4561113376307
+  },
+  {
+   "lat": 35.385409,
+   "lon": -78.037678,
+   "site": 26899,
+   "surveyed_ft": 0.37,
+   "wse_ft": 79.93386170255826,
+   "ground_ft": 73.65814579856873,
+   "depth_ft": 6.275715903989536,
+   "dist_to_channel_m": 1796.353196002645
+  },
+  {
+   "lat": 34.3286909,
+   "lon": -78.2187818,
+   "site": 26981,
+   "surveyed_ft": 3.75,
+   "wse_ft": 26.68,
+   "ground_ft": 20.697615001716613,
+   "depth_ft": 5.982384998283386,
+   "dist_to_channel_m": 9794.161898925851
+  },
+  {
+   "lat": 34.386,
+   "lon": -80.063,
+   "site": 26976,
+   "surveyed_ft": 3.0,
+   "wse_ft": 169.54022037252398,
+   "ground_ft": 162.71815733078003,
+   "depth_ft": 6.822063041743945,
+   "dist_to_channel_m": 74.25214752809241
+  },
+  {
+   "lat": 35.299021,
+   "lon": -77.7964,
+   "site": 26960,
+   "surveyed_ft": 1.0,
+   "wse_ft": 51.99827922030325,
+   "ground_ft": 91.2542760318756,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7344.625955178509
+  },
+  {
+   "lat": 34.392,
+   "lon": -80.03,
+   "site": 26977,
+   "surveyed_ft": 2.9,
+   "wse_ft": 163.06860213119978,
+   "ground_ft": 151.74869962875366,
+   "depth_ft": 11.319902502446126,
+   "dist_to_channel_m": 51.01982719079052
+  },
+  {
+   "lat": 34.38851,
+   "lon": -80.06368,
+   "site": 26978,
+   "surveyed_ft": 2.15,
+   "wse_ft": 169.2589175747222,
+   "ground_ft": 163.09356961044313,
+   "depth_ft": 6.1653479642790785,
+   "dist_to_channel_m": 146.9295030378966
+  },
+  {
+   "lat": 34.38547,
+   "lon": -80.06412,
+   "site": 26979,
+   "surveyed_ft": 0.35,
+   "wse_ft": 169.64629886543761,
+   "ground_ft": 165.84746072982787,
+   "depth_ft": 3.798838135609742,
+   "dist_to_channel_m": 114.20624164759292
+  },
+  {
+   "lat": 34.64498,
+   "lon": -78.8242,
+   "site": 26934,
+   "surveyed_ft": 4.43,
+   "wse_ft": 116.45,
+   "ground_ft": 101.97198623405457,
+   "depth_ft": 14.478013765945434,
+   "dist_to_channel_m": 6306.109203779284
+  },
+  {
+   "lat": 35.121212,
+   "lon": -77.022047,
+   "site": 27009,
+   "surveyed_ft": 2.6,
+   "wse_ft": 16.6,
+   "ground_ft": 7.034541183710099,
+   "depth_ft": 9.565458816289903,
+   "dist_to_channel_m": 33099.91400009426
+  },
+  {
+   "lat": 35.255376,
+   "lon": -77.603323,
+   "site": 26969,
+   "surveyed_ft": 1.75,
+   "wse_ft": 36.40599803013761,
+   "ground_ft": 35.833077688789366,
+   "depth_ft": 0.5729203413482438,
+   "dist_to_channel_m": 943.7267110456992
+  },
+  {
+   "lat": 35.245066,
+   "lon": -77.586589,
+   "site": 26973,
+   "surveyed_ft": 0.58,
+   "wse_ft": 34.63847152891387,
+   "ground_ft": 34.494654565315244,
+   "depth_ft": 0.14381696359862417,
+   "dist_to_channel_m": 354.8585079842029
+  },
+  {
+   "lat": 34.915926,
+   "lon": -78.5514807,
+   "site": 26971,
+   "surveyed_ft": 2.92,
+   "wse_ft": 73.52143218479418,
+   "ground_ft": 79.69340256523132,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 20545.762380138163
+  },
+  {
+   "lat": 34.3112922,
+   "lon": -78.5473638,
+   "site": 27001,
+   "surveyed_ft": 1.38,
+   "wse_ft": 37.13,
+   "ground_ft": 43.804553074493406,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5644.77948218887
+  },
+  {
+   "lat": 34.2885118,
+   "lon": -78.4709423,
+   "site": 26996,
+   "surveyed_ft": 1.75,
+   "wse_ft": 37.13,
+   "ground_ft": 45.14734407653808,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 381.00514194196484
+  },
+  {
+   "lat": 34.2998141,
+   "lon": -78.4826394,
+   "site": 27000,
+   "surveyed_ft": 1.6,
+   "wse_ft": 37.13,
+   "ground_ft": 44.30639916873932,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 743.6757764110685
+  },
+  {
+   "lat": 35.424722,
+   "lon": -77.593056,
+   "site": 26928,
+   "surveyed_ft": 0.95,
+   "wse_ft": 33.11,
+   "ground_ft": 22.872015979099274,
+   "depth_ft": 10.237984020900726,
+   "dist_to_channel_m": 248.41038146741286
+  },
+  {
+   "lat": 34.439167,
+   "lon": -79.351667,
+   "site": 27003,
+   "surveyed_ft": 3.23,
+   "wse_ft": 93.52,
+   "ground_ft": 102.4946986479187,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 930.8064531038345
+  },
+  {
+   "lat": 34.7268787,
+   "lon": -77.9918468,
+   "site": 26985,
+   "surveyed_ft": 1.59,
+   "wse_ft": 32.72317452056556,
+   "ground_ft": 34.91497839870453,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5494.637103144229
+  },
+  {
+   "lat": 34.7099648,
+   "lon": -77.9864281,
+   "site": 26987,
+   "surveyed_ft": 2.98,
+   "wse_ft": 30.005946284737547,
+   "ground_ft": 32.54938104614258,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 4843.749062919644
+  },
+  {
+   "lat": 34.62144,
+   "lon": -78.57993,
+   "site": 27283,
+   "surveyed_ft": 8.81,
+   "wse_ft": 50.00033513310095,
+   "ground_ft": 38.558699622726444,
+   "depth_ft": 11.441635510374503,
+   "dist_to_channel_m": 650.7111146774648
+  },
+  {
+   "lat": 35.425591,
+   "lon": -77.582988,
+   "site": 26927,
+   "surveyed_ft": 0.44,
+   "wse_ft": 33.11,
+   "ground_ft": 32.812439349021915,
+   "depth_ft": 0.2975606509780846,
+   "dist_to_channel_m": 171.50391145214016
+  },
+  {
+   "lat": 35.4385485,
+   "lon": -76.9721065,
+   "site": 26931,
+   "surveyed_ft": 3.13,
+   "wse_ft": 16.6,
+   "ground_ft": 4.693024655957222,
+   "depth_ft": 11.90697534404278,
+   "dist_to_channel_m": 33013.46772517514
+  },
+  {
+   "lat": 35.26036,
+   "lon": -77.61596,
+   "site": 26968,
+   "surveyed_ft": 0.81,
+   "wse_ft": 37.57533676138321,
+   "ground_ft": 34.77069134979248,
+   "depth_ft": 2.8046454115907338,
+   "dist_to_channel_m": 273.32154081043745
+  },
+  {
+   "lat": 35.29976,
+   "lon": -77.3403,
+   "site": 26980,
+   "surveyed_ft": 0.46,
+   "wse_ft": 18.067833850746798,
+   "ground_ft": 36.27298501213074,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2227.830264815179
+  },
+  {
+   "lat": 34.887621,
+   "lon": -76.930228,
+   "site": 26997,
+   "surveyed_ft": 0.4,
+   "wse_ft": 24.36,
+   "ground_ft": 10.668280584945679,
+   "depth_ft": 13.69171941505432,
+   "dist_to_channel_m": 52917.745966219074
+  },
+  {
+   "lat": 35.30571,
+   "lon": -77.18866,
+   "site": 26993,
+   "surveyed_ft": 0.59,
+   "wse_ft": 16.6,
+   "ground_ft": 17.163214331645964,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 10294.734264777939
+  },
+  {
+   "lat": 35.158513,
+   "lon": -77.070126,
+   "site": 27002,
+   "surveyed_ft": 3.21,
+   "wse_ft": 16.6,
+   "ground_ft": 6.871416876249313,
+   "depth_ft": 9.728583123750688,
+   "dist_to_channel_m": 27099.449831974132
+  },
+  {
+   "lat": 35.1516,
+   "lon": -77.05141,
+   "site": 26991,
+   "surveyed_ft": 3.04,
+   "wse_ft": 16.6,
+   "ground_ft": 7.333799531784058,
+   "depth_ft": 9.266200468215944,
+   "dist_to_channel_m": 28903.563579754344
+  },
+  {
+   "lat": 34.724859,
+   "lon": -77.973495,
+   "site": 26992,
+   "surveyed_ft": 4.99,
+   "wse_ft": 32.72317452056556,
+   "ground_ft": 30.72997814804077,
+   "depth_ft": 1.9931963725247854,
+   "dist_to_channel_m": 3904.4520003598045
+  },
+  {
+   "lat": 35.360298,
+   "lon": -77.975548,
+   "site": 18791,
+   "surveyed_ft": 0.58,
+   "wse_ft": 69.08181843194507,
+   "ground_ft": 77.71392755561828,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2786.194978957273
+  },
+  {
+   "lat": 35.1958363,
+   "lon": -78.987528,
+   "site": 27011,
+   "surveyed_ft": 1.5,
+   "wse_ft": 89.63866664113428,
+   "ground_ft": 158.75226125823974,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 13731.148016064162
+  },
+  {
+   "lat": 34.2753407,
+   "lon": -78.5374571,
+   "site": 18664,
+   "surveyed_ft": 1.1,
+   "wse_ft": 37.13,
+   "ground_ft": 44.07525829372406,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2023.015807905499
+  },
+  {
+   "lat": 34.261452,
+   "lon": -78.5238234,
+   "site": 18669,
+   "surveyed_ft": 1.63,
+   "wse_ft": 37.13,
+   "ground_ft": 43.78881807353974,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 87.43466559698244
+  },
+  {
+   "lat": 34.40472,
+   "lon": -79.33444,
+   "site": 27012,
+   "surveyed_ft": 2.4,
+   "wse_ft": 93.52,
+   "ground_ft": 91.47632446052552,
+   "depth_ft": 2.043675539474478,
+   "dist_to_channel_m": 316.5298927142792
+  },
+  {
+   "lat": 34.474167,
+   "lon": -79.378889,
+   "site": 27008,
+   "surveyed_ft": 7.725,
+   "wse_ft": 93.52,
+   "ground_ft": 98.00634672744751,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 98.26980418332516
+  },
+  {
+   "lat": 34.2917259,
+   "lon": -78.5499193,
+   "site": 27019,
+   "surveyed_ft": 1.22,
+   "wse_ft": 37.13,
+   "ground_ft": 44.1839546415329,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 4131.581946401801
+  },
+  {
+   "lat": 34.275116,
+   "lon": -78.5381534,
+   "site": 18664,
+   "surveyed_ft": 1.57,
+   "wse_ft": 37.13,
+   "ground_ft": 43.371066157188416,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2054.6091334809935
+  },
+  {
+   "lat": 35.3329155291,
+   "lon": -76.6273598103,
+   "site": 6909,
+   "surveyed_ft": 2.73,
+   "wse_ft": 3.04,
+   "ground_ft": 3.202185528328419,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 57927.66598708799
+  },
+  {
+   "lat": 34.3205933,
+   "lon": -78.7012116,
+   "site": 18698,
+   "surveyed_ft": 3.83,
+   "wse_ft": 37.13,
+   "ground_ft": 55.0151076612854,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 16569.85262735105
+  },
+  {
+   "lat": 35.4320183,
+   "lon": -76.9679031,
+   "site": 26937,
+   "surveyed_ft": 3.79,
+   "wse_ft": 16.6,
+   "ground_ft": 4.956937526769638,
+   "depth_ft": 11.643062473230364,
+   "dist_to_channel_m": 33060.08199833346
+  },
+  {
+   "lat": 34.71847,
+   "lon": -79.30569,
+   "site": 27051,
+   "surveyed_ft": 1.44,
+   "wse_ft": 85.49,
+   "ground_ft": 173.38283973495484,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 364.50973122112333
+  },
+  {
+   "lat": 34.9023408,
+   "lon": -77.5346059,
+   "site": 27042,
+   "surveyed_ft": 1.85,
+   "wse_ft": 260.32765478555575,
+   "ground_ft": 32.023129899711606,
+   "depth_ft": 228.30452488584416,
+   "dist_to_channel_m": 2850.017873720725
+  },
+  {
+   "lat": 35.136474,
+   "lon": -77.028118,
+   "site": 27022,
+   "surveyed_ft": 1.5,
+   "wse_ft": 16.6,
+   "ground_ft": 5.925012810015678,
+   "depth_ft": 10.674987189984323,
+   "dist_to_channel_m": 31602.218084937125
+  },
+  {
+   "lat": 35.047994,
+   "lon": -78.859588,
+   "site": 27045,
+   "surveyed_ft": 2.73,
+   "wse_ft": 81.26904743111425,
+   "ground_ft": 85.9432235445404,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 124.07417309064577
+  },
+  {
+   "lat": 34.76207,
+   "lon": -77.427047,
+   "site": 27020,
+   "surveyed_ft": 1.32,
+   "wse_ft": 24.36,
+   "ground_ft": 7.809184917526245,
+   "depth_ft": 16.550815082473754,
+   "dist_to_channel_m": 12242.98609399956
+  },
+  {
+   "lat": 34.750385,
+   "lon": -77.434878,
+   "site": 27004,
+   "surveyed_ft": 4.96,
+   "wse_ft": 24.36,
+   "ground_ft": 0.0,
+   "depth_ft": 24.36,
+   "dist_to_channel_m": 12912.108293276235
+  },
+  {
+   "lat": 34.76581,
+   "lon": -79.33315,
+   "site": 27050,
+   "surveyed_ft": 5.25,
+   "wse_ft": 85.49,
+   "ground_ft": 182.59771185440064,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 172.30683476948326
+  },
+  {
+   "lat": 34.3141174,
+   "lon": -78.708181,
+   "site": 18713,
+   "surveyed_ft": 2.43,
+   "wse_ft": 37.13,
+   "ground_ft": 58.046972325057986,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 16672.373084894392
+  },
+  {
+   "lat": 35.3446208,
+   "lon": -76.6640893,
+   "site": 26962,
+   "surveyed_ft": 3.11,
+   "wse_ft": 3.04,
+   "ground_ft": 4.32979964922905,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 55508.148249884085
+  },
+  {
+   "lat": 34.234797,
+   "lon": -79.150886,
+   "site": 18623,
+   "surveyed_ft": 2.69,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 53.16612458839416,
+   "depth_ft": 5.6007304346756115,
+   "dist_to_channel_m": 3438.0011376508996
+  },
+  {
+   "lat": 34.236166,
+   "lon": -79.151271,
+   "site": 18625,
+   "surveyed_ft": 3.17,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 53.52616168518066,
+   "depth_ft": 5.2406933378891125,
+   "dist_to_channel_m": 3543.638151486676
+  },
+  {
+   "lat": 35.09624,
+   "lon": -78.86371,
+   "site": 27018,
+   "surveyed_ft": 1.07,
+   "wse_ft": 85.46257335561836,
+   "ground_ft": 86.03660102882385,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 152.21158745972247
+  },
+  {
+   "lat": 34.233611,
+   "lon": -79.1475,
+   "site": 27028,
+   "surveyed_ft": 2.28,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 53.71394917518616,
+   "depth_ft": 5.052905847883615,
+   "dist_to_channel_m": 3525.4801313564453
+  },
+  {
+   "lat": 34.82076,
+   "lon": -79.17916,
+   "site": 27049,
+   "surveyed_ft": 1.39,
+   "wse_ft": 85.49,
+   "ground_ft": 181.10997987319945,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 14768.279891201017
+  },
+  {
+   "lat": 35.15254,
+   "lon": -77.04691,
+   "site": 26984,
+   "surveyed_ft": 0.78,
+   "wse_ft": 16.6,
+   "ground_ft": 10.207741605949401,
+   "depth_ft": 6.3922583940506,
+   "dist_to_channel_m": 29161.06724716619
+  },
+  {
+   "lat": 35.14915,
+   "lon": -77.04272,
+   "site": 26986,
+   "surveyed_ft": 0.87,
+   "wse_ft": 16.6,
+   "ground_ft": 12.27832333489418,
+   "depth_ft": 4.321676665105821,
+   "dist_to_channel_m": 29691.904821511696
+  },
+  {
+   "lat": 34.8432608,
+   "lon": -77.5010823,
+   "site": 27034,
+   "surveyed_ft": 5.15,
+   "wse_ft": 24.36,
+   "ground_ft": 14.750921979236603,
+   "depth_ft": 9.609078020763397,
+   "dist_to_channel_m": 978.6934046894913
+  },
+  {
+   "lat": 34.63134,
+   "lon": -78.60496,
+   "site": 18737,
+   "surveyed_ft": 0.82,
+   "wse_ft": 51.153406147268434,
+   "ground_ft": 43.86320342105866,
+   "depth_ft": 7.2902027262097775,
+   "dist_to_channel_m": 238.1514011598808
+  },
+  {
+   "lat": 34.287742,
+   "lon": -77.827943,
+   "site": 27454,
+   "surveyed_ft": 0.49,
+   "wse_ft": 24.61,
+   "ground_ft": 41.247210233078,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 34710.9363701841
+  },
+  {
+   "lat": 34.705,
+   "lon": -79.896,
+   "site": 26947,
+   "surveyed_ft": 1.8,
+   "wse_ft": 102.62,
+   "ground_ft": 101.667210936203,
+   "depth_ft": 0.9527890637969989,
+   "dist_to_channel_m": 1859.2103501640634
+  },
+  {
+   "lat": 34.9134491,
+   "lon": -78.55332724,
+   "site": 26970,
+   "surveyed_ft": 5.85,
+   "wse_ft": 73.52143218479418,
+   "ground_ft": 83.31240272293091,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 20444.31953933883
+  },
+  {
+   "lat": 34.37194,
+   "lon": -79.35889,
+   "site": 27058,
+   "surveyed_ft": 0.86,
+   "wse_ft": 89.13033387421976,
+   "ground_ft": 87.85803768127441,
+   "depth_ft": 1.2722961929453476,
+   "dist_to_channel_m": 585.2907615922277
+  },
+  {
+   "lat": 35.104357,
+   "lon": -77.018073,
+   "site": 26906,
+   "surveyed_ft": 6.95,
+   "wse_ft": 16.6,
+   "ground_ft": 3.9154538803052903,
+   "depth_ft": 12.684546119694712,
+   "dist_to_channel_m": 34600.994407897546
+  },
+  {
+   "lat": 34.34944,
+   "lon": -79.16556,
+   "site": 18611,
+   "surveyed_ft": 0.64,
+   "wse_ft": 72.0479914072406,
+   "ground_ft": 76.00901564079285,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7593.769768904068
+  },
+  {
+   "lat": 34.659906,
+   "lon": -79.210949,
+   "site": 27064,
+   "surveyed_ft": 0.96,
+   "wse_ft": 85.49,
+   "ground_ft": 152.50320371902467,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 543.3365505599342
+  },
+  {
+   "lat": 34.67929,
+   "lon": -79.23817,
+   "site": 27056,
+   "surveyed_ft": 2.6,
+   "wse_ft": 85.49,
+   "ground_ft": 158.05456462020874,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 154.80635734573363
+  },
+  {
+   "lat": 34.348333,
+   "lon": -79.349444,
+   "site": 27053,
+   "surveyed_ft": 1.51,
+   "wse_ft": 87.0927754379577,
+   "ground_ft": 85.3979521016693,
+   "depth_ft": 1.694823336288394,
+   "dist_to_channel_m": 84.15954278198454
+  },
+  {
+   "lat": 35.0669495,
+   "lon": -77.3567718,
+   "site": 27073,
+   "surveyed_ft": 4.48,
+   "wse_ft": 32.26241296188176,
+   "ground_ft": 25.705189100704192,
+   "depth_ft": 6.557223861177565,
+   "dist_to_channel_m": 26051.821894841145
+  },
+  {
+   "lat": 34.531,
+   "lon": -79.83,
+   "site": 27085,
+   "surveyed_ft": 2.91,
+   "wse_ft": 91.98,
+   "ground_ft": 66.64013512664795,
+   "depth_ft": 25.339864873352056,
+   "dist_to_channel_m": 8973.742899433226
+  },
+  {
+   "lat": 34.772862,
+   "lon": -79.3337624,
+   "site": 27062,
+   "surveyed_ft": 4.4,
+   "wse_ft": 85.49,
+   "ground_ft": 184.26990848388672,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 177.31600112288422
+  },
+  {
+   "lat": 34.25028,
+   "lon": -79.14722,
+   "site": 27071,
+   "surveyed_ft": 1.38,
+   "wse_ft": 60.62833004358632,
+   "ground_ft": 55.41299136207581,
+   "depth_ft": 5.215338681510509,
+   "dist_to_channel_m": 4932.883188154122
+  },
+  {
+   "lat": 34.748271,
+   "lon": -77.329654,
+   "site": 27055,
+   "surveyed_ft": 8.04,
+   "wse_ft": 24.36,
+   "ground_ft": 5.181668946733475,
+   "depth_ft": 19.178331053266525,
+   "dist_to_channel_m": 19827.96332708268
+  },
+  {
+   "lat": 34.81744,
+   "lon": -79.42359,
+   "site": 27043,
+   "surveyed_ft": 2.03,
+   "wse_ft": 170.59,
+   "ground_ft": 191.56783258895874,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 4334.919443988891
+  },
+  {
+   "lat": 34.737598,
+   "lon": -77.232462,
+   "site": 27063,
+   "surveyed_ft": 5.24,
+   "wse_ft": 24.36,
+   "ground_ft": 17.66585202566147,
+   "depth_ft": 6.694147974338531,
+   "dist_to_channel_m": 28092.330348736512
+  },
+  {
+   "lat": 34.71533,
+   "lon": -77.2246,
+   "site": 27070,
+   "surveyed_ft": 2.95,
+   "wse_ft": 24.36,
+   "ground_ft": 3.838067962908745,
+   "depth_ft": 20.521932037091254,
+   "dist_to_channel_m": 29892.427346524084
+  },
+  {
+   "lat": 34.71218,
+   "lon": -77.2223,
+   "site": 27083,
+   "surveyed_ft": 2.25,
+   "wse_ft": 24.36,
+   "ground_ft": 7.363492345275879,
+   "depth_ft": 16.99650765472412,
+   "dist_to_channel_m": 30249.643104255767
+  },
+  {
+   "lat": 35.012996,
+   "lon": -78.829144,
+   "site": 27015,
+   "surveyed_ft": 4.65,
+   "wse_ft": 79.04787503464955,
+   "ground_ft": 84.0682647353363,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2171.7022936067
+  },
+  {
+   "lat": 34.60697,
+   "lon": -79.09983,
+   "site": 27082,
+   "surveyed_ft": 3.69,
+   "wse_ft": 85.49,
+   "ground_ft": 126.58331117172241,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 298.37486548223
+  },
+  {
+   "lat": 35.0641902,
+   "lon": -77.3529966,
+   "site": 27069,
+   "surveyed_ft": 2.58,
+   "wse_ft": 32.26241296188176,
+   "ground_ft": 26.35078877445221,
+   "depth_ft": 5.911624187429549,
+   "dist_to_channel_m": 26506.331378275077
+  },
+  {
+   "lat": 34.554,
+   "lon": -79.856,
+   "site": 27088,
+   "surveyed_ft": 3.58,
+   "wse_ft": 91.98,
+   "ground_ft": 84.81759370300293,
+   "depth_ft": 7.1624062969970765,
+   "dist_to_channel_m": 8044.321274532526
+  },
+  {
+   "lat": 35.05441,
+   "lon": -78.87916,
+   "site": 27006,
+   "surveyed_ft": 3.39,
+   "wse_ft": 81.43416322461934,
+   "ground_ft": 96.22404576637268,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2019.9786507798594
+  },
+  {
+   "lat": 34.77937,
+   "lon": -79.46189,
+   "site": 27048,
+   "surveyed_ft": 0.28,
+   "wse_ft": 93.52,
+   "ground_ft": 214.0107811553955,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5915.973533208244
+  },
+  {
+   "lat": 34.69441,
+   "lon": -79.25693,
+   "site": 27060,
+   "surveyed_ft": 1.31,
+   "wse_ft": 85.49,
+   "ground_ft": 164.28751482498168,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 82.60306742121527
+  },
+  {
+   "lat": 34.772182,
+   "lon": -79.3335545,
+   "site": 27062,
+   "surveyed_ft": 5.09,
+   "wse_ft": 85.49,
+   "ground_ft": 186.0446814250183,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 121.39543981951964
+  },
+  {
+   "lat": 34.649,
+   "lon": -79.886,
+   "site": 27081,
+   "surveyed_ft": 3.19,
+   "wse_ft": 100.02527836149154,
+   "ground_ft": 94.9831302129364,
+   "depth_ft": 5.0421481485551425,
+   "dist_to_channel_m": 3901.48029078633
+  },
+  {
+   "lat": 35.1441913,
+   "lon": -76.763214,
+   "site": 27039,
+   "surveyed_ft": 5.92,
+   "wse_ft": 16.6,
+   "ground_ft": 2.0547933419394493,
+   "depth_ft": 14.545206658060552,
+   "dist_to_channel_m": 52279.70187771503
+  },
+  {
+   "lat": 34.6144,
+   "lon": -79.01585,
+   "site": 27121,
+   "surveyed_ft": 1.14,
+   "wse_ft": 85.49,
+   "ground_ft": 114.18337949554443,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 256.547181955024
+  },
+  {
+   "lat": 34.71218,
+   "lon": -77.2223,
+   "site": 27083,
+   "surveyed_ft": 2.37,
+   "wse_ft": 24.36,
+   "ground_ft": 7.363492345275879,
+   "depth_ft": 16.99650765472412,
+   "dist_to_channel_m": 30249.643104255767
+  },
+  {
+   "lat": 34.53507,
+   "lon": -79.73169,
+   "site": 27114,
+   "surveyed_ft": 1.69,
+   "wse_ft": 92.28282190208755,
+   "ground_ft": 79.40135544075012,
+   "depth_ft": 12.881466461337425,
+   "dist_to_channel_m": 9315.119875167744
+  },
+  {
+   "lat": 34.51354,
+   "lon": -79.86315,
+   "site": 27103,
+   "surveyed_ft": 4.15,
+   "wse_ft": 91.98,
+   "ground_ft": 86.42613695022582,
+   "depth_ft": 5.553863049774179,
+   "dist_to_channel_m": 12043.412728067871
+  },
+  {
+   "lat": 34.2238095,
+   "lon": -80.2166715,
+   "site": 27115,
+   "surveyed_ft": 1.6,
+   "wse_ft": 168.76585745257998,
+   "ground_ft": 165.1104281538391,
+   "depth_ft": 3.65542929874087,
+   "dist_to_channel_m": 266.25424973658596
+  },
+  {
+   "lat": 34.51279,
+   "lon": -79.86391,
+   "site": 27106,
+   "surveyed_ft": 4.66,
+   "wse_ft": 91.98,
+   "ground_ft": 86.78205021896362,
+   "depth_ft": 5.197949781036385,
+   "dist_to_channel_m": 12150.381382977386
+  },
+  {
+   "lat": 34.2238095,
+   "lon": -80.2166715,
+   "site": 27115,
+   "surveyed_ft": 3.51,
+   "wse_ft": 168.76585745257998,
+   "ground_ft": 165.1104281538391,
+   "depth_ft": 3.65542929874087,
+   "dist_to_channel_m": 266.25424973658596
+  },
+  {
+   "lat": 34.1953021,
+   "lon": -80.1827056,
+   "site": 27119,
+   "surveyed_ft": 2.84,
+   "wse_ft": 162.1315990885318,
+   "ground_ft": 164.90112041397094,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1173.0144310206379
+  },
+  {
+   "lat": 34.2238095,
+   "lon": -80.2166715,
+   "site": 27115,
+   "surveyed_ft": 1.61,
+   "wse_ft": 168.76585745257998,
+   "ground_ft": 165.1104281538391,
+   "depth_ft": 3.65542929874087,
+   "dist_to_channel_m": 266.25424973658596
+  },
+  {
+   "lat": 34.62057,
+   "lon": -79.06226,
+   "site": 27089,
+   "surveyed_ft": 5.28,
+   "wse_ft": 85.49,
+   "ground_ft": 120.83096527923584,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 339.79602694129727
+  },
+  {
+   "lat": 34.62132,
+   "lon": -79.01479,
+   "site": 27120,
+   "surveyed_ft": 1.46,
+   "wse_ft": 85.49,
+   "ground_ft": 114.42498951217651,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 297.2537932718865
+  },
+  {
+   "lat": 34.22722,
+   "lon": -79.14667,
+   "site": 27097,
+   "surveyed_ft": 2.38,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 52.782308209991456,
+   "depth_ft": 5.9845468130783175,
+   "dist_to_channel_m": 3081.0098082749905
+  },
+  {
+   "lat": 34.229,
+   "lon": -79.1412,
+   "site": 27101,
+   "surveyed_ft": 2.35,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 54.01038920906067,
+   "depth_ft": 4.756465814009104,
+   "dist_to_channel_m": 3597.4345883336537
+  },
+  {
+   "lat": 34.62,
+   "lon": -79.04447,
+   "site": 27113,
+   "surveyed_ft": 2.32,
+   "wse_ft": 85.49,
+   "ground_ft": 117.52541985717774,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 915.6376370430843
+  },
+  {
+   "lat": 34.63266,
+   "lon": -79.05537,
+   "site": 27095,
+   "surveyed_ft": 3.16,
+   "wse_ft": 85.49,
+   "ground_ft": 122.1879863040161,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 485.95414493327394
+  },
+  {
+   "lat": 34.613544,
+   "lon": -79.074945,
+   "site": 27086,
+   "surveyed_ft": 1.19,
+   "wse_ft": 85.49,
+   "ground_ft": 125.60409287017822,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 462.63653045722253
+  },
+  {
+   "lat": 34.62176,
+   "lon": -79.08915,
+   "site": 27099,
+   "surveyed_ft": 3.58,
+   "wse_ft": 85.49,
+   "ground_ft": 124.7957349647522,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 621.5888688198214
+  },
+  {
+   "lat": 34.62828,
+   "lon": -79.02746,
+   "site": 27118,
+   "surveyed_ft": 1.08,
+   "wse_ft": 85.49,
+   "ground_ft": 114.58751464431762,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 347.5657474077987
+  },
+  {
+   "lat": 34.62755,
+   "lon": -79.05866,
+   "site": 27094,
+   "surveyed_ft": 5.45,
+   "wse_ft": 85.49,
+   "ground_ft": 120.55492536590576,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 293.52784083906454
+  },
+  {
+   "lat": 34.2267,
+   "lon": -79.1417,
+   "site": 18627,
+   "surveyed_ft": 2.89,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 51.895785302810665,
+   "depth_ft": 6.871069720259108,
+   "dist_to_channel_m": 3411.9064563456054
+  },
+  {
+   "lat": 35.218721,
+   "lon": -77.14855,
+   "site": 27110,
+   "surveyed_ft": 0.4,
+   "wse_ft": 16.6,
+   "ground_ft": 6.702634038419723,
+   "depth_ft": 9.897365961580277,
+   "dist_to_channel_m": 17375.86983290074
+  },
+  {
+   "lat": 35.133012,
+   "lon": -77.069771,
+   "site": 27044,
+   "surveyed_ft": 4.5,
+   "wse_ft": 16.6,
+   "ground_ft": 4.853118669438362,
+   "depth_ft": 11.746881330561639,
+   "dist_to_channel_m": 28997.565615580603
+  },
+  {
+   "lat": 35.2999,
+   "lon": -77.3405,
+   "site": 26980,
+   "surveyed_ft": 1.0,
+   "wse_ft": 18.067833850746798,
+   "ground_ft": 35.58833256160736,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2217.3441465861697
+  },
+  {
+   "lat": 34.8887075,
+   "lon": -77.2359155,
+   "site": 27111,
+   "surveyed_ft": 2.81,
+   "wse_ft": 24.36,
+   "ground_ft": 20.700510755023956,
+   "depth_ft": 3.6594892449760437,
+   "dist_to_channel_m": 25250.801693901954
+  },
+  {
+   "lat": 34.904681,
+   "lon": -77.850691,
+   "site": 27127,
+   "surveyed_ft": 7.44,
+   "wse_ft": 42.07,
+   "ground_ft": 43.44411861339569,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 558.2593001706879
+  },
+  {
+   "lat": 35.0076253,
+   "lon": -77.224158,
+   "site": 27059,
+   "surveyed_ft": 5.93,
+   "wse_ft": 24.36,
+   "ground_ft": 15.409647190666199,
+   "depth_ft": 8.9503528093338,
+   "dist_to_channel_m": 31340.68947160154
+  },
+  {
+   "lat": 35.0081542,
+   "lon": -77.218457,
+   "site": 27052,
+   "surveyed_ft": 6.55,
+   "wse_ft": 24.36,
+   "ground_ft": 13.888481852397918,
+   "depth_ft": 10.471518147602081,
+   "dist_to_channel_m": 31804.970167758038
+  },
+  {
+   "lat": 34.74831,
+   "lon": -77.32991,
+   "site": 27107,
+   "surveyed_ft": 6.36,
+   "wse_ft": 24.36,
+   "ground_ft": 5.526258505921364,
+   "depth_ft": 18.833741494078637,
+   "dist_to_channel_m": 19806.28507161106
+  },
+  {
+   "lat": 34.8342,
+   "lon": -77.580073,
+   "site": 27140,
+   "surveyed_ft": 0.8,
+   "wse_ft": 385.3817858227966,
+   "ground_ft": 82.44907087303162,
+   "depth_ft": 302.932714949765,
+   "dist_to_channel_m": 4865.137208109576
+  },
+  {
+   "lat": 34.64216,
+   "lon": -79.00588,
+   "site": 27129,
+   "surveyed_ft": 2.58,
+   "wse_ft": 85.49,
+   "ground_ft": 123.74577955810547,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1959.6261373481393
+  },
+  {
+   "lat": 35.067472,
+   "lon": -77.590084,
+   "site": 27147,
+   "surveyed_ft": 4.3,
+   "wse_ft": 1183.3864625771603,
+   "ground_ft": 61.029601360473634,
+   "depth_ft": 1122.3568612166866,
+   "dist_to_channel_m": 11625.892667932214
+  },
+  {
+   "lat": 34.909945,
+   "lon": -77.838303,
+   "site": 27117,
+   "surveyed_ft": 8.32,
+   "wse_ft": 42.07,
+   "ground_ft": 42.72256760128021,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 461.93091533098215
+  },
+  {
+   "lat": 35.124685,
+   "lon": -77.051978,
+   "site": 27046,
+   "surveyed_ft": 4.5,
+   "wse_ft": 16.6,
+   "ground_ft": 5.9040741356754305,
+   "depth_ft": 10.695925864324572,
+   "dist_to_channel_m": 30807.607110899604
+  },
+  {
+   "lat": 34.65608,
+   "lon": -79.01202,
+   "site": 27139,
+   "surveyed_ft": 4.15,
+   "wse_ft": 85.49,
+   "ground_ft": 121.65828403289795,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2954.8034473740404
+  },
+  {
+   "lat": 34.647621,
+   "lon": -79.012246,
+   "site": 27126,
+   "surveyed_ft": 3.15,
+   "wse_ft": 85.49,
+   "ground_ft": 122.94051295928955,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2139.3502315884166
+  },
+  {
+   "lat": 34.9070534,
+   "lon": -77.8379688,
+   "site": 27125,
+   "surveyed_ft": 5.75,
+   "wse_ft": 42.07,
+   "ground_ft": 44.500891790390014,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 276.6985267381206
+  },
+  {
+   "lat": 34.815282,
+   "lon": -79.8915609,
+   "site": 27134,
+   "surveyed_ft": 8.27,
+   "wse_ft": 102.62,
+   "ground_ft": 170.75429046051025,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2036.7633908850928
+  },
+  {
+   "lat": 38.22203,
+   "lon": -80.53303,
+   "site": 26878,
+   "surveyed_ft": 0.1,
+   "wse_ft": 1900.0084273322411,
+   "ground_ft": 2181.1768836791994,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 10995.989483763044
+  },
+  {
+   "lat": 34.8339217,
+   "lon": -77.8274505,
+   "site": 27138,
+   "surveyed_ft": 7.02,
+   "wse_ft": 42.07,
+   "ground_ft": 36.023255622367856,
+   "depth_ft": 6.046744377632145,
+   "dist_to_channel_m": 584.7642507540528
+  },
+  {
+   "lat": 34.60551,
+   "lon": -78.99339,
+   "site": 27156,
+   "surveyed_ft": 2.25,
+   "wse_ft": 85.49,
+   "ground_ft": 112.06908847457886,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 294.53596416024874
+  },
+  {
+   "lat": 34.8305441,
+   "lon": -77.819702,
+   "site": 27130,
+   "surveyed_ft": 3.92,
+   "wse_ft": 42.07,
+   "ground_ft": 38.12262514411926,
+   "depth_ft": 3.9473748558807387,
+   "dist_to_channel_m": 1161.7412359197187
+  },
+  {
+   "lat": 33.869444,
+   "lon": -78.774146,
+   "site": 27159,
+   "surveyed_ft": 1.95,
+   "wse_ft": 24.75877702898911,
+   "ground_ft": 23.44156262676239,
+   "depth_ft": 1.3172144022267176,
+   "dist_to_channel_m": 1413.3137343946005
+  },
+  {
+   "lat": 34.591678,
+   "lon": -78.984034,
+   "site": 27158,
+   "surveyed_ft": 2.78,
+   "wse_ft": 85.49,
+   "ground_ft": 108.37983305511474,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 75.78782205588122
+  },
+  {
+   "lat": 34.61025,
+   "lon": -79.00188,
+   "site": 27149,
+   "surveyed_ft": 2.26,
+   "wse_ft": 85.49,
+   "ground_ft": 113.21132000930785,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 67.40066295375686
+  },
+  {
+   "lat": 34.97974,
+   "lon": -79.85744,
+   "site": 27123,
+   "surveyed_ft": 3.87,
+   "wse_ft": 102.62,
+   "ground_ft": 147.8816753060913,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 617.7194092705273
+  },
+  {
+   "lat": 33.9829398,
+   "lon": -79.891924,
+   "site": 27143,
+   "surveyed_ft": 0.76,
+   "wse_ft": 101.64159363108438,
+   "ground_ft": 97.36486305961608,
+   "depth_ft": 4.276730571468292,
+   "dist_to_channel_m": 483.4753059735747
+  },
+  {
+   "lat": 33.97511,
+   "lon": -79.6817598,
+   "site": 27165,
+   "surveyed_ft": 0.77,
+   "wse_ft": 74.2,
+   "ground_ft": 58.01570882743835,
+   "depth_ft": 16.18429117256165,
+   "dist_to_channel_m": 9078.270202764392
+  },
+  {
+   "lat": 33.865508,
+   "lon": -78.802,
+   "site": 27176,
+   "surveyed_ft": 1.34,
+   "wse_ft": 23.740935712225074,
+   "ground_ft": 20.187004990653993,
+   "depth_ft": 3.5539307215710814,
+   "dist_to_channel_m": 2022.029920411419
+  },
+  {
+   "lat": 33.922393,
+   "lon": -78.673536,
+   "site": 27124,
+   "surveyed_ft": 1.02,
+   "wse_ft": 28.926506183151325,
+   "ground_ft": 15.232940533008575,
+   "depth_ft": 13.69356565014275,
+   "dist_to_channel_m": 79.26517033970438
+  },
+  {
+   "lat": 33.866409,
+   "lon": -78.733248,
+   "site": 27141,
+   "surveyed_ft": 1.4,
+   "wse_ft": 25.771433220896462,
+   "ground_ft": 20.646337796878814,
+   "depth_ft": 5.125095424017648,
+   "dist_to_channel_m": 1935.5894070506856
+  },
+  {
+   "lat": 33.902806,
+   "lon": -78.702415,
+   "site": 27131,
+   "surveyed_ft": 1.51,
+   "wse_ft": 27.910638439927418,
+   "ground_ft": 21.912730034599303,
+   "depth_ft": 5.997908405328115,
+   "dist_to_channel_m": 909.3700291931744
+  },
+  {
+   "lat": 33.9829398,
+   "lon": -79.891924,
+   "site": 27143,
+   "surveyed_ft": 0.64,
+   "wse_ft": 101.64159363108438,
+   "ground_ft": 97.36486305961608,
+   "depth_ft": 4.276730571468292,
+   "dist_to_channel_m": 483.4753059735747
+  },
+  {
+   "lat": 33.97511,
+   "lon": -79.6817598,
+   "site": 27165,
+   "surveyed_ft": 0.55,
+   "wse_ft": 74.2,
+   "ground_ft": 58.01570882743835,
+   "depth_ft": 16.18429117256165,
+   "dist_to_channel_m": 9078.270202764392
+  },
+  {
+   "lat": 34.60034,
+   "lon": -79.0091,
+   "site": 27181,
+   "surveyed_ft": 2.6,
+   "wse_ft": 85.49,
+   "ground_ft": 114.3298598703003,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1078.9619780519247
+  },
+  {
+   "lat": 34.7522241,
+   "lon": -79.5162699,
+   "site": 27190,
+   "surveyed_ft": 2.1,
+   "wse_ft": 93.52,
+   "ground_ft": 191.30908897415162,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1369.8515681689173
+  },
+  {
+   "lat": 34.7919826,
+   "lon": -77.9058173,
+   "site": 27157,
+   "surveyed_ft": 4.99,
+   "wse_ft": 37.48990931079791,
+   "ground_ft": 32.17839296440125,
+   "depth_ft": 5.311516346396665,
+   "dist_to_channel_m": 1743.5025821832576
+  },
+  {
+   "lat": 34.775016,
+   "lon": -77.920252,
+   "site": 27146,
+   "surveyed_ft": 5.19,
+   "wse_ft": 36.37799851954226,
+   "ground_ft": 32.404609025039676,
+   "depth_ft": 3.973389494502584,
+   "dist_to_channel_m": 1697.656805517475
+  },
+  {
+   "lat": 34.78998,
+   "lon": -77.913207,
+   "site": 27152,
+   "surveyed_ft": 7.88,
+   "wse_ft": 36.80262293959725,
+   "ground_ft": 29.960937407455443,
+   "depth_ft": 6.841685532141806,
+   "dist_to_channel_m": 2224.3564821243017
+  },
+  {
+   "lat": 34.7763904,
+   "lon": -77.8636131,
+   "site": 27167,
+   "surveyed_ft": 7.02,
+   "wse_ft": 38.343719790032736,
+   "ground_ft": 31.361793660583494,
+   "depth_ft": 6.981926129449242,
+   "dist_to_channel_m": 800.8234482285734
+  },
+  {
+   "lat": 34.58646,
+   "lon": -79.00543,
+   "site": 27179,
+   "surveyed_ft": 2.45,
+   "wse_ft": 85.49,
+   "ground_ft": 110.7501768774414,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1798.9696906738495
+  },
+  {
+   "lat": 34.58023,
+   "lon": -78.99583,
+   "site": 27173,
+   "surveyed_ft": 3.18,
+   "wse_ft": 85.49,
+   "ground_ft": 107.8536476145935,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1699.0045135603445
+  },
+  {
+   "lat": 33.960886,
+   "lon": -79.350539,
+   "site": 27192,
+   "surveyed_ft": 1.64,
+   "wse_ft": 39.55,
+   "ground_ft": 31.853205030593873,
+   "depth_ft": 7.696794969406124,
+   "dist_to_channel_m": 13622.785132006587
+  },
+  {
+   "lat": 33.849972,
+   "lon": -78.894598,
+   "site": 27189,
+   "surveyed_ft": 1.15,
+   "wse_ft": 19.827223508934956,
+   "ground_ft": 18.645017136707306,
+   "depth_ft": 1.1822063722276503,
+   "dist_to_channel_m": 278.1983706088944
+  },
+  {
+   "lat": 34.7421,
+   "lon": -77.432723,
+   "site": 27014,
+   "surveyed_ft": 1.72,
+   "wse_ft": 24.36,
+   "ground_ft": 4.374364291396141,
+   "depth_ft": 19.98563570860386,
+   "dist_to_channel_m": 13804.347906586587
+  },
+  {
+   "lat": 34.221284,
+   "lon": -77.891579,
+   "site": 27412,
+   "surveyed_ft": 1.0,
+   "wse_ft": 26.68,
+   "ground_ft": 36.49327189662933,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 40293.583535743805
+  },
+  {
+   "lat": 34.48861,
+   "lon": -78.65054,
+   "site": 27210,
+   "surveyed_ft": 4.31,
+   "wse_ft": 37.13,
+   "ground_ft": 81.21204761253357,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 15494.388311846487
+  },
+  {
+   "lat": 34.88425,
+   "lon": -79.4518,
+   "site": 27174,
+   "surveyed_ft": 4.65,
+   "wse_ft": 170.59,
+   "ground_ft": 230.83221993988036,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5564.687556236316
+  },
+  {
+   "lat": 34.603365,
+   "lon": -79.026058,
+   "site": 27186,
+   "surveyed_ft": 1.77,
+   "wse_ft": 85.49,
+   "ground_ft": 114.17643344223022,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1610.6152178076056
+  },
+  {
+   "lat": 34.74831,
+   "lon": -77.32991,
+   "site": 27107,
+   "surveyed_ft": 4.83,
+   "wse_ft": 24.36,
+   "ground_ft": 5.526258505921364,
+   "depth_ft": 18.833741494078637,
+   "dist_to_channel_m": 19806.28507161106
+  },
+  {
+   "lat": 34.59103,
+   "lon": -79.0298,
+   "site": 27191,
+   "surveyed_ft": 1.51,
+   "wse_ft": 85.49,
+   "ground_ft": 114.4853763720703,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2871.430444812459
+  },
+  {
+   "lat": 33.9549,
+   "lon": -78.715835,
+   "site": 27208,
+   "surveyed_ft": 4.1,
+   "wse_ft": 25.07,
+   "ground_ft": 20.63648503927231,
+   "depth_ft": 4.433514960727692,
+   "dist_to_channel_m": 332.83587802414974
+  },
+  {
+   "lat": 34.49995,
+   "lon": -78.93859,
+   "site": 27221,
+   "surveyed_ft": 0.46,
+   "wse_ft": 85.49,
+   "ground_ft": 90.68182737319947,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 569.0567494086874
+  },
+  {
+   "lat": 34.60845,
+   "lon": -79.03267,
+   "site": 27188,
+   "surveyed_ft": 1.08,
+   "wse_ft": 85.49,
+   "ground_ft": 115.34007884582519,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1886.783493289535
+  },
+  {
+   "lat": 34.71533,
+   "lon": -77.2246,
+   "site": 27070,
+   "surveyed_ft": 2.39,
+   "wse_ft": 24.36,
+   "ground_ft": 3.838067962908745,
+   "depth_ft": 20.521932037091254,
+   "dist_to_channel_m": 29892.427346524084
+  },
+  {
+   "lat": 33.912616,
+   "lon": -78.746069,
+   "site": 27214,
+   "surveyed_ft": 0.6,
+   "wse_ft": 26.840494004509683,
+   "ground_ft": 22.536096080036163,
+   "depth_ft": 4.30439792447352,
+   "dist_to_channel_m": 2308.633698437567
+  },
+  {
+   "lat": 34.63115,
+   "lon": -79.00777,
+   "site": 27216,
+   "surveyed_ft": 1.25,
+   "wse_ft": 85.49,
+   "ground_ft": 133.9737366822815,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 938.2454300831965
+  },
+  {
+   "lat": 35.12307,
+   "lon": -78.152134,
+   "site": 27217,
+   "surveyed_ft": 1.1,
+   "wse_ft": 42.07,
+   "ground_ft": 124.43823223876953,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 11103.009597321749
+  },
+  {
+   "lat": 33.922096,
+   "lon": -78.725671,
+   "site": 27212,
+   "surveyed_ft": 5.2,
+   "wse_ft": 27.539946481360893,
+   "ground_ft": 18.464555855636597,
+   "depth_ft": 9.075390625724296,
+   "dist_to_channel_m": 1488.9596252885765
+  },
+  {
+   "lat": 33.935907,
+   "lon": -78.723161,
+   "site": 27209,
+   "surveyed_ft": 3.04,
+   "wse_ft": 25.07,
+   "ground_ft": 20.406822547225953,
+   "depth_ft": 4.663177452774047,
+   "dist_to_channel_m": 797.1821667519814
+  },
+  {
+   "lat": 33.954921,
+   "lon": -78.693892,
+   "site": 27206,
+   "surveyed_ft": 1.15,
+   "wse_ft": 25.07,
+   "ground_ft": 24.934388380393983,
+   "depth_ft": 0.1356116196060171,
+   "dist_to_channel_m": 2168.658840338054
+  },
+  {
+   "lat": 34.47662,
+   "lon": -78.9695,
+   "site": 27224,
+   "surveyed_ft": 2.8,
+   "wse_ft": 85.49,
+   "ground_ft": 83.41256981788635,
+   "depth_ft": 2.0774301821136447,
+   "dist_to_channel_m": 1596.5537188629405
+  },
+  {
+   "lat": 33.91012,
+   "lon": -78.761199,
+   "site": 27218,
+   "surveyed_ft": 1.88,
+   "wse_ft": 24.681426676538898,
+   "ground_ft": 19.790014577350615,
+   "depth_ft": 4.891412099188283,
+   "dist_to_channel_m": 3107.762684077746
+  },
+  {
+   "lat": 33.904688,
+   "lon": -78.772387,
+   "site": 27220,
+   "surveyed_ft": 2.5,
+   "wse_ft": 24.681426676538898,
+   "ground_ft": 20.216542925930025,
+   "depth_ft": 4.464883750608873,
+   "dist_to_channel_m": 2221.7484177964957
+  },
+  {
+   "lat": 35.115397,
+   "lon": -77.01821,
+   "site": 12508,
+   "surveyed_ft": 2.6,
+   "wse_ft": 16.6,
+   "ground_ft": 8.149763678474427,
+   "depth_ft": 8.450236321525574,
+   "dist_to_channel_m": 33782.86238349886
+  },
+  {
+   "lat": 34.4439,
+   "lon": -78.96172,
+   "site": 27227,
+   "surveyed_ft": 1.67,
+   "wse_ft": 85.49,
+   "ground_ft": 84.07919068946838,
+   "depth_ft": 1.4108093105316186,
+   "dist_to_channel_m": 244.01820746367932
+  },
+  {
+   "lat": 34.1842753,
+   "lon": -79.1721324,
+   "site": 27226,
+   "surveyed_ft": 6.79,
+   "wse_ft": 56.271100978499064,
+   "ground_ft": 43.21426682575226,
+   "depth_ft": 13.056834152746802,
+   "dist_to_channel_m": 139.88357713188853
+  },
+  {
+   "lat": 34.31789,
+   "lon": -79.02452,
+   "site": 27243,
+   "surveyed_ft": 2.19,
+   "wse_ft": 85.49,
+   "ground_ft": 66.16844804496765,
+   "depth_ft": 19.321551955032348,
+   "dist_to_channel_m": 11345.953539880276
+  },
+  {
+   "lat": 34.1819791,
+   "lon": -79.1722028,
+   "site": 27228,
+   "surveyed_ft": 5.96,
+   "wse_ft": 56.12963458910399,
+   "ground_ft": 45.83652084827423,
+   "depth_ft": 10.29311374082976,
+   "dist_to_channel_m": 74.34102666687504
+  },
+  {
+   "lat": 33.907697,
+   "lon": -78.828066,
+   "site": 27232,
+   "surveyed_ft": 1.1,
+   "wse_ft": 22.70933609926693,
+   "ground_ft": 19.05510179916382,
+   "depth_ft": 3.654234300103113,
+   "dist_to_channel_m": 1089.2442810677012
+  },
+  {
+   "lat": 34.1838745,
+   "lon": -79.1815694,
+   "site": 27234,
+   "surveyed_ft": 4.95,
+   "wse_ft": 54.60168660131171,
+   "ground_ft": 47.01745942153931,
+   "depth_ft": 7.584227179772405,
+   "dist_to_channel_m": 287.9511395625605
+  },
+  {
+   "lat": 33.917325,
+   "lon": -78.807967,
+   "site": 27225,
+   "surveyed_ft": 2.17,
+   "wse_ft": 22.891301324886793,
+   "ground_ft": 21.030199543647765,
+   "depth_ft": 1.8611017812390287,
+   "dist_to_channel_m": 2644.2308169137095
+  },
+  {
+   "lat": 34.2083,
+   "lon": -79.5438,
+   "site": 27233,
+   "surveyed_ft": 3.45,
+   "wse_ft": 74.82,
+   "ground_ft": 52.521837468414304,
+   "depth_ft": 22.29816253158569,
+   "dist_to_channel_m": 17941.77112663197
+  },
+  {
+   "lat": 34.0407,
+   "lon": -79.4422,
+   "site": 27250,
+   "surveyed_ft": 3.54,
+   "wse_ft": 39.55,
+   "ground_ft": 37.93592023719788,
+   "depth_ft": 1.6140797628021204,
+   "dist_to_channel_m": 17217.197963622002
+  },
+  {
+   "lat": 34.3889,
+   "lon": -78.97767,
+   "site": 27235,
+   "surveyed_ft": 2.35,
+   "wse_ft": 85.49,
+   "ground_ft": 75.23541929046631,
+   "depth_ft": 10.254580709533684,
+   "dist_to_channel_m": 2405.2427390459848
+  },
+  {
+   "lat": 34.1813156,
+   "lon": -79.1852055,
+   "site": 27237,
+   "surveyed_ft": 6.1,
+   "wse_ft": 54.418799389467104,
+   "ground_ft": 46.12970061748505,
+   "depth_ft": 8.289098771982054,
+   "dist_to_channel_m": 123.22954351826634
+  },
+  {
+   "lat": 35.122543,
+   "lon": -78.093153,
+   "site": 27241,
+   "surveyed_ft": 5.0,
+   "wse_ft": 42.07,
+   "ground_ft": 99.22617381271363,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7133.626274420609
+  },
+  {
+   "lat": 34.2043,
+   "lon": -79.5409,
+   "site": 27236,
+   "surveyed_ft": 1.78,
+   "wse_ft": 74.82,
+   "ground_ft": 52.555372513198854,
+   "depth_ft": 22.26462748680114,
+   "dist_to_channel_m": 18292.89215742533
+  },
+  {
+   "lat": 34.1653303,
+   "lon": -79.5142539,
+   "site": 27239,
+   "surveyed_ft": 3.6,
+   "wse_ft": 74.82,
+   "ground_ft": 46.696554887275695,
+   "depth_ft": 28.123445112724298,
+   "dist_to_channel_m": 21924.352092037694
+  },
+  {
+   "lat": 34.1282926,
+   "lon": -79.4558411,
+   "site": 27248,
+   "surveyed_ft": 1.33,
+   "wse_ft": 39.55,
+   "ground_ft": 45.012643832740785,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 20128.415102627652
+  },
+  {
+   "lat": 34.4397,
+   "lon": -78.95343,
+   "site": 27230,
+   "surveyed_ft": 2.8,
+   "wse_ft": 85.49,
+   "ground_ft": 78.76599806678772,
+   "depth_ft": 6.7240019332122785,
+   "dist_to_channel_m": 413.010447078913
+  },
+  {
+   "lat": 34.1653303,
+   "lon": -79.5142539,
+   "site": 27239,
+   "surveyed_ft": 3.36,
+   "wse_ft": 74.82,
+   "ground_ft": 46.696554887275695,
+   "depth_ft": 28.123445112724298,
+   "dist_to_channel_m": 21924.352092037694
+  },
+  {
+   "lat": 34.1402797,
+   "lon": -79.2045845,
+   "site": 27253,
+   "surveyed_ft": 3.32,
+   "wse_ft": 49.54737292944649,
+   "ground_ft": 43.32803817287445,
+   "depth_ft": 6.219334756572039,
+   "dist_to_channel_m": 154.0283514531775
+  },
+  {
+   "lat": 34.31288,
+   "lon": -79.03731,
+   "site": 27247,
+   "surveyed_ft": 3.41,
+   "wse_ft": 85.49,
+   "ground_ft": 63.76919362236023,
+   "depth_ft": 21.720806377639768,
+   "dist_to_channel_m": 12382.474260440975
+  },
+  {
+   "lat": 35.126205,
+   "lon": -77.583649,
+   "site": 27154,
+   "surveyed_ft": 3.5,
+   "wse_ft": 33.8398678019847,
+   "ground_ft": 72.47372481208801,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12790.237595751792
+  },
+  {
+   "lat": 34.243,
+   "lon": -79.739,
+   "site": 27267,
+   "surveyed_ft": 4.17,
+   "wse_ft": 74.82,
+   "ground_ft": 68.02696160362244,
+   "depth_ft": 6.793038396377554,
+   "dist_to_channel_m": 222.26725755013805
+  },
+  {
+   "lat": 34.244,
+   "lon": -79.736,
+   "site": 27270,
+   "surveyed_ft": 2.8,
+   "wse_ft": 74.82,
+   "ground_ft": 69.6098983191681,
+   "depth_ft": 5.210101680831897,
+   "dist_to_channel_m": 353.8233754533767
+  },
+  {
+   "lat": 34.822384,
+   "lon": -77.4579383,
+   "site": 27104,
+   "surveyed_ft": 4.07,
+   "wse_ft": 24.36,
+   "ground_ft": 11.955405383825301,
+   "depth_ft": 12.404594616174698,
+   "dist_to_channel_m": 5520.84219287655
+  },
+  {
+   "lat": 34.30723,
+   "lon": -79.04385,
+   "site": 27251,
+   "surveyed_ft": 2.4,
+   "wse_ft": 85.49,
+   "ground_ft": 64.45232857925414,
+   "depth_ft": 21.037671420745852,
+   "dist_to_channel_m": 13224.684256736095
+  },
+  {
+   "lat": 34.4804,
+   "lon": -78.87836,
+   "site": 27254,
+   "surveyed_ft": 0.74,
+   "wse_ft": 85.49,
+   "ground_ft": 90.68222160865784,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5576.037588014912
+  },
+  {
+   "lat": 35.048281,
+   "lon": -78.029825,
+   "site": 27264,
+   "surveyed_ft": 7.0,
+   "wse_ft": 42.07,
+   "ground_ft": 107.60728174163819,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 13898.161953027653
+  },
+  {
+   "lat": 34.0049027,
+   "lon": -79.4578588,
+   "site": 27255,
+   "surveyed_ft": 4.38,
+   "wse_ft": 39.55,
+   "ground_ft": 35.24929319625854,
+   "depth_ft": 4.3007068037414555,
+   "dist_to_channel_m": 19391.505428634904
+  },
+  {
+   "lat": 33.9936501,
+   "lon": -79.4298464,
+   "site": 27257,
+   "surveyed_ft": 4.35,
+   "wse_ft": 39.55,
+   "ground_ft": 37.13838816261291,
+   "depth_ft": 2.4116118373870847,
+   "dist_to_channel_m": 17397.89416356895
+  },
+  {
+   "lat": 33.9462142,
+   "lon": -79.4401196,
+   "site": 27261,
+   "surveyed_ft": 2.42,
+   "wse_ft": 39.55,
+   "ground_ft": 37.581070778427126,
+   "depth_ft": 1.9689292215728713,
+   "dist_to_channel_m": 20815.591486582205
+  },
+  {
+   "lat": 33.9462142,
+   "lon": -79.4401196,
+   "site": 27261,
+   "surveyed_ft": 2.42,
+   "wse_ft": 39.55,
+   "ground_ft": 37.581070778427126,
+   "depth_ft": 1.9689292215728713,
+   "dist_to_channel_m": 20815.591486582205
+  },
+  {
+   "lat": 34.58229,
+   "lon": -78.87364,
+   "site": 27262,
+   "surveyed_ft": 1.86,
+   "wse_ft": 85.49,
+   "ground_ft": 98.8524636289978,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7782.988598972513
+  },
+  {
+   "lat": 35.143927,
+   "lon": -76.76648,
+   "site": 13269,
+   "surveyed_ft": 0.8,
+   "wse_ft": 16.6,
+   "ground_ft": 6.2433360406827925,
+   "depth_ft": 10.35666395931721,
+   "dist_to_channel_m": 52014.06726755418
+  },
+  {
+   "lat": 34.81132,
+   "lon": -79.13913,
+   "site": 27205,
+   "surveyed_ft": 2.03,
+   "wse_ft": 85.49,
+   "ground_ft": 181.816725153656,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 16928.08193787111
+  },
+  {
+   "lat": 34.655554,
+   "lon": -79.071089,
+   "site": 27263,
+   "surveyed_ft": 5.38,
+   "wse_ft": 85.49,
+   "ground_ft": 121.56861111038208,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 3042.9280946629046
+  },
+  {
+   "lat": 34.62632,
+   "lon": -79.07327,
+   "site": 27256,
+   "surveyed_ft": 4.69,
+   "wse_ft": 85.49,
+   "ground_ft": 121.63370376495361,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 550.567535136442
+  },
+  {
+   "lat": 34.32176,
+   "lon": -78.11721,
+   "site": 27269,
+   "surveyed_ft": 4.41,
+   "wse_ft": 26.68,
+   "ground_ft": 15.29869181110382,
+   "depth_ft": 11.38130818889618,
+   "dist_to_channel_m": 16951.594612959925
+  },
+  {
+   "lat": 34.33114,
+   "lon": -78.21628,
+   "site": 27271,
+   "surveyed_ft": 1.15,
+   "wse_ft": 26.68,
+   "ground_ft": 22.41207930427551,
+   "depth_ft": 4.267920695724488,
+   "dist_to_channel_m": 9682.151394288736
+  },
+  {
+   "lat": 34.59641,
+   "lon": -77.87727,
+   "site": 27282,
+   "surveyed_ft": 1.98,
+   "wse_ft": 24.61,
+   "ground_ft": 21.381482110176087,
+   "depth_ft": 3.2285178898239124,
+   "dist_to_channel_m": 273.71939835291516
+  },
+  {
+   "lat": 34.41105,
+   "lon": -78.25836,
+   "site": 27272,
+   "surveyed_ft": 4.74,
+   "wse_ft": 26.68,
+   "ground_ft": 18.954293289375304,
+   "depth_ft": 7.725706710624696,
+   "dist_to_channel_m": 1586.6951136370628
+  },
+  {
+   "lat": 34.463087,
+   "lon": -78.320845,
+   "site": 27277,
+   "surveyed_ft": 2.47,
+   "wse_ft": 31.913518536166634,
+   "ground_ft": 22.755513143444063,
+   "depth_ft": 9.158005392722572,
+   "dist_to_channel_m": 2703.6409141067634
+  },
+  {
+   "lat": 34.78442,
+   "lon": -76.862882,
+   "site": 27280,
+   "surveyed_ft": 4.2,
+   "wse_ft": 24.36,
+   "ground_ft": 8.774658950738907,
+   "depth_ft": 15.585341049261093,
+   "dist_to_channel_m": 59332.00315441978
+  },
+  {
+   "lat": 34.47459,
+   "lon": -78.36846,
+   "site": 27278,
+   "surveyed_ft": 11.42,
+   "wse_ft": 32.95440343106594,
+   "ground_ft": 21.092865772838593,
+   "depth_ft": 11.861537658227348,
+   "dist_to_channel_m": 36.94480015275038
+  },
+  {
+   "lat": 34.58003,
+   "lon": -77.89958,
+   "site": 27279,
+   "surveyed_ft": 4.11,
+   "wse_ft": 24.697808325296684,
+   "ground_ft": 21.638852158584594,
+   "depth_ft": 3.0589561667120897,
+   "dist_to_channel_m": 2988.9459684749954
+  },
+  {
+   "lat": 34.43451,
+   "lon": -78.10749,
+   "site": 27299,
+   "surveyed_ft": 4.0,
+   "wse_ft": 26.68,
+   "ground_ft": 15.119289646720887,
+   "depth_ft": 11.560710353279113,
+   "dist_to_channel_m": 15494.654640038367
+  },
+  {
+   "lat": 34.4228,
+   "lon": -78.26406,
+   "site": 27274,
+   "surveyed_ft": 3.82,
+   "wse_ft": 26.68,
+   "ground_ft": 19.5438614663887,
+   "depth_ft": 7.136138533611298,
+   "dist_to_channel_m": 2228.9279452827477
+  },
+  {
+   "lat": 34.56024,
+   "lon": -77.8393,
+   "site": 27290,
+   "surveyed_ft": 6.22,
+   "wse_ft": 24.61,
+   "ground_ft": 15.909195142498016,
+   "depth_ft": 8.700804857501984,
+   "dist_to_channel_m": 5175.1627441689125
+  },
+  {
+   "lat": 34.68011,
+   "lon": -78.22567,
+   "site": 27292,
+   "surveyed_ft": 1.18,
+   "wse_ft": 38.902272608646676,
+   "ground_ft": 44.868503839912414,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 24080.407431446394
+  },
+  {
+   "lat": 34.821617,
+   "lon": -77.84063,
+   "site": 27132,
+   "surveyed_ft": 6.53,
+   "wse_ft": 41.77425437395105,
+   "ground_ft": 35.116830082244874,
+   "depth_ft": 6.657424291706178,
+   "dist_to_channel_m": 581.9500450202022
+  },
+  {
+   "lat": 34.60331,
+   "lon": -78.24006,
+   "site": 27293,
+   "surveyed_ft": 3.64,
+   "wse_ft": 31.949008786328953,
+   "ground_ft": 32.577622071914675,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 18420.394783440926
+  },
+  {
+   "lat": 34.33189,
+   "lon": -78.0003,
+   "site": 27302,
+   "surveyed_ft": 0.83,
+   "wse_ft": 26.68,
+   "ground_ft": 6.078013322992325,
+   "depth_ft": 20.601986677007673,
+   "dist_to_channel_m": 26153.756316833013
+  },
+  {
+   "lat": 35.194233,
+   "lon": -77.899078,
+   "site": 27291,
+   "surveyed_ft": 9.0,
+   "wse_ft": 42.07,
+   "ground_ft": 119.01236336746216,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 3299.137409895422
+  },
+  {
+   "lat": 33.6873432,
+   "lon": -79.3145819,
+   "site": 27298,
+   "surveyed_ft": 1.24,
+   "wse_ft": 3.882118815916795,
+   "ground_ft": 17.736352902374268,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 16036.233955531627
+  },
+  {
+   "lat": 33.847281,
+   "lon": -79.2826984,
+   "site": 27286,
+   "surveyed_ft": 0.78,
+   "wse_ft": 15.98,
+   "ground_ft": 22.58119849378586,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 14070.162749214911
+  },
+  {
+   "lat": 33.8481993,
+   "lon": -79.2926679,
+   "site": 27288,
+   "surveyed_ft": 0.53,
+   "wse_ft": 15.98,
+   "ground_ft": 22.389778405628203,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 14962.194612737121
+  },
+  {
+   "lat": 35.152582,
+   "lon": -77.851238,
+   "site": 27303,
+   "surveyed_ft": 10.0,
+   "wse_ft": 42.07,
+   "ground_ft": 89.73703896835327,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1956.9068509487781
+  },
+  {
+   "lat": 34.25399,
+   "lon": -79.67947,
+   "site": 27265,
+   "surveyed_ft": 0.99,
+   "wse_ft": 74.82,
+   "ground_ft": 59.087547430877684,
+   "depth_ft": 15.732452569122309,
+   "dist_to_channel_m": 5405.139948550361
+  },
+  {
+   "lat": 34.54055,
+   "lon": -77.85318,
+   "site": 27295,
+   "surveyed_ft": 3.8,
+   "wse_ft": 24.61,
+   "ground_ft": 18.7880839330101,
+   "depth_ft": 5.8219160669899,
+   "dist_to_channel_m": 6612.971902345071
+  },
+  {
+   "lat": 35.183084,
+   "lon": -77.968095,
+   "site": 27284,
+   "surveyed_ft": 0.6,
+   "wse_ft": 42.07,
+   "ground_ft": 143.96979574905396,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1281.0982331904086
+  },
+  {
+   "lat": 34.33189,
+   "lon": -78.0003,
+   "site": 27302,
+   "surveyed_ft": 2.82,
+   "wse_ft": 26.68,
+   "ground_ft": 6.078013322992325,
+   "depth_ft": 20.601986677007673,
+   "dist_to_channel_m": 26153.756316833013
+  },
+  {
+   "lat": 35.184431,
+   "lon": -77.872024,
+   "site": 27297,
+   "surveyed_ft": 7.5,
+   "wse_ft": 42.07,
+   "ground_ft": 102.18882825157165,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 4237.565526079389
+  },
+  {
+   "lat": 35.406818,
+   "lon": -78.368354,
+   "site": 27305,
+   "surveyed_ft": 5.0,
+   "wse_ft": 113.49452729710359,
+   "ground_ft": 107.08625265060425,
+   "depth_ft": 6.408274646499336,
+   "dist_to_channel_m": 3576.3831347741193
+  },
+  {
+   "lat": 35.16883,
+   "lon": -77.871664,
+   "site": 27300,
+   "surveyed_ft": 3.0,
+   "wse_ft": 42.07,
+   "ground_ft": 98.64473283096314,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2807.4895675757034
+  },
+  {
+   "lat": 35.25412,
+   "lon": -78.11378,
+   "site": 27273,
+   "surveyed_ft": 9.0,
+   "wse_ft": 42.07,
+   "ground_ft": 100.86462263542175,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 9307.419679280294
+  },
+  {
+   "lat": 35.19062,
+   "lon": -77.870766,
+   "site": 27294,
+   "surveyed_ft": 6.5,
+   "wse_ft": 55.1610167971437,
+   "ground_ft": 111.74600312988281,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 4329.0193725352465
+  },
+  {
+   "lat": 34.244,
+   "lon": -79.732,
+   "site": 27266,
+   "surveyed_ft": 2.3,
+   "wse_ft": 74.82,
+   "ground_ft": 69.36966499778748,
+   "depth_ft": 5.450335002212512,
+   "dist_to_channel_m": 548.5136495336558
+  },
+  {
+   "lat": 34.784784,
+   "lon": -76.875653,
+   "site": 27268,
+   "surveyed_ft": 3.58,
+   "wse_ft": 24.36,
+   "ground_ft": 9.653339388265609,
+   "depth_ft": 14.70666061173439,
+   "dist_to_channel_m": 58171.242278098354
+  },
+  {
+   "lat": 34.24167,
+   "lon": -79.14861,
+   "site": 27079,
+   "surveyed_ft": 2.95,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 53.05133323524475,
+   "depth_ft": 5.7155217878250255,
+   "dist_to_channel_m": 4190.769601077145
+  },
+  {
+   "lat": 34.60975,
+   "lon": -79.01871,
+   "site": 27184,
+   "surveyed_ft": 1.89,
+   "wse_ft": 85.49,
+   "ground_ft": 113.47350536224366,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 646.4140071882874
+  },
+  {
+   "lat": 34.39301,
+   "lon": -77.7678,
+   "site": 27316,
+   "surveyed_ft": 1.87,
+   "wse_ft": 24.61,
+   "ground_ft": 11.8773506741333,
+   "depth_ft": 12.7326493258667,
+   "dist_to_channel_m": 24705.313877166343
+  },
+  {
+   "lat": 35.361503,
+   "lon": -78.392997,
+   "site": 27317,
+   "surveyed_ft": 3.0,
+   "wse_ft": 112.00300868742605,
+   "ground_ft": 126.13846338974,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 9049.982694842547
+  },
+  {
+   "lat": 35.404744,
+   "lon": -78.384474,
+   "site": 27309,
+   "surveyed_ft": 5.0,
+   "wse_ft": 113.49452729710359,
+   "ground_ft": 108.01225542297364,
+   "depth_ft": 5.48227187412995,
+   "dist_to_channel_m": 4672.065428837426
+  },
+  {
+   "lat": 34.47974,
+   "lon": -77.8709,
+   "site": 27308,
+   "surveyed_ft": 4.75,
+   "wse_ft": 24.61,
+   "ground_ft": 13.551083570365906,
+   "depth_ft": 11.058916429634094,
+   "dist_to_channel_m": 13114.921535865082
+  },
+  {
+   "lat": 34.45224,
+   "lon": -77.82958,
+   "site": 27311,
+   "surveyed_ft": 5.29,
+   "wse_ft": 24.61,
+   "ground_ft": 11.376904741535187,
+   "depth_ft": 13.233095258464813,
+   "dist_to_channel_m": 16656.945895369878
+  },
+  {
+   "lat": 34.44767,
+   "lon": -77.80376,
+   "site": 27314,
+   "surveyed_ft": 7.02,
+   "wse_ft": 24.61,
+   "ground_ft": 7.6372262940597535,
+   "depth_ft": 16.972773705940245,
+   "dist_to_channel_m": 17843.69487421362
+  },
+  {
+   "lat": 34.3661,
+   "lon": -77.80975,
+   "site": 27319,
+   "surveyed_ft": 3.62,
+   "wse_ft": 24.61,
+   "ground_ft": 11.10579042479515,
+   "depth_ft": 13.504209575204849,
+   "dist_to_channel_m": 26395.045276901586
+  },
+  {
+   "lat": 34.65467,
+   "lon": -77.70977,
+   "site": 27306,
+   "surveyed_ft": 3.12,
+   "wse_ft": 25.740121321873406,
+   "ground_ft": 20.549836153030395,
+   "depth_ft": 5.190285168843012,
+   "dist_to_channel_m": 15193.485856202396
+  },
+  {
+   "lat": 34.1437514,
+   "lon": -79.2064801,
+   "site": 27321,
+   "surveyed_ft": 5.15,
+   "wse_ft": 49.822413531877466,
+   "ground_ft": 42.34751201084137,
+   "depth_ft": 7.474901521036095,
+   "dist_to_channel_m": 80.56326947044668
+  },
+  {
+   "lat": 34.0569147,
+   "lon": -79.2465051,
+   "site": 27327,
+   "surveyed_ft": 2.8,
+   "wse_ft": 39.552679309646145,
+   "ground_ft": 36.3477270488739,
+   "depth_ft": 3.204952260772245,
+   "dist_to_channel_m": 105.31624501808844
+  },
+  {
+   "lat": 34.43502,
+   "lon": -78.03467,
+   "site": 27339,
+   "surveyed_ft": 6.56,
+   "wse_ft": 26.68,
+   "ground_ft": 11.176670674915314,
+   "depth_ft": 15.503329325084685,
+   "dist_to_channel_m": 22017.8903227237
+  },
+  {
+   "lat": 33.842,
+   "lon": -78.977,
+   "site": 27355,
+   "surveyed_ft": 1.1,
+   "wse_ft": 17.480123353952994,
+   "ground_ft": 20.68569563680649,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 337.81897903938824
+  },
+  {
+   "lat": 33.849,
+   "lon": -78.996,
+   "site": 27340,
+   "surveyed_ft": 1.74,
+   "wse_ft": 16.567408004104184,
+   "ground_ft": 17.362206243686675,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 125.05660936044019
+  },
+  {
+   "lat": 33.89805,
+   "lon": -78.88508,
+   "site": 27334,
+   "surveyed_ft": 2.95,
+   "wse_ft": 21.513913325856528,
+   "ground_ft": 19.038720690097808,
+   "depth_ft": 2.47519263575872,
+   "dist_to_channel_m": 273.8097533978912
+  },
+  {
+   "lat": 33.863,
+   "lon": -78.871,
+   "site": 27347,
+   "surveyed_ft": 1.2,
+   "wse_ft": 20.1855056349924,
+   "ground_ft": 15.433071347484589,
+   "depth_ft": 4.7524342875078105,
+   "dist_to_channel_m": 1387.4781680007654
+  },
+  {
+   "lat": 33.88757,
+   "lon": -78.90382,
+   "site": 27336,
+   "surveyed_ft": 3.14,
+   "wse_ft": 21.107906062803462,
+   "ground_ft": 17.78216243686676,
+   "depth_ft": 3.3257436259367026,
+   "dist_to_channel_m": 290.5755264086144
+  },
+  {
+   "lat": 33.854,
+   "lon": -78.915,
+   "site": 27338,
+   "surveyed_ft": 1.32,
+   "wse_ft": 19.4560293443864,
+   "ground_ft": 23.809065166435243,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1215.6430709882106
+  },
+  {
+   "lat": 33.857,
+   "lon": -78.866,
+   "site": 27345,
+   "surveyed_ft": 4.0,
+   "wse_ft": 20.169273170573277,
+   "ground_ft": 17.04397844303131,
+   "depth_ft": 3.1252947275419665,
+   "dist_to_channel_m": 1970.506295049386
+  },
+  {
+   "lat": 33.856,
+   "lon": -78.891,
+   "site": 27351,
+   "surveyed_ft": 1.15,
+   "wse_ft": 19.984310963393522,
+   "ground_ft": 18.343170445117952,
+   "depth_ft": 1.64114051827557,
+   "dist_to_channel_m": 175.606090696073
+  },
+  {
+   "lat": 33.9403106,
+   "lon": -79.284571,
+   "site": 27332,
+   "surveyed_ft": 1.13,
+   "wse_ft": 39.55,
+   "ground_ft": 25.833334397792814,
+   "depth_ft": 13.716665602207183,
+   "dist_to_channel_m": 13015.5184805051
+  },
+  {
+   "lat": 33.862,
+   "lon": -78.885,
+   "site": 27349,
+   "surveyed_ft": 2.25,
+   "wse_ft": 20.169273170573277,
+   "ground_ft": 19.35366788854599,
+   "depth_ft": 0.8156052820272883,
+   "dist_to_channel_m": 137.84493510690615
+  },
+  {
+   "lat": 35.338807,
+   "lon": -78.363364,
+   "site": 27350,
+   "surveyed_ft": 7.0,
+   "wse_ft": 105.3483136662497,
+   "ground_ft": 105.75024500152588,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 10029.265114652877
+  },
+  {
+   "lat": 34.780584,
+   "lon": -77.911845,
+   "site": 27150,
+   "surveyed_ft": 4.8,
+   "wse_ft": 36.790643109303595,
+   "ground_ft": 33.04025738231659,
+   "depth_ft": 3.7503857269870053,
+   "dist_to_channel_m": 1487.9575728907516
+  },
+  {
+   "lat": 35.314178,
+   "lon": -78.692012,
+   "site": 26920,
+   "surveyed_ft": 1.36,
+   "wse_ft": 112.83247153269208,
+   "ground_ft": 105.30788778640748,
+   "depth_ft": 7.5245837462846055,
+   "dist_to_channel_m": 99.96294276199859
+  },
+  {
+   "lat": 33.8499143,
+   "lon": -79.0870065,
+   "site": 27362,
+   "surveyed_ft": 1.53,
+   "wse_ft": 15.98,
+   "ground_ft": 15.951445606880188,
+   "depth_ft": 0.028554393119812005,
+   "dist_to_channel_m": 163.9820762593899
+  },
+  {
+   "lat": 34.7240639,
+   "lon": -77.9818063,
+   "site": 27276,
+   "surveyed_ft": 3.45,
+   "wse_ft": 32.72317452056556,
+   "ground_ft": 32.52261683891297,
+   "depth_ft": 0.20055768165259025,
+   "dist_to_channel_m": 4659.328552482573
+  },
+  {
+   "lat": 34.47448,
+   "lon": -78.20018,
+   "site": 27296,
+   "surveyed_ft": 8.5,
+   "wse_ft": 26.68,
+   "ground_ft": 17.53319179391861,
+   "depth_ft": 9.146808206081388,
+   "dist_to_channel_m": 10274.318640226757
+  },
+  {
+   "lat": 34.33995,
+   "lon": -78.67999,
+   "site": 27359,
+   "surveyed_ft": 0.79,
+   "wse_ft": 37.13,
+   "ground_ft": 60.83741470336914,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 16563.548231201345
+  },
+  {
+   "lat": 33.8711343,
+   "lon": -79.038317,
+   "site": 27365,
+   "surveyed_ft": 3.25,
+   "wse_ft": 15.98,
+   "ground_ft": 12.165355320739746,
+   "depth_ft": 3.8146446792602546,
+   "dist_to_channel_m": 1168.1508798483471
+  },
+  {
+   "lat": 34.643976,
+   "lon": -77.893047,
+   "site": 27301,
+   "surveyed_ft": 4.58,
+   "wse_ft": 27.276690509910303,
+   "ground_ft": 21.281568452301027,
+   "depth_ft": 5.995122057609276,
+   "dist_to_channel_m": 131.9258693882069
+  },
+  {
+   "lat": 33.8476149,
+   "lon": -79.0707117,
+   "site": 27364,
+   "surveyed_ft": 1.25,
+   "wse_ft": 15.98,
+   "ground_ft": 14.051837694969176,
+   "depth_ft": 1.928162305030824,
+   "dist_to_channel_m": 103.22861035922433
+  },
+  {
+   "lat": 34.213995,
+   "lon": -77.947065,
+   "site": 27421,
+   "surveyed_ft": 3.5,
+   "wse_ft": 26.68,
+   "ground_ft": 2.6585084315347673,
+   "depth_ft": 24.021491568465233,
+   "dist_to_channel_m": 36492.576877202315
+  },
+  {
+   "lat": 34.4053,
+   "lon": -79.3403,
+   "site": 26832,
+   "surveyed_ft": 1.49,
+   "wse_ft": 93.52,
+   "ground_ft": 83.96971212844849,
+   "depth_ft": 9.550287871551504,
+   "dist_to_channel_m": 8.6313135760764
+  },
+  {
+   "lat": 34.04028,
+   "lon": -78.068663,
+   "site": 27380,
+   "surveyed_ft": 1.2,
+   "wse_ft": 37.13,
+   "ground_ft": 47.47710667747498,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 44365.8101240272
+  },
+  {
+   "lat": 33.8607613,
+   "lon": -79.0576537,
+   "site": 27366,
+   "surveyed_ft": 2.4,
+   "wse_ft": 15.98,
+   "ground_ft": 11.971791968383789,
+   "depth_ft": 4.008208031616212,
+   "dist_to_channel_m": 194.02557927580753
+  },
+  {
+   "lat": 34.1912127,
+   "lon": -79.1701188,
+   "site": 27222,
+   "surveyed_ft": 5.0,
+   "wse_ft": 56.88112159930378,
+   "ground_ft": 44.08116869674683,
+   "depth_ft": 12.799952902556953,
+   "dist_to_channel_m": 206.43832519157442
+  },
+  {
+   "lat": 33.879266,
+   "lon": -78.720758,
+   "site": 27137,
+   "surveyed_ft": 2.1,
+   "wse_ft": 26.027399396068823,
+   "ground_ft": 22.39827793437958,
+   "depth_ft": 3.6291214616892447,
+   "dist_to_channel_m": 1432.1905357714977
+  },
+  {
+   "lat": 33.692125,
+   "lon": -79.00208,
+   "site": 18723,
+   "surveyed_ft": 2.67,
+   "wse_ft": 12.23068032506224,
+   "ground_ft": 7.8248049331378935,
+   "depth_ft": 4.405875391924346,
+   "dist_to_channel_m": 4532.937111405661
+  },
+  {
+   "lat": 34.04641,
+   "lon": -78.03547,
+   "site": 27372,
+   "surveyed_ft": 5.53,
+   "wse_ft": 26.68,
+   "ground_ft": 22.417271635570525,
+   "depth_ft": 4.262728364429474,
+   "dist_to_channel_m": 45328.28209213191
+  },
+  {
+   "lat": 35.16896,
+   "lon": -78.180599,
+   "site": 27229,
+   "surveyed_ft": 4.5,
+   "wse_ft": 42.07,
+   "ground_ft": 123.27479959716797,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 11853.50205411396
+  },
+  {
+   "lat": 34.09499,
+   "lon": -78.54809,
+   "site": 27368,
+   "surveyed_ft": 4.18,
+   "wse_ft": 37.13,
+   "ground_ft": 35.679325860023496,
+   "depth_ft": 1.4506741399765062,
+   "dist_to_channel_m": 68.14801275311872
+  },
+  {
+   "lat": 35.1841,
+   "lon": -77.9371,
+   "site": 27287,
+   "surveyed_ft": 5.0,
+   "wse_ft": 42.07,
+   "ground_ft": 109.92370917175293,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1329.6952997531369
+  },
+  {
+   "lat": 34.487998,
+   "lon": -78.65157,
+   "site": 27207,
+   "surveyed_ft": 2.12,
+   "wse_ft": 37.13,
+   "ground_ft": 81.92844227516174,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 15570.823095871652
+  },
+  {
+   "lat": 34.694569,
+   "lon": -78.659167,
+   "site": 27354,
+   "surveyed_ft": 0.65,
+   "wse_ft": 56.36371652275622,
+   "ground_ft": 43.993751677131655,
+   "depth_ft": 12.369964845624565,
+   "dist_to_channel_m": 2203.410216951708
+  },
+  {
+   "lat": 34.04542,
+   "lon": -78.037229,
+   "site": 27369,
+   "surveyed_ft": 1.32,
+   "wse_ft": 26.68,
+   "ground_ft": 40.30981843635559,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 45348.83343356591
+  },
+  {
+   "lat": 34.0132,
+   "lon": -78.63366,
+   "site": 27367,
+   "surveyed_ft": 5.83,
+   "wse_ft": 32.59748991906299,
+   "ground_ft": 24.601514419574738,
+   "depth_ft": 7.9959754994882495,
+   "dist_to_channel_m": 57.02434032820602
+  },
+  {
+   "lat": 34.66142,
+   "lon": -77.72505,
+   "site": 27304,
+   "surveyed_ft": 3.86,
+   "wse_ft": 25.740121321873406,
+   "ground_ft": 20.965039618740082,
+   "depth_ft": 4.775081703133324,
+   "dist_to_channel_m": 14091.138553293496
+  },
+  {
+   "lat": 34.346524,
+   "lon": -78.659913,
+   "site": 27360,
+   "surveyed_ft": 5.84,
+   "wse_ft": 37.13,
+   "ground_ft": 56.25231239524841,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 15795.851756502727
+  },
+  {
+   "lat": 34.3119147,
+   "lon": -78.1140804,
+   "site": 26951,
+   "surveyed_ft": 0.25,
+   "wse_ft": 26.68,
+   "ground_ft": 19.707243904209136,
+   "depth_ft": 6.972756095790864,
+   "dist_to_channel_m": 17800.777163622806
+  },
+  {
+   "lat": 34.48783,
+   "lon": -79.39414,
+   "site": 18829,
+   "surveyed_ft": 0.66,
+   "wse_ft": 93.52,
+   "ground_ft": 100.64969547584533,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 32.433540429143655
+  },
+  {
+   "lat": 35.02268,
+   "lon": -79.44272,
+   "site": 27160,
+   "surveyed_ft": 3.75,
+   "wse_ft": 85.49,
+   "ground_ft": 260.0731770193481,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12.901841309131152
+  },
+  {
+   "lat": 35.08343,
+   "lon": -78.090023,
+   "site": 27252,
+   "surveyed_ft": 4.5,
+   "wse_ft": 42.07,
+   "ground_ft": 103.95992166175843,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 10792.11870560227
+  },
+  {
+   "lat": 34.6813,
+   "lon": -79.11787,
+   "site": 27238,
+   "surveyed_ft": 3.82,
+   "wse_ft": 85.49,
+   "ground_ft": 154.1649875262451,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 6493.356470952029
+  },
+  {
+   "lat": 33.794,
+   "lon": -79.177,
+   "site": 27381,
+   "surveyed_ft": 1.87,
+   "wse_ft": 15.98,
+   "ground_ft": 20.80052766504288,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 9235.742856150428
+  },
+  {
+   "lat": 34.680224,
+   "lon": -78.226153,
+   "site": 27292,
+   "surveyed_ft": 5.35,
+   "wse_ft": 38.902272608646676,
+   "ground_ft": 38.87171006126404,
+   "depth_ft": 0.03056254738263675,
+   "dist_to_channel_m": 24052.957576883913
+  },
+  {
+   "lat": 33.906054,
+   "lon": -78.697107,
+   "site": 27128,
+   "surveyed_ft": 2.37,
+   "wse_ft": 27.92304215399958,
+   "ground_ft": 23.53675171684265,
+   "depth_ft": 4.38629043715693,
+   "dist_to_channel_m": 537.7467590808227
+  },
+  {
+   "lat": 34.047646,
+   "lon": -78.036811,
+   "site": 27388,
+   "surveyed_ft": 4.0,
+   "wse_ft": 26.68,
+   "ground_ft": 16.75515090812683,
+   "depth_ft": 9.92484909187317,
+   "dist_to_channel_m": 45149.256709316905
+  },
+  {
+   "lat": 33.650869,
+   "lon": -79.096063,
+   "site": 18619,
+   "surveyed_ft": 2.42,
+   "wse_ft": 11.082355242870321,
+   "ground_ft": 8.011815685424805,
+   "depth_ft": 3.0705395574455157,
+   "dist_to_channel_m": 161.17478873473988
+  },
+  {
+   "lat": 34.043265,
+   "lon": -78.044745,
+   "site": 27374,
+   "surveyed_ft": 0.75,
+   "wse_ft": 26.68,
+   "ground_ft": 38.20942577972412,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 45240.95370905425
+  },
+  {
+   "lat": 34.655231,
+   "lon": -78.491045,
+   "site": 27389,
+   "surveyed_ft": 0.62,
+   "wse_ft": 45.94151684713369,
+   "ground_ft": 75.35447839889527,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5483.201560037161
+  },
+  {
+   "lat": 34.3978732,
+   "lon": -77.9089005,
+   "site": 27328,
+   "surveyed_ft": 5.1,
+   "wse_ft": 24.61,
+   "ground_ft": 8.771275878601074,
+   "depth_ft": 15.838724121398926,
+   "dist_to_channel_m": 22438.40668056338
+  },
+  {
+   "lat": 33.706,
+   "lon": -79.131,
+   "site": 27386,
+   "surveyed_ft": 2.27,
+   "wse_ft": 11.820851450024191,
+   "ground_ft": 14.219156229667664,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 6427.629510798342
+  },
+  {
+   "lat": 34.04507,
+   "lon": -78.056161,
+   "site": 27377,
+   "surveyed_ft": 1.5,
+   "wse_ft": 26.68,
+   "ground_ft": 39.42214724018097,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 44592.20938821139
+  },
+  {
+   "lat": 33.875864,
+   "lon": -78.756639,
+   "site": 27144,
+   "surveyed_ft": 2.0,
+   "wse_ft": 25.18892787914347,
+   "ground_ft": 20.38714519168854,
+   "depth_ft": 4.801782687454931,
+   "dist_to_channel_m": 265.8631389079576
+  },
+  {
+   "lat": 34.998048,
+   "lon": -78.643247,
+   "site": 27387,
+   "surveyed_ft": 2.72,
+   "wse_ft": 74.0344777371199,
+   "ground_ft": 99.45150753684997,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12276.832447826198
+  },
+  {
+   "lat": 34.347222,
+   "lon": -79.864444,
+   "site": 26946,
+   "surveyed_ft": 3.78,
+   "wse_ft": 118.15914712738144,
+   "ground_ft": 104.73047050941467,
+   "depth_ft": 13.428676617966772,
+   "dist_to_channel_m": 35.23658075265252
+  },
+  {
+   "lat": 33.794,
+   "lon": -79.177,
+   "site": 27381,
+   "surveyed_ft": 1.92,
+   "wse_ft": 15.98,
+   "ground_ft": 20.80052766504288,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 9235.742856150428
+  },
+  {
+   "lat": 34.7214,
+   "lon": -78.27119,
+   "site": 27289,
+   "surveyed_ft": 11.32,
+   "wse_ft": 40.04553222836739,
+   "ground_ft": 38.67086586833954,
+   "depth_ft": 1.3746663600278524,
+   "dist_to_channel_m": 24205.131620374465
+  },
+  {
+   "lat": 34.050024,
+   "lon": -78.046982,
+   "site": 27382,
+   "surveyed_ft": 1.38,
+   "wse_ft": 26.68,
+   "ground_ft": 39.462024469680784,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 44480.428121926125
+  },
+  {
+   "lat": 34.268406,
+   "lon": -78.61052,
+   "site": 27361,
+   "surveyed_ft": 3.71,
+   "wse_ft": 37.13,
+   "ground_ft": 44.2274801134491,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 6411.843955185889
+  },
+  {
+   "lat": 34.16772,
+   "lon": -78.56064,
+   "site": 27363,
+   "surveyed_ft": 3.05,
+   "wse_ft": 37.13,
+   "ground_ft": 37.627359027404786,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1010.7614230945268
+  },
+  {
+   "lat": 34.69676,
+   "lon": -79.08585,
+   "site": 27231,
+   "surveyed_ft": 3.75,
+   "wse_ft": 85.49,
+   "ground_ft": 131.24953211868285,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 7659.839610804539
+  },
+  {
+   "lat": 34.99623,
+   "lon": -78.643012,
+   "site": 27371,
+   "surveyed_ft": 1.2,
+   "wse_ft": 74.0344777371199,
+   "ground_ft": 99.68810513122558,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12241.11223665694
+  },
+  {
+   "lat": 34.2315,
+   "lon": -77.913289,
+   "site": 27392,
+   "surveyed_ft": 2.2,
+   "wse_ft": 26.68,
+   "ground_ft": 3.1861906370353696,
+   "depth_ft": 23.49380936296463,
+   "dist_to_channel_m": 38015.314439990354
+  },
+  {
+   "lat": 34.62509,
+   "lon": -79.03866,
+   "site": 27078,
+   "surveyed_ft": 1.72,
+   "wse_ft": 85.49,
+   "ground_ft": 118.54041971984863,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 954.796346873722
+  },
+  {
+   "lat": 34.231687,
+   "lon": -77.913218,
+   "site": 27392,
+   "surveyed_ft": 3.4,
+   "wse_ft": 26.68,
+   "ground_ft": 5.978296782846451,
+   "depth_ft": 20.70170321715355,
+   "dist_to_channel_m": 38010.3760337945
+  },
+  {
+   "lat": 34.242561,
+   "lon": -77.924939,
+   "site": 27406,
+   "surveyed_ft": 2.78,
+   "wse_ft": 26.68,
+   "ground_ft": 5.172540127453804,
+   "depth_ft": 21.507459872546196,
+   "dist_to_channel_m": 36482.79425365695
+  },
+  {
+   "lat": 33.86389,
+   "lon": -79.04393,
+   "site": 27395,
+   "surveyed_ft": 0.42,
+   "wse_ft": 15.98,
+   "ground_ft": 14.396324393119812,
+   "depth_ft": 1.5836756068801883,
+   "dist_to_channel_m": 300.2798966006991
+  },
+  {
+   "lat": 33.83264,
+   "lon": -79.04528,
+   "site": 27404,
+   "surveyed_ft": 3.12,
+   "wse_ft": 15.019379158877545,
+   "ground_ft": 12.529529543199539,
+   "depth_ft": 2.489849615678006,
+   "dist_to_channel_m": 118.1379171620644
+  },
+  {
+   "lat": 33.80943,
+   "lon": -79.07713,
+   "site": 27419,
+   "surveyed_ft": 0.87,
+   "wse_ft": 14.50127625202989,
+   "ground_ft": 12.372047339630127,
+   "depth_ft": 2.1292289123997623,
+   "dist_to_channel_m": 2095.988101512157
+  },
+  {
+   "lat": 33.68605,
+   "lon": -79.00285,
+   "site": 18665,
+   "surveyed_ft": 2.51,
+   "wse_ft": 12.217410450492444,
+   "ground_ft": 7.552495394611358,
+   "depth_ft": 4.664915055881086,
+   "dist_to_channel_m": 4564.642668575939
+  },
+  {
+   "lat": 33.917261,
+   "lon": -78.808207,
+   "site": 27225,
+   "surveyed_ft": 1.67,
+   "wse_ft": 22.891301324886793,
+   "ground_ft": 20.032804171504974,
+   "depth_ft": 2.858497153381819,
+   "dist_to_channel_m": 2625.5094594841607
+  },
+  {
+   "lat": 34.248869,
+   "lon": -77.927855,
+   "site": 27398,
+   "surveyed_ft": 2.7,
+   "wse_ft": 26.68,
+   "ground_ft": 5.465782473721505,
+   "depth_ft": 21.214217526278496,
+   "dist_to_channel_m": 35909.24962218341
+  },
+  {
+   "lat": 33.8409,
+   "lon": -79.04665,
+   "site": 27399,
+   "surveyed_ft": 2.45,
+   "wse_ft": 15.07305088905865,
+   "ground_ft": 11.660099559106827,
+   "depth_ft": 3.412951329951822,
+   "dist_to_channel_m": 739.4658478985377
+  },
+  {
+   "lat": 34.24044,
+   "lon": -77.932055,
+   "site": 27403,
+   "surveyed_ft": 1.83,
+   "wse_ft": 26.68,
+   "ground_ft": 7.423719633674621,
+   "depth_ft": 19.256280366325377,
+   "dist_to_channel_m": 36039.84656909352
+  },
+  {
+   "lat": 33.82168,
+   "lon": -79.06734,
+   "site": 27415,
+   "surveyed_ft": 0.37,
+   "wse_ft": 14.574017470424518,
+   "ground_ft": 19.153543331775666,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1945.6672059746936
+  },
+  {
+   "lat": 33.69615,
+   "lon": -78.98503,
+   "site": 18628,
+   "surveyed_ft": 3.69,
+   "wse_ft": 12.23068032506224,
+   "ground_ft": 7.824804150924683,
+   "depth_ft": 4.405876174137557,
+   "dist_to_channel_m": 6090.4581798060435
+  },
+  {
+   "lat": 33.689,
+   "lon": -78.991,
+   "site": 27416,
+   "surveyed_ft": 4.0,
+   "wse_ft": 12.23068032506224,
+   "ground_ft": 13.320219598827363,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 5586.2404924112125
+  },
+  {
+   "lat": 34.0996319,
+   "lon": -79.1970951,
+   "site": 27323,
+   "surveyed_ft": 2.48,
+   "wse_ft": 44.904400763629965,
+   "ground_ft": 42.04069044322968,
+   "depth_ft": 2.863710320400287,
+   "dist_to_channel_m": 2124.629297587258
+  },
+  {
+   "lat": 34.214637,
+   "lon": -77.925877,
+   "site": 27420,
+   "surveyed_ft": 1.7,
+   "wse_ft": 26.68,
+   "ground_ft": 14.653735116615294,
+   "depth_ft": 12.026264883384705,
+   "dist_to_channel_m": 38039.23722553592
+  },
+  {
+   "lat": 33.9778609,
+   "lon": -79.4174486,
+   "site": 27259,
+   "surveyed_ft": 3.85,
+   "wse_ft": 39.55,
+   "ground_ft": 36.610666455345154,
+   "depth_ft": 2.9393335446548434,
+   "dist_to_channel_m": 17162.640992214627
+  },
+  {
+   "lat": 34.202129,
+   "lon": -77.894399,
+   "site": 27417,
+   "surveyed_ft": 1.73,
+   "wse_ft": 26.68,
+   "ground_ft": 36.976638985977175,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 41195.58321667699
+  },
+  {
+   "lat": 33.834,
+   "lon": -78.957,
+   "site": 27426,
+   "surveyed_ft": 4.61,
+   "wse_ft": 17.86150469690966,
+   "ground_ft": 13.116802706651688,
+   "depth_ft": 4.744701990257971,
+   "dist_to_channel_m": 138.4234958803782
+  },
+  {
+   "lat": 33.842,
+   "lon": -79.031,
+   "site": 27343,
+   "surveyed_ft": 0.74,
+   "wse_ft": 15.241643184394876,
+   "ground_ft": 14.24541199831009,
+   "depth_ft": 0.9962311860847866,
+   "dist_to_channel_m": 551.0928407803048
+  },
+  {
+   "lat": 35.11139,
+   "lon": -79.90636,
+   "site": 27102,
+   "surveyed_ft": 4.34,
+   "wse_ft": 102.62,
+   "ground_ft": 194.67341928344726,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1388.016961187716
+  },
+  {
+   "lat": 35.30178,
+   "lon": -78.35993,
+   "site": 27335,
+   "surveyed_ft": 6.5,
+   "wse_ft": 105.25746958451339,
+   "ground_ft": 112.92411634902955,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12940.593601709692
+  },
+  {
+   "lat": 33.521,
+   "lon": -79.095,
+   "site": 27436,
+   "surveyed_ft": 3.14,
+   "wse_ft": 7.399340111113835,
+   "ground_ft": 7.894245910949707,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1529.8671456069396
+  },
+  {
+   "lat": 35.33436,
+   "lon": -78.396627,
+   "site": 27331,
+   "surveyed_ft": 2.5,
+   "wse_ft": 112.00300868742605,
+   "ground_ft": 117.91731493362427,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 11784.329255877903
+  },
+  {
+   "lat": 34.730204,
+   "lon": -77.54425,
+   "site": 27427,
+   "surveyed_ft": 3.7,
+   "wse_ft": 24.36,
+   "ground_ft": 16.84683724744797,
+   "depth_ft": 7.513162752552031,
+   "dist_to_channel_m": 13377.988040618622
+  },
+  {
+   "lat": 34.157475,
+   "lon": -78.856483,
+   "site": 27409,
+   "surveyed_ft": 4.65,
+   "wse_ft": 25.07,
+   "ground_ft": 71.1095011680603,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 17684.281771609487
+  },
+  {
+   "lat": 33.69375,
+   "lon": -78.95223,
+   "site": 18656,
+   "surveyed_ft": 2.78,
+   "wse_ft": 12.716732939249109,
+   "ground_ft": 7.1784778011035915,
+   "depth_ft": 5.538255138145518,
+   "dist_to_channel_m": 9075.240850534876
+  },
+  {
+   "lat": 35.025469,
+   "lon": -76.698315,
+   "site": 13231,
+   "surveyed_ft": 2.8,
+   "wse_ft": 16.6,
+   "ground_ft": 5.235978792190552,
+   "depth_ft": 11.36402120780945,
+   "dist_to_channel_m": 63325.98511792036
+  },
+  {
+   "lat": 33.71841,
+   "lon": -78.95443,
+   "site": 27425,
+   "surveyed_ft": 1.13,
+   "wse_ft": 12.84804436076913,
+   "ground_ft": 10.456034852256774,
+   "depth_ft": 2.3920095085123556,
+   "dist_to_channel_m": 8207.382540352526
+  },
+  {
+   "lat": 33.73125,
+   "lon": -79.03036,
+   "site": 27431,
+   "surveyed_ft": 1.87,
+   "wse_ft": 12.867090776884812,
+   "ground_ft": 10.7775557705307,
+   "depth_ft": 2.0895350063541116,
+   "dist_to_channel_m": 1117.4521026775083
+  },
+  {
+   "lat": 34.0533428,
+   "lon": -77.884302,
+   "site": 27402,
+   "surveyed_ft": 1.95,
+   "wse_ft": 26.68,
+   "ground_ft": 3.5928374724292755,
+   "depth_ft": 23.087162527570726,
+   "dist_to_channel_m": 52718.73426624025
+  },
+  {
+   "lat": 33.691905,
+   "lon": -79.043072,
+   "site": 18717,
+   "surveyed_ft": 2.56,
+   "wse_ft": 12.217410450492444,
+   "ground_ft": 8.749994985980987,
+   "depth_ft": 3.4674154645114577,
+   "dist_to_channel_m": 812.6107497457581
+  },
+  {
+   "lat": 33.837,
+   "lon": -78.894,
+   "site": 27353,
+   "surveyed_ft": 1.1,
+   "wse_ft": 19.602637227338757,
+   "ground_ft": 21.3615450598526,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1158.6613696671257
+  },
+  {
+   "lat": 34.794633,
+   "lon": -78.303898,
+   "site": 27418,
+   "surveyed_ft": 3.33,
+   "wse_ft": 45.94151684713369,
+   "ground_ft": 54.454930363464356,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 28286.91684364484
+  },
+  {
+   "lat": 35.021828,
+   "lon": -78.805621,
+   "site": 27391,
+   "surveyed_ft": 1.46,
+   "wse_ft": 79.04787503464955,
+   "ground_ft": 93.36603268203736,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 4525.560990071847
+  },
+  {
+   "lat": 34.04647,
+   "lon": -78.03615,
+   "site": 27372,
+   "surveyed_ft": 10.38,
+   "wse_ft": 26.68,
+   "ground_ft": 10.874170835294724,
+   "depth_ft": 15.805829164705276,
+   "dist_to_channel_m": 45292.86480407643
+  },
+  {
+   "lat": 34.757139,
+   "lon": -77.543711,
+   "site": 27434,
+   "surveyed_ft": 3.54,
+   "wse_ft": 24.36,
+   "ground_ft": 30.668314716186522,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 10432.85187028668
+  },
+  {
+   "lat": 34.89775,
+   "lon": -78.810318,
+   "site": 27393,
+   "surveyed_ft": 5.13,
+   "wse_ft": 69.92171239547059,
+   "ground_ft": 63.72973253028869,
+   "depth_ft": 6.191979865181899,
+   "dist_to_channel_m": 577.4941247846399
+  },
+  {
+   "lat": 34.04628,
+   "lon": -78.03641,
+   "site": 27372,
+   "surveyed_ft": 7.39,
+   "wse_ft": 26.68,
+   "ground_ft": 18.10203444969177,
+   "depth_ft": 8.577965550308228,
+   "dist_to_channel_m": 45300.15119808516
+  },
+  {
+   "lat": 34.70899,
+   "lon": -79.90012,
+   "site": 26945,
+   "surveyed_ft": 3.05,
+   "wse_ft": 102.62,
+   "ground_ft": 100.26553492362976,
+   "depth_ft": 2.3544650763702464,
+   "dist_to_channel_m": 2086.412069554744
+  },
+  {
+   "lat": 35.002861,
+   "lon": -78.087788,
+   "site": 27424,
+   "surveyed_ft": 1.9,
+   "wse_ft": 42.07,
+   "ground_ft": 141.01940015563966,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 19313.431635398967
+  },
+  {
+   "lat": 34.0725817,
+   "lon": -79.5353662,
+   "site": 27358,
+   "surveyed_ft": 5.25,
+   "wse_ft": 74.2,
+   "ground_ft": 38.786511398315426,
+   "depth_ft": 35.41348860168458,
+   "dist_to_channel_m": 18643.531586552184
+  },
+  {
+   "lat": 34.042385,
+   "lon": -78.053648,
+   "site": 27376,
+   "surveyed_ft": 3.0,
+   "wse_ft": 26.68,
+   "ground_ft": 37.78364835582733,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 44961.28356321433
+  },
+  {
+   "lat": 34.690593,
+   "lon": -78.57878,
+   "site": 27405,
+   "surveyed_ft": 5.87,
+   "wse_ft": 52.17964224271945,
+   "ground_ft": 52.07991516384125,
+   "depth_ft": 0.0997270788782032,
+   "dist_to_channel_m": 6043.996202114143
+  },
+  {
+   "lat": 33.80967,
+   "lon": -79.07031,
+   "site": 27437,
+   "surveyed_ft": 1.97,
+   "wse_ft": 14.50127625202989,
+   "ground_ft": 12.811680888347626,
+   "depth_ft": 1.6895953636822636,
+   "dist_to_channel_m": 1506.6094761405434
+  },
+  {
+   "lat": 33.67985,
+   "lon": -79.01085,
+   "site": 27455,
+   "surveyed_ft": 3.44,
+   "wse_ft": 12.217410450492444,
+   "ground_ft": 6.272959628305435,
+   "depth_ft": 5.944450822187009,
+   "dist_to_channel_m": 4072.305825674145
+  },
+  {
+   "lat": 33.68,
+   "lon": -79.041,
+   "site": 27453,
+   "surveyed_ft": 1.25,
+   "wse_ft": 12.155095154745638,
+   "ground_ft": 11.97504832198143,
+   "depth_ft": 0.18004683276420863,
+   "dist_to_channel_m": 1663.0633792623155
+  },
+  {
+   "lat": 33.67259,
+   "lon": -79.10784,
+   "site": 27457,
+   "surveyed_ft": 2.35,
+   "wse_ft": 11.1629395096059,
+   "ground_ft": 11.532159201879502,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 2377.3521965432637
+  },
+  {
+   "lat": 33.85299,
+   "lon": -79.04788,
+   "site": 27435,
+   "surveyed_ft": 3.06,
+   "wse_ft": 15.98,
+   "ground_ft": 12.421259501590729,
+   "depth_ft": 3.5587404984092714,
+   "dist_to_channel_m": 862.9181906075041
+  },
+  {
+   "lat": 33.75557,
+   "lon": -79.07022,
+   "site": 27456,
+   "surveyed_ft": 1.44,
+   "wse_ft": 13.565996867189492,
+   "ground_ft": 11.351705742940903,
+   "depth_ft": 2.2142911242485894,
+   "dist_to_channel_m": 72.65902429145112
+  },
+  {
+   "lat": 34.0343998,
+   "lon": -79.7903675,
+   "site": 27151,
+   "surveyed_ft": 2.95,
+   "wse_ft": 81.75816929638965,
+   "ground_ft": 73.15874333839416,
+   "depth_ft": 8.599425957995493,
+   "dist_to_channel_m": 1.8522041942301062
+  },
+  {
+   "lat": 33.679774,
+   "lon": -79.099328,
+   "site": 18632,
+   "surveyed_ft": 2.84,
+   "wse_ft": 11.183176587059089,
+   "ground_ft": 7.076779132680893,
+   "depth_ft": 4.106397454378196,
+   "dist_to_channel_m": 2706.0768341152443
+  },
+  {
+   "lat": 34.747129,
+   "lon": -77.733006,
+   "site": 27440,
+   "surveyed_ft": 1.98,
+   "wse_ft": 40.03856634205721,
+   "ground_ft": 50.875948233642575,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 10409.773590025034
+  },
+  {
+   "lat": 34.2322,
+   "lon": -79.1434,
+   "site": 18629,
+   "surveyed_ft": 2.46,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 53.72577623893738,
+   "depth_ft": 5.041078784132395,
+   "dist_to_channel_m": 3672.1810748241487
+  },
+  {
+   "lat": 34.780243,
+   "lon": -77.783042,
+   "site": 27450,
+   "surveyed_ft": 1.68,
+   "wse_ft": 40.2090651884882,
+   "ground_ft": 43.215321249160766,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 4914.6453931772185
+  },
+  {
+   "lat": 35.034333,
+   "lon": -78.974837,
+   "site": 27422,
+   "surveyed_ft": 2.95,
+   "wse_ft": 80.73705279966552,
+   "ground_ft": 137.0229664793396,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 10420.721037806457
+  },
+  {
+   "lat": 33.76416,
+   "lon": -79.02454,
+   "site": 27459,
+   "surveyed_ft": 4.14,
+   "wse_ft": 14.143502410548948,
+   "ground_ft": 8.802489314575196,
+   "depth_ft": 5.341013095973752,
+   "dist_to_channel_m": 3448.2045423344207
+  },
+  {
+   "lat": 34.752733,
+   "lon": -77.348712,
+   "site": 27462,
+   "surveyed_ft": 5.22,
+   "wse_ft": 24.36,
+   "ground_ft": 3.6636230747509004,
+   "depth_ft": 20.696376925249098,
+   "dist_to_channel_m": 18124.779832539567
+  },
+  {
+   "lat": 34.751734,
+   "lon": -77.348863,
+   "site": 27461,
+   "surveyed_ft": 0.54,
+   "wse_ft": 24.36,
+   "ground_ft": 6.896961613082886,
+   "depth_ft": 17.463038386917113,
+   "dist_to_channel_m": 18179.90529783945
+  },
+  {
+   "lat": 34.750975,
+   "lon": -77.343,
+   "site": 27467,
+   "surveyed_ft": 4.57,
+   "wse_ft": 24.36,
+   "ground_ft": 5.440210750532151,
+   "depth_ft": 18.919789249467847,
+   "dist_to_channel_m": 18660.615082847387
+  },
+  {
+   "lat": 34.256935,
+   "lon": -77.831845,
+   "site": 27460,
+   "surveyed_ft": 1.38,
+   "wse_ft": 24.61,
+   "ground_ft": 37.616958720550535,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 38077.24914887746
+  },
+  {
+   "lat": 35.04822,
+   "lon": -78.871761,
+   "site": 27439,
+   "surveyed_ft": 2.64,
+   "wse_ft": 81.19377147889126,
+   "ground_ft": 84.58939394966126,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1224.6955413048938
+  },
+  {
+   "lat": 35.052794,
+   "lon": -78.873009,
+   "site": 27430,
+   "surveyed_ft": 7.2,
+   "wse_ft": 81.41069665520742,
+   "ground_ft": 60.700133155975344,
+   "depth_ft": 20.710563499232073,
+   "dist_to_channel_m": 1433.1392256517865
+  },
+  {
+   "lat": 35.059998,
+   "lon": -78.867476,
+   "site": 27432,
+   "surveyed_ft": 5.55,
+   "wse_ft": 82.30996765696801,
+   "ground_ft": 83.44883322235107,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1106.3966813365773
+  },
+  {
+   "lat": 34.95204,
+   "lon": -77.874528,
+   "site": 27408,
+   "surveyed_ft": 5.14,
+   "wse_ft": 42.07,
+   "ground_ft": 51.23053486877441,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 885.402860603318
+  },
+  {
+   "lat": 35.044773,
+   "lon": -78.877685,
+   "site": 27449,
+   "surveyed_ft": 0.51,
+   "wse_ft": 80.96969580221995,
+   "ground_ft": 86.28443120491028,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1676.6378034103332
+  },
+  {
+   "lat": 33.436,
+   "lon": -79.182,
+   "site": 27438,
+   "surveyed_ft": 1.33,
+   "wse_ft": 4.7,
+   "ground_ft": 3.709546421265602,
+   "depth_ft": 0.9904535787343982,
+   "dist_to_channel_m": 198.1808557751783
+  },
+  {
+   "lat": 35.266443,
+   "lon": -77.619361,
+   "site": 27383,
+   "surveyed_ft": 4.35,
+   "wse_ft": 37.28807797846481,
+   "ground_ft": 38.029178825073245,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 79.86508428599574
+  },
+  {
+   "lat": 33.80909,
+   "lon": -79.0356,
+   "site": 27465,
+   "surveyed_ft": 1.62,
+   "wse_ft": 14.712537126123785,
+   "ground_ft": 12.582019960727692,
+   "depth_ft": 2.1305171653960926,
+   "dist_to_channel_m": 1096.8045762476715
+  },
+  {
+   "lat": 33.79371,
+   "lon": -79.0498,
+   "site": 27463,
+   "surveyed_ft": 2.37,
+   "wse_ft": 14.302663091070349,
+   "ground_ft": 10.196850069198609,
+   "depth_ft": 4.1058130218717395,
+   "dist_to_channel_m": 112.5289101555286
+  },
+  {
+   "lat": 33.83,
+   "lon": -79.059,
+   "site": 27411,
+   "surveyed_ft": 1.44,
+   "wse_ft": 14.922787447102317,
+   "ground_ft": 21.587926949691774,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1318.3790575718135
+  },
+  {
+   "lat": 33.854,
+   "lon": -79.044,
+   "site": 27433,
+   "surveyed_ft": 3.58,
+   "wse_ft": 15.98,
+   "ground_ft": 14.353674999999999,
+   "depth_ft": 1.6263250000000014,
+   "dist_to_channel_m": 512.7816797674132
+  },
+  {
+   "lat": 34.263867,
+   "lon": -77.88856,
+   "site": 27469,
+   "surveyed_ft": 5.0,
+   "wse_ft": 24.61,
+   "ground_ft": 2.14816965290308,
+   "depth_ft": 22.46183034709692,
+   "dist_to_channel_m": 37138.38017139295
+  },
+  {
+   "lat": 35.08265,
+   "lon": -79.99938,
+   "site": 27087,
+   "surveyed_ft": 5.23,
+   "wse_ft": 102.62,
+   "ground_ft": 199.935749274292,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 318.8815345829364
+  },
+  {
+   "lat": 34.238668,
+   "lon": -77.920969,
+   "site": 27397,
+   "surveyed_ft": 3.75,
+   "wse_ft": 26.68,
+   "ground_ft": 4.829528292312622,
+   "depth_ft": 21.850471707687376,
+   "dist_to_channel_m": 37011.01099125188
+  },
+  {
+   "lat": 35.14989,
+   "lon": -80.27852,
+   "site": 27065,
+   "surveyed_ft": 5.98,
+   "wse_ft": 102.62,
+   "ground_ft": 292.74701131622317,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 18404.23010116043
+  },
+  {
+   "lat": 35.16685,
+   "lon": -80.21086,
+   "site": 27061,
+   "surveyed_ft": 2.09,
+   "wse_ft": 102.62,
+   "ground_ft": 252.52903722625732,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 12559.229668161606
+  },
+  {
+   "lat": 33.72165,
+   "lon": -79.03534,
+   "site": 27446,
+   "surveyed_ft": 1.6,
+   "wse_ft": 12.739478979626094,
+   "ground_ft": 10.9219171296978,
+   "depth_ft": 1.8175618499282944,
+   "dist_to_channel_m": 868.755946896857
+  },
+  {
+   "lat": 34.2928992,
+   "lon": -77.8460996,
+   "site": 27474,
+   "surveyed_ft": 2.95,
+   "wse_ft": 24.61,
+   "ground_ft": 25.196464223480223,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 33980.64329376093
+  },
+  {
+   "lat": 33.469,
+   "lon": -79.138,
+   "site": 27441,
+   "surveyed_ft": 0.94,
+   "wse_ft": 5.421849501841406,
+   "ground_ft": 7.34850748679161,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 1676.49979848339
+  },
+  {
+   "lat": 33.65,
+   "lon": -79.062,
+   "site": 27448,
+   "surveyed_ft": 1.25,
+   "wse_ft": 11.517973460672653,
+   "ground_ft": 11.154859441738129,
+   "depth_ft": 0.36311401893452455,
+   "dist_to_channel_m": 1712.3340662581725
+  },
+  {
+   "lat": 34.23182,
+   "lon": -77.909393,
+   "site": 27407,
+   "surveyed_ft": 0.83,
+   "wse_ft": 26.68,
+   "ground_ft": 12.252599471235275,
+   "depth_ft": 14.427400528764725,
+   "dist_to_channel_m": 38303.643367233635
+  },
+  {
+   "lat": 34.336965,
+   "lon": -77.897259,
+   "site": 27468,
+   "surveyed_ft": 5.67,
+   "wse_ft": 24.61,
+   "ground_ft": 12.905099047718048,
+   "depth_ft": 11.704900952281951,
+   "dist_to_channel_m": 29063.22003132592
+  },
+  {
+   "lat": 33.72472222,
+   "lon": -79.05972222,
+   "site": 27477,
+   "surveyed_ft": 3.11,
+   "wse_ft": 13.075417546697341,
+   "ground_ft": 9.517737252635955,
+   "depth_ft": 3.5576802940613863,
+   "dist_to_channel_m": 894.1780335674213
+  },
+  {
+   "lat": 34.067696,
+   "lon": -79.238783,
+   "site": 27325,
+   "surveyed_ft": 0.85,
+   "wse_ft": 41.06741605169824,
+   "ground_ft": 43.13694974311829,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 118.24470963714657
+  },
+  {
+   "lat": 33.81429,
+   "lon": -79.03775,
+   "site": 27466,
+   "surveyed_ft": 1.42,
+   "wse_ft": 14.756636097551821,
+   "ground_ft": 12.844486910419464,
+   "depth_ft": 1.912149187132357,
+   "dist_to_channel_m": 695.8269949818307
+  },
+  {
+   "lat": 33.701852,
+   "lon": -78.974077,
+   "site": 18707,
+   "surveyed_ft": 2.49,
+   "wse_ft": 12.716732939249109,
+   "ground_ft": 7.864173724050522,
+   "depth_ft": 4.852559215198587,
+   "dist_to_channel_m": 6877.8309961846735
+  },
+  {
+   "lat": 34.706808,
+   "lon": -77.480242,
+   "site": 27458,
+   "surveyed_ft": 6.0,
+   "wse_ft": 24.36,
+   "ground_ft": 6.902627965583801,
+   "depth_ft": 17.4573720344162,
+   "dist_to_channel_m": 16076.539872668143
+  },
+  {
+   "lat": 35.025509,
+   "lon": -76.698386,
+   "site": 13231,
+   "surveyed_ft": 2.8,
+   "wse_ft": 16.6,
+   "ground_ft": 5.377067371282577,
+   "depth_ft": 11.222932628717423,
+   "dist_to_channel_m": 63318.1870696782
+  },
+  {
+   "lat": 35.104962,
+   "lon": -77.037805,
+   "site": 26910,
+   "surveyed_ft": 2.1,
+   "wse_ft": 16.6,
+   "ground_ft": 8.298750264358521,
+   "depth_ft": 8.30124973564148,
+   "dist_to_channel_m": 33246.55039736248
+  },
+  {
+   "lat": 34.034927,
+   "lon": -78.054642,
+   "site": 27370,
+   "surveyed_ft": 2.0,
+   "wse_ft": 26.68,
+   "ground_ft": 35.9309169172287,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 45665.709978187675
+  },
+  {
+   "lat": 34.61713,
+   "lon": -79.00954,
+   "site": 27148,
+   "surveyed_ft": 1.83,
+   "wse_ft": 85.49,
+   "ground_ft": 116.43974546646118,
+   "depth_ft": 0.0,
+   "dist_to_channel_m": 181.3959934085654
+  },
+  {
+   "lat": 34.834678,
+   "lon": -78.824813,
+   "site": 26919,
+   "surveyed_ft": 0.46,
+   "wse_ft": 66.65797213523125,
+   "ground_ft": 65.42690366317748,
+   "depth_ft": 1.2310684720537637,
+   "dist_to_channel_m": 180.64455067997775
+  },
+  {
+   "lat": 34.227779,
+   "lon": -79.153377,
+   "site": 18635,
+   "surveyed_ft": 2.28,
+   "wse_ft": 58.76685502306977,
+   "ground_ft": 52.76609449455261,
+   "depth_ft": 6.000760528517162,
+   "dist_to_channel_m": 2682.717457301596
+  },
+  {
+   "lat": 35.5122467,
+   "lon": -78.3501356,
+   "site": 26940,
+   "surveyed_ft": 2.3,
+   "wse_ft": 122.97160970095577,
+   "ground_ft": 106.74849924377442,
+   "depth_ft": 16.22311045718135,
+   "dist_to_channel_m": 28.418633052708287
+  },
+  {
+   "lat": 33.8845942,
+   "lon": -79.4098613,
+   "site": 27285,
+   "surveyed_ft": 3.47,
+   "wse_ft": 39.55,
+   "ground_ft": 30.023542624015807,
+   "depth_ft": 9.52645737598419,
+   "dist_to_channel_m": 23651.302733166198
+  }
+ ]
+}

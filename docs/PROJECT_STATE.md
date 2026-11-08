@@ -24,8 +24,10 @@ in `docs/ROADMAP_FREE_UPGRADES.md`. The headline that changes §2b/§3:
   (`validation/gauge_depth_check.py`). Brazos: water found at 7/18 surveyed
   sites (95% CI 20–61%) vs radar 0/18. Harvey: 16/48 (22–47%) vs radar 3/48,
   bias −0.3 ft vs −2.7 ft. Harvey exposed a reservoir-pool bug, so it is now
-  development data; **a clean third-event test is owed before quoting this as
-  general (roadmap B1).** Riverine floodplains only.
+  development data. **The clean third-event test has since PASSED (Hurricane
+  Florence, pre-registered: 130/221 sites, 59%, CI 52-65%, bias +1.0 ft within
+  3 km of a gauged river; depth magnitude weak beyond 1 km, r = 0.04).**
+  Riverine floodplains only. See `docs/PREREG_GAUGE_FLORENCE.md`.
 - **Extent benchmark on independent hand labels** (Sen1Floods11): per-chip
   Otsu IoU 0.21 / precision 0.23 on test; learned LightGBM 0.63, but no clear
   gain over a fixed rule on a never-seen country (Bolivia).
