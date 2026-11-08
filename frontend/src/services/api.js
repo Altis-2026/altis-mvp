@@ -67,6 +67,9 @@ export const api = {
   getPasses:      (bbox)   => get(`/passes?bbox=${bbox.join(',')}`),
   getGauges:      (bbox)   => get(`/gauges?bbox=${bbox.join(',')}`),
   getEventGauges: (id)     => get(`/events/${id}/gauges`),
+  getEventAnalogs: (id)    => get(`/events/${id}/analogs`),
+  getAnalogs: ({ lat, lon, date, cause }) => get(`/analogs?lat=${lat}&lon=${lon}`
+    + (date ? `&date=${date}` : '') + (cause ? `&cause=${encodeURIComponent(cause)}` : '')),
 
   /* Pre-event flood risk score (1–5), no event date needed */
   getRiskScore:   (id)     => get(`/portfolio/${id}/risk-score`),

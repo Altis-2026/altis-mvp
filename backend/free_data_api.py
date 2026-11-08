@@ -101,3 +101,33 @@ def event_gauges(event_id: str):
     return {"event_id": event_id, "window": [start.isoformat(), end.isoformat()],
             "gauges": [g for g in peaks if g.get("peak_stage_ft") is not None],
             "validation": validation}
+
+
+# ── Flood event library: historical analogs ──────────────────────────────────
+
+EVENT_CAUSE = {"harvey": "hurricane", "brazos": "hurricane", "lismore": "heavy rain"}
+
+
+@router.get("/analogs")
+def analogs(lat: float = Query(..., ge=-90, le=90), lon: float = Query(..., ge=-180, le=180),
+            date: Optional[str] = None, cause: Optional[str] = None,
+            flooded_km2: Optional[float] = None, duration_days: Optional[float] = None,
+            k: int = Query(8, ge=1, le=25)):
+    """Most similar past floods, with their real outcomes where known."""
+    from backend.event_library import find_analogs
+    return find_analogs(lat, lon, date, cause, flooded_km2, duration_days, k=k)
+
+
+@router.get("/events/{event_id}/analogs")
+def event_analogs(event_id: str, k: int = Query(8, ge=1, le=25)):
+    from backend.event_library import find_analogs
+    ev = EVENTS.get(event_id)
+    if not ev:
+        raise HTTPException(404, f"Unknown event '{event_id}'.")
+    return find_analogs(ev["lat"], ev["lon"], ev["event_date"], EVENT_CAUSE.get(event_id), k=k)
+
+
+@router.get("/library/stats")
+def library_stats():
+    from backend.event_library import library_stats as stats
+    return stats()

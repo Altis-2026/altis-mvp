@@ -443,6 +443,8 @@ export default function App() {
             portfolioId={portfolioId}
             portfolioLabel={activePortfolio?.id}
             portfolioProperties={portfolioProps}
+            portfolioCenter={portfolioBbox ? [(portfolioBbox[0] + portfolioBbox[2]) / 2, (portfolioBbox[1] + portfolioBbox[3]) / 2] : null}
+            liveEventDate={liveEventDate}
           />
         )}
         {activePanel === 'operations' && (

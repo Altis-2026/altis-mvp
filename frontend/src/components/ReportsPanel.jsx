@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import AnalogsCard from './AnalogsCard.jsx';
 import { api } from '../services/api.js';
 import { downloadCSV } from '../utils/csv.js';
 
@@ -99,6 +100,7 @@ const PORTFOLIO_EXPORT_COLS = ['property_id', 'policy_number', 'address', 'cover
 export default function ReportsPanel({
   events = [], selectedEvent, eventLabel, eventProperties = [],
   portfolioId, portfolioLabel, portfolioProperties = [],
+  portfolioCenter = null, liveEventDate = null,
 }) {
   const [reportEventId, setReportEventId] = useState(selectedEvent || events[0]?.id || '');
   // Follow the event the user is looking at; fall back to the first event once
@@ -256,6 +258,12 @@ export default function ReportsPanel({
         {/* ROI section — the per-event business case, computed from the live
             triage numbers on screen. This is the pricing conversation. */}
         <RoiWidget rows={hasAnalyzedPortfolio ? portfolioProperties : eventProperties} />
+
+        {/* Historical analogs from the free flood library */}
+        {selectedEvent ? <AnalogsCard eventId={selectedEvent} />
+          : (portfolioCenter && liveEventDate) ? (
+            <AnalogsCard lat={portfolioCenter[1]} lon={portfolioCenter[0]} date={liveEventDate} />
+          ) : null}
 
         {/* Validation section */}
         <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--teal)', textTransform: 'uppercase', margin: '22px 0 10px' }}>

@@ -609,6 +609,25 @@ def analyze_portfolio_live_endpoint(portfolio_id: str, body: dict = Body(...)):
     if gauge_meta:
         out['meta']['gauges'] = gauge_meta
 
+    # Grow the event library with this run so later analog searches see it.
+    try:
+        from backend.event_library import record_altis_run
+        pts = [r for r in results if r.get('latitude') is not None and r.get('impact_class')
+               and r.get('impact_class') != 'No Coverage']
+        if pts:
+            counts = {}
+            for r in pts:
+                counts[r['impact_class']] = counts.get(r['impact_class'], 0) + 1
+            record_altis_run(
+                name=str(body.get('label', 'Live analysis')),
+                lat=sum(float(r['latitude']) for r in pts) / len(pts),
+                lon=sum(float(r['longitude']) for r in pts) / len(pts),
+                event_date=event_date, cause=body.get('cause'),
+                summary={'portfolio_id': portfolio_id, 'n_analyzed': len(pts), 'classes': counts,
+                         'gauge_conflicts': (gauge_meta or {}).get('n_conflicts')})
+    except Exception as e:  # noqa: BLE001 — library bookkeeping must never fail a run
+        print(f"  [library] could not record run: {e}")
+
     save_analysis_results(portfolio_id, 'live', results)
     save_analysis_meta(portfolio_id, 'live', out['meta'])
     if event_date:
