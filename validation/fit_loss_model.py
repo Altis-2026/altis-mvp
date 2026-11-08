@@ -42,53 +42,78 @@ def load(names):
     return df
 
 
-def main():
-    df = load(TRAIN)
-    print(len(df), "training claims from", TRAIN)
-    tables, n_train = {}, {}
+V0 = 200_000.0
+
+
+def fit_power_c(x, dmg, val, dcol):
+    """Slope c in  ratio ~ value^-c  from cell means (depth-bin fixed effects)."""
+    r = np.clip((x[dmg] / x[val]).to_numpy(), 0, 1.2)
+    v = x[val].to_numpy(); b = np.array([lm.depth_bin(d) for d in x[dcol].to_numpy()])
+    vb = np.array([lm.value_bracket(a) for a in v])
+    rows = []
+    for bi in np.unique(b):
+        for vi in np.unique(vb):
+            m = (b == bi) & (vb == vi)
+            if m.sum() >= 150 and r[m].mean() > 0:
+                rows.append((bi, np.log(np.median(v[m])), np.log(r[m].mean()), m.sum()))
+    t = np.array(rows)
+    # demean log-ratio and log-value within depth bin, then weighted OLS slope
+    X, Y, W = [], [], []
+    for bi in np.unique(t[:, 0]):
+        g = t[t[:, 0] == bi]
+        if len(g) < 3:
+            continue
+        X += list(g[:, 1] - np.average(g[:, 1], weights=g[:, 3])); Y += list(g[:, 2] - np.average(g[:, 2], weights=g[:, 3])); W += list(g[:, 3])
+    X, Y, W = map(np.array, (X, Y, W))
+    return float(-(W * X * Y).sum() / (W * X * X).sum())
+
+
+def build_model(df, trained_on, structure="bracket"):
+    """Fit tables on a dataframe of claims. structure: 'bracket' or 'power'."""
+    tables, n_train, value_norm = {}, {}, {}
     for cov, dmg, val, vmin in (("building", "buildingDamageAmount", "buildingPropertyValue", 10000),
                                 ("contents", "contentsDamageAmount", "contentsPropertyValue", 1000)):
         for kind, dcol in (("interior", "interiorWaterDepth"), ("exterior", "exteriorWaterDepth")):
             x = df[(df[val] > vmin) & (df[dmg] >= 0) & (df[dcol] > 0) & (df[dcol] <= MAX_DEPTH_IN)]
             ratio = np.clip((x[dmg] / x[val]).to_numpy(), 0.0, 1.2)
-            tables[f"{cov}_{kind}"] = lm.fit_distributions(ratio, x[dcol].to_numpy(), x.segment.to_numpy())
-            n_train[f"{cov}_{kind}"] = int(len(x))
-            print(f"  {cov}_{kind}: {len(x)} claims, mean ratio {ratio.mean():.3f}")
-
-    # Replacement-cost uplift theta: paid + deductible = damage * (1 + theta*(RC/ACV - 1)).
+            key = f"{cov}_{kind}"
+            if structure == "power":
+                c = max(0.0, fit_power_c(x, dmg, val, dcol))
+                value_norm[key] = {"c": round(c, 3), "v0": V0}
+                ratio = np.clip(ratio * (x[val].to_numpy() / V0) ** c, 0, 1.2 * 3)   # normalised ratio r'
+                tables[key] = lm.fit_distributions(ratio, x[dcol].to_numpy(), x.segment.to_numpy(), np.full(len(x), V0))
+                tables[key] = {k: v for k, v in tables[key].items() if k.endswith("|all") or k.endswith("|3")}
+                tables[key] = {(k.replace("|3", "|all") if k.endswith("|3") else k): v for k, v in tables[key].items()}
+            else:
+                tables[key] = lm.fit_distributions(ratio, x[dcol].to_numpy(), x.segment.to_numpy(), x[val].to_numpy())
+            n_train[key] = int(len(x))
     b = df[(df.buildingDamageAmount > 0) & df.ded.notna() & (df.buildingPropertyValue > 10000)
            & (df.buildingReplacementCost > 10000) & (df.totalBuildingInsuranceCoverage > 0)
            & (df.replacementCostBasis == "R")].copy()
-    b = b[b.buildingDamageAmount * 1.6 < b.totalBuildingInsuranceCoverage]       # clearly below the limit
+    b = b[b.buildingDamageAmount * 1.6 < b.totalBuildingInsuranceCoverage]
     b["up"] = b.buildingReplacementCost / b.buildingPropertyValue
     t = b[(b.up > 1.05) & (b.amountPaidOnBuildingClaim > 0)]
-    theta_i = ((t.amountPaidOnBuildingClaim + t.ded) / t.buildingDamageAmount - 1) / (t.up - 1)
-    theta = float(theta_i.median())
-    lo, hi = np.percentile(theta_i, [25, 75])
-    print(f"theta = {theta:.3f} (IQR {lo:.2f}..{hi:.2f}) on {len(t)} replacement-cost claims")
+    th = ((t.amountPaidOnBuildingClaim + t.ded) / t.buildingDamageAmount - 1) / (t.up - 1)
+    model = {"trained_on": list(trained_on), "n_train": n_train, "structure": structure,
+             "theta": round(float(th.median()), 3), "theta_n": int(len(t)), "tables": tables}
+    if value_norm:
+        model["value_norm"] = value_norm
+    return model
 
+
+def main():
+    structure = sys.argv[sys.argv.index("--structure") + 1] if "--structure" in sys.argv else "bracket"
+    df = load(TRAIN)
+    print(len(df), "training claims from", TRAIN, "| structure:", structure)
+    out = build_model(df, TRAIN, structure)
     v = df[(df.buildingPropertyValue > 10000) & (df.totalBuildingInsuranceCoverage > 0)]
     rc = df[(df.buildingReplacementCost > 10000) & (df.buildingPropertyValue > 10000)]
-    fallbacks = {"acv_value_over_coverage": round(float((v.buildingPropertyValue / v.totalBuildingInsuranceCoverage).median()), 3),
-                 "rc_over_acv": round(float((rc.buildingReplacementCost / rc.buildingPropertyValue).median()), 3),
-                 "modal_building_deductible_code": df.buildingDeductibleCode.astype(str).mode().iat[0]}
-    # What the national shapes shipped before say, at the same depths, for the record.
-    from config import SEVERITY
-    from severity import _interpolate
-    comp = []
-    for row in tables["building_interior"]["all"]:
-        c = row["cell"]
-        if c:
-            ft = row["centre_in"] / 12.0
-            comp.append({"centre_in": row["centre_in"], "claims_mean_damage_pct": round(c["mean"] * 100, 1),
-                         "national_generic_pct": round(_interpolate(SEVERITY["depth_damage_curve"], ft), 1), "n": c["n"]})
-    out = {"trained_on": list(TRAIN), "n_train": n_train, "theta": round(theta, 3),
-           "theta_iqr": [round(float(lo), 3), round(float(hi), 3)], "theta_n": int(len(t)),
-           "fallbacks": fallbacks, "tables": tables, "national_vs_claims_building_interior": comp,
-           "note": "Fitted on training storms only; see docs/PREREG_LOSS_MODEL.md"}
+    out["fallbacks"] = {"acv_value_over_coverage": round(float((v.buildingPropertyValue / v.totalBuildingInsuranceCoverage).median()), 3),
+                        "rc_over_acv": round(float((rc.buildingReplacementCost / rc.buildingPropertyValue).median()), 3),
+                        "modal_building_deductible_code": df.buildingDeductibleCode.astype(str).mode().iat[0]}
+    out["note"] = "Fitted on training storms only; see docs/PREREG_LOSS_MODEL.md"
+    print("theta", out["theta"], "| value_norm", out.get("value_norm"))
     (ROOT / "outputs" / "loss_model.json").write_text(json.dumps(out))
-    print(json.dumps(fallbacks)); 
-    for r in comp: print(r)
 
 
 if __name__ == "__main__":

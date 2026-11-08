@@ -275,6 +275,42 @@ async def upload_portfolio(file: UploadFile = File(...)):
     }
 
 
+def _money_or_none(v):
+    s = str(v if v is not None else '').replace(',', '').replace('$', '').strip()
+    if not s or s.lower() in ('nan', 'none', 'null', 'n/a', '-'):
+        return None
+    try:
+        x = float(s)
+    except ValueError:
+        return None
+    return x if x >= 0 else None
+
+
+def _parse_valuation(v):
+    """'RCV'/'ACV' from the many ways a policy admin system writes it; None if unclear."""
+    s = str(v or '').strip().lower()
+    if s in ('r', 'rc', 'rcv', 'replacement', 'replacement cost', 'replacement cost value'):
+        return 'RCV'
+    if s in ('a', 'acv', 'actual cash value', 'actual cash', 'cash value'):
+        return 'ACV'
+    return None
+
+
+def _parse_policy_terms(row: dict) -> dict:
+    """Optional per-policy terms from an upload row. Only fields actually
+    present are returned, so anything missing is treated as unknown (and later
+    labelled as assumed), never silently defaulted to zero."""
+    out = {}
+    for key in ('deductible', 'replacement_cost', 'acv_value', 'contents_coverage_amount', 'contents_deductible'):
+        v = _money_or_none(row.get(key))
+        if v is not None:
+            out[key] = v
+    val = _parse_valuation(row.get('valuation_basis'))
+    if val:
+        out['valuation_basis'] = val
+    return out
+
+
 @app.post("/api/portfolio/{upload_id}/confirm")
 async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
     """
@@ -338,6 +374,7 @@ async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
         except ValueError:
             coverage_amount = 0
 
+        terms = _parse_policy_terms(row)
         prop = {
             'property_id':     f"PORT-{portfolio_id}-{str(r['i']+1).zfill(4)}",
             'policy_number':   str(row.get('policy_number', '') or ''),
@@ -349,6 +386,10 @@ async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
             'state':           str(row.get('state', '') or ''),
             'zip':             str(row.get('zip', '') or ''),
         }
+        if terms:
+            prop['terms'] = terms
+            if terms.get('contents_coverage_amount'):
+                prop['contents_coverage_amount'] = terms['contents_coverage_amount']
 
         if r['lat'] is not None and r['lon'] is not None:
             prop['latitude']  = r['lat']

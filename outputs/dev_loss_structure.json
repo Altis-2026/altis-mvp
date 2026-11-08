@@ -1,0 +1,128 @@
+{
+ "bracket": {
+  "cells": [
+   {
+    "held_out": "matthew",
+    "basis": "above_first_floor",
+    "n": 8482,
+    "agg_ratio": 1.959,
+    "nmae": 1.363
+   },
+   {
+    "held_out": "matthew",
+    "basis": "above_ground",
+    "n": 14119,
+    "agg_ratio": 1.871,
+    "nmae": 1.298
+   },
+   {
+    "held_out": "louisiana2016",
+    "basis": "above_first_floor",
+    "n": 6112,
+    "agg_ratio": 0.7,
+    "nmae": 0.444
+   },
+   {
+    "held_out": "louisiana2016",
+    "basis": "above_ground",
+    "n": 9285,
+    "agg_ratio": 0.616,
+    "nmae": 0.503
+   },
+   {
+    "held_out": "harvey",
+    "basis": "above_first_floor",
+    "n": 14483,
+    "agg_ratio": 0.63,
+    "nmae": 0.555
+   },
+   {
+    "held_out": "harvey",
+    "basis": "above_ground",
+    "n": 17307,
+    "agg_ratio": 0.558,
+    "nmae": 0.601
+   },
+   {
+    "held_out": "irma",
+    "basis": "above_first_floor",
+    "n": 11764,
+    "agg_ratio": 2.382,
+    "nmae": 1.812
+   },
+   {
+    "held_out": "irma",
+    "basis": "above_ground",
+    "n": 14614,
+    "agg_ratio": 2.26,
+    "nmae": 1.717
+   }
+  ],
+  "mean_abs_agg_error": 0.746,
+  "mean_nmae": 1.037
+ },
+ "power": {
+  "cells": [
+   {
+    "held_out": "matthew",
+    "basis": "above_first_floor",
+    "n": 8482,
+    "agg_ratio": 1.63,
+    "nmae": 1.096
+   },
+   {
+    "held_out": "matthew",
+    "basis": "above_ground",
+    "n": 14119,
+    "agg_ratio": 1.641,
+    "nmae": 1.123
+   },
+   {
+    "held_out": "louisiana2016",
+    "basis": "above_first_floor",
+    "n": 6112,
+    "agg_ratio": 0.694,
+    "nmae": 0.434
+   },
+   {
+    "held_out": "louisiana2016",
+    "basis": "above_ground",
+    "n": 9285,
+    "agg_ratio": 0.617,
+    "nmae": 0.494
+   },
+   {
+    "held_out": "harvey",
+    "basis": "above_first_floor",
+    "n": 14483,
+    "agg_ratio": 0.608,
+    "nmae": 0.538
+   },
+   {
+    "held_out": "harvey",
+    "basis": "above_ground",
+    "n": 17307,
+    "agg_ratio": 0.569,
+    "nmae": 0.586
+   },
+   {
+    "held_out": "irma",
+    "basis": "above_first_floor",
+    "n": 11764,
+    "agg_ratio": 1.545,
+    "nmae": 1.049
+   },
+   {
+    "held_out": "irma",
+    "basis": "above_ground",
+    "n": 14614,
+    "agg_ratio": 1.703,
+    "nmae": 1.207
+   }
+  ],
+  "mean_abs_agg_error": 0.504,
+  "mean_nmae": 0.816
+ },
+ "chosen": "power",
+ "rule": "lowest mean |aggregate ratio - 1| over leave-one-storm-out training cells"
+}

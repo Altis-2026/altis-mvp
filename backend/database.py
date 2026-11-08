@@ -167,6 +167,12 @@ def init_db():
             conn.execute(f"ALTER TABLE portfolio_properties ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass
+    # Policy terms (deductible, replacement cost, valuation basis, contents) ride
+    # in one JSON column so older databases migrate without a table rebuild.
+    try:
+        conn.execute("ALTER TABLE portfolio_properties ADD COLUMN terms_json TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS analysis_meta (
             portfolio_id TEXT,
@@ -237,12 +243,13 @@ def save_portfolio(portfolio_id: str, properties: list, center: dict,
         INSERT OR REPLACE INTO portfolio_properties
         (portfolio_id, property_id, policy_number, address,
          coverage_amount, latitude, longitude, matched_address,
-         city, state, zip)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         city, state, zip, terms_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, [(portfolio_id, p['property_id'], p.get('policy_number', ''),
            p['address'], p.get('coverage_amount', 0),
            p['latitude'], p['longitude'], p.get('matched_address', ''),
-           p.get('city', ''), p.get('state', ''), p.get('zip', ''))
+           p.get('city', ''), p.get('state', ''), p.get('zip', ''),
+           json.dumps(p['terms']) if p.get('terms') else None)
           for p in properties])
 
     conn.commit()
@@ -270,7 +277,19 @@ def get_portfolio(portfolio_id: str) -> list | None:
         (portfolio_id,)
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows] if rows else None
+    if not rows:
+        return None
+    out = []
+    for r in rows:
+        d = dict(r)
+        raw = d.pop('terms_json', None)
+        if raw:
+            try:
+                d['terms'] = json.loads(raw)
+            except ValueError:
+                pass
+        out.append(d)
+    return out
 
 
 # Columns stored natively in analysis_results; everything else in a result row
@@ -280,7 +299,7 @@ _NATIVE_RESULT_KEYS = {
     'pct_flooded', 'confidence_score', 'adjuster_note',
     # portfolio_properties columns (re-joined on read, don't duplicate):
     'policy_number', 'address', 'coverage_amount', 'latitude', 'longitude',
-    'matched_address',
+    'matched_address', 'terms', 'terms_json',
 }
 
 
@@ -322,6 +341,12 @@ def get_analysis_results(portfolio_id: str, event_id: str) -> list | None:
     out = []
     for r in rows:
         d = dict(r)
+        raw_terms = d.pop('terms_json', None)
+        if raw_terms:
+            try:
+                d['terms'] = _json.loads(raw_terms)
+            except (ValueError, TypeError):
+                pass
         extra = d.pop('extra_json', None)
         if extra:
             try:
