@@ -68,6 +68,8 @@ export const api = {
   getGauges:      (bbox)   => get(`/gauges?bbox=${bbox.join(',')}`),
   getEventGauges: (id)     => get(`/events/${id}/gauges`),
   getEventAnalogs: (id)    => get(`/events/${id}/analogs`),
+  getWatch:        ()      => get('/watch'),
+  getStormExposure: (pid)  => get(`/portfolio/${pid}/storm-exposure`),
   getAnalogs: ({ lat, lon, date, cause }) => get(`/analogs?lat=${lat}&lon=${lon}`
     + (date ? `&date=${date}` : '') + (cause ? `&cause=${encodeURIComponent(cause)}` : '')),
 

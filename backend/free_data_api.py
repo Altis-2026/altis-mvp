@@ -131,3 +131,49 @@ def event_analogs(event_id: str, k: int = Query(8, ge=1, le=25)):
 def library_stats():
     from backend.event_library import library_stats as stats
     return stats()
+
+
+# ── Event watch and pre-event exposure ───────────────────────────────────────
+
+@router.get("/watch")
+def watch():
+    """Active tropical cyclones (NHC) and recently declared flood-type disasters (FEMA)."""
+    from backend.event_watch import watch_summary
+    return watch_summary()
+
+
+@router.get("/portfolio/{portfolio_id}/storm-exposure")
+def portfolio_storm_exposure(portfolio_id: str):
+    """Which of this portfolio's properties sit inside an active storm's 5-day cone."""
+    from backend.database import get_portfolio
+    from backend.event_watch import portfolio_storm_exposure as exposure
+    props = get_portfolio(portfolio_id)
+    if not props:
+        raise HTTPException(404, f"Portfolio '{portfolio_id}' not found.")
+    try:
+        return exposure(props)
+    except requests.RequestException as e:
+        raise HTTPException(502, f"NHC unavailable: {e}")
+
+
+@router.get("/events/{event_id}/cone-replay")
+def cone_replay(event_id: str, storm: str = Query(..., pattern=r"^[a-zA-Z]{2}\d{6}$"),
+                advisories: str = Query("008,012,016,020,024")):
+    """Replay historical NHC cones over an event's properties: how early would
+    each property have been flagged as in the storm's path?"""
+    from backend.database import load_event_data
+    from backend.event_watch import archived_cone, exposure_in_rings
+    df = load_event_data(event_id)
+    if df is None:
+        raise HTTPException(404, f"No data for event '{event_id}'.")
+    props = df[["property_id", "latitude", "longitude"]].to_dict("records")
+    out = []
+    for adv in [a.strip() for a in advisories.split(",") if a.strip()][:12]:
+        try:
+            cone = archived_cone(storm, adv)
+        except requests.RequestException:
+            out.append({"advisory": adv, "error": "not in NHC archive"})
+            continue
+        e = exposure_in_rings(props, cone)
+        out.append({"advisory": adv, "n_in_cone": e["n_in_cone"], "n_total": e["n_total"]})
+    return {"event_id": event_id, "storm": storm, "replay": out}

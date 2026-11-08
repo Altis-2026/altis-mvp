@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.js';
 import DataFreshness from './DataFreshness.jsx';
+import WatchCard from './WatchCard.jsx';
 
 /* OperationsPanel — closes the monitor → pipeline loop. The monitor service
    watches NHC/USGS feeds and, on a new flood event, enqueues a pipeline run
@@ -28,7 +29,7 @@ function ago(iso) {
   } catch { return ''; }
 }
 
-export default function OperationsPanel({ selectedEventMeta, portfolioBbox }) {
+export default function OperationsPanel({ selectedEventMeta, portfolioBbox, portfolioId }) {
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -63,7 +64,7 @@ export default function OperationsPanel({ selectedEventMeta, portfolioBbox }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '0 18px 12px' }}>
+      <div style={{ padding: '0 18px 12px', overflowY: 'auto', maxHeight: '68%', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>Operations</div>
           <button onClick={refresh} style={linkBtn}>↻ Refresh</button>
@@ -85,6 +86,8 @@ export default function OperationsPanel({ selectedEventMeta, portfolioBbox }) {
           NHC cyclones and USGS flood gauges, and new events queue a run here.
           <div style={{ marginTop: 4, color: 'var(--text-muted)' }}>{queued} run{queued === 1 ? '' : 's'} queued</div>
         </div>
+
+        <WatchCard portfolioId={portfolioId} />
 
         {(selectedEventMeta || portfolioBbox) && (
           <DataFreshness

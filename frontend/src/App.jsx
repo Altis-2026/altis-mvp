@@ -448,7 +448,7 @@ export default function App() {
           />
         )}
         {activePanel === 'operations' && (
-          <OperationsPanel selectedEventMeta={selectedEventMeta} portfolioBbox={portfolioBbox} />
+          <OperationsPanel selectedEventMeta={selectedEventMeta} portfolioBbox={portfolioBbox} portfolioId={portfolioId} />
         )}
       </Sidebar>
 
