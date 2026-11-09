@@ -46,3 +46,12 @@ def test_flights_for_filters_by_date_bounds_and_imagery(tmp_path, monkeypatch):
     outside = eri.flights_for(40.0, -100.0, "2017-08-23")
     assert outside["flights"] == []
     assert eri.flights_for(29.5, -95.5, "bad")["flights"] == []
+
+
+def test_outage_is_not_reported_as_no_coverage(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+    def boom(*a, **k):
+        raise eri.requests.ConnectionError("down")
+    monkeypatch.setattr(eri.requests, "get", boom)
+    out = eri.flights_for(29.5, -95.5, "2017-08-23")
+    assert out["flights"] == [] and out["service_error"] is True

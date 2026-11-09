@@ -35,7 +35,7 @@ export default function PostStormAerial({ property, eventDate }) {
     let alive = true;
     setState('loading'); setData(null); setPick(0); setWide(false);
     api.getPostStormFlights(lat, lon, eventDate)
-      .then(d => { if (!alive) return; setData(d); setState(d.flights?.length ? 'ready' : 'none'); })
+      .then(d => { if (!alive) return; setData(d); setState(d.flights?.length ? 'ready' : (d.service_error ? 'down' : 'none')); })
       .catch(() => alive && setState('error'));
     return () => { alive = false; };
   }, [lat, lon, eventDate, ok]);
@@ -67,8 +67,15 @@ export default function PostStormAerial({ property, eventDate }) {
   if (state === 'loading') {
     return <div style={{ ...muted, marginBottom: 24 }}>Checking for NOAA post-storm aerial photos…</div>;
   }
-  if (state === 'none' || state === 'error') {
-    if (state === 'none' && ok && US(lat, lon)) {
+  if (state === 'down' || state === 'error') {
+    return (
+      <div style={{ ...muted, marginBottom: 24 }}>
+        NOAA's imagery service didn't respond, so post-storm aerial photos couldn't be checked. This does not mean none exist; reopen this property to retry.
+      </div>
+    );
+  }
+  if (state === 'none') {
+    if (ok && US(lat, lon)) {
       return (
         <div style={{ ...muted, marginBottom: 24 }}>
           No NOAA post-storm aerial photos cover this spot. That means no flight reached it, not that it stayed dry.
@@ -126,7 +133,7 @@ export default function PostStormAerial({ property, eventDate }) {
       )}
       <div style={{ ...muted, marginTop: 8 }}>
         Flown {flight.date} ({flight.days_after_event >= 0 ? `${flight.days_after_event} days after` : `${-flight.days_after_event} days before`} the
-        event start, after {flight.storm.replace(/_/g, ' ')}. A direct look at this house from the air:
+        event start, after {flight.storm.replace(/_/g, ' ')}. A direct look at this location from the air:
         roofs, yards, standing water and debris. Water may already have receded, so a dry-looking photo does not
         prove it never flooded.
       </div>

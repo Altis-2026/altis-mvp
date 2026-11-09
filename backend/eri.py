@@ -93,12 +93,31 @@ def fetch_tile(code: str, z: int, x: int, y: int) -> Optional[tuple[bytes, str]]
     return body, media
 
 
-def has_imagery(code: str, z: int, x: int, y: int) -> bool:
+def _service_error(code: str, z: int, x: int, y: int) -> bool:
+    """True when NOAA could not be reached or answered 5xx (as opposed to a clean
+    'no imagery' reply), so an outage is never reported as 'no coverage'."""
+    lyr = layer(code)
+    if not lyr:
+        return False
+    try:
+        r = requests.get(f"https://{lyr['host']}/{code}/{z}/{x}/{y}", headers=UA, timeout=PROBE_TIMEOUT)
+    except requests.RequestException:
+        return True
+    return r.status_code >= 500
+
+
+def has_imagery(code: str, z: int, x: int, y: int) -> Optional[bool]:
+    """True/False for a definite answer, None when the NOAA service failed."""
     key = (code, z, x, y)
     if key in _probe_cache:
         return _probe_cache[key]
     t = fetch_tile(code, z, x, y)
-    ok = bool(t and len(t[0]) > BLANK_MAX_BYTES)
+    if t is None:
+        if _service_error(code, z, x, y):
+            return None            # not cached: retry next time
+        _probe_cache[key] = False
+        return False
+    ok = len(t[0]) > BLANK_MAX_BYTES
     _probe_cache[key] = ok
     return ok
 
@@ -129,10 +148,12 @@ def flights_for(lat: float, lon: float, event_date: str, before_days: int = 10,
 
     def probe(r):
         x, y, _, _ = tile_xy(lat, lon, 17)
-        return r if has_imagery(r["code"], 17, x, y) else None
+        return r, has_imagery(r["code"], 17, x, y)
 
     with ThreadPoolExecutor(10) as ex:
-        hits = [r for r in ex.map(probe, cands) if r]
+        probed = list(ex.map(probe, cands))
+    failed = sum(1 for _, ok in probed if ok is None)
+    hits = [r for r, ok in probed if ok]
     with ThreadPoolExecutor(6) as ex:
         zooms = list(ex.map(lambda r: _best_zoom(r["code"], lat, lon), hits))
     flights = [{"code": r["code"], "storm": r["storm"], "date": r["date"], "zoom": z,
@@ -140,4 +161,5 @@ def flights_for(lat: float, lon: float, event_date: str, before_days: int = 10,
                for r, z in zip(hits, zooms) if z]
     flights.sort(key=lambda f: f["date"])
     return {"flights": flights, "checked": len(cands),
+            "service_error": bool(failed) and not flights,
             "attribution": "NOAA National Geodetic Survey, Emergency Response Imagery (public domain)"}
