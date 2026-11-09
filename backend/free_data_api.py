@@ -219,3 +219,26 @@ def calibrate_losses(portfolio_id: str, body: dict):
             "note": ("Early-settling claims skew small, so a factor from few claims can be biased low; the "
                      "interval covers sampling error only. Validated: after 200 settled claims the storm "
                      "total was typically within 6% (docs/PREREG_LOSS_MODEL.md).")}
+
+
+# ── NOAA post-storm aerial imagery ───────────────────────────────────────────
+
+@router.get("/imagery/post-storm")
+def post_storm_imagery(lat: float = Query(..., ge=-90, le=90), lon: float = Query(..., ge=-180, le=180),
+                       date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$",
+                                         description="when the storm/flood began")):
+    """Post-storm aerial photos (NOAA, ~30 cm) that actually cover this point,
+    earliest first. Empty when no flight covered it (not the same as dry)."""
+    from backend.eri import flights_for
+    return flights_for(lat, lon, date)
+
+
+@router.get("/imagery/tile/{code}/{z}/{x}/{y}")
+def post_storm_tile(code: str, z: int, x: int, y: int):
+    """One NOAA tile, fetched through our server. Only catalogued layers."""
+    from fastapi.responses import Response
+    from backend.eri import fetch_tile
+    t = fetch_tile(code, z, x, y)
+    if t is None:
+        raise HTTPException(404, "Unknown layer or tile unavailable.")
+    return Response(content=t[0], media_type=t[1], headers={"Cache-Control": "public, max-age=86400"})

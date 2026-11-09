@@ -70,6 +70,14 @@ export const api = {
   getEventAnalogs: (id)    => get(`/events/${id}/analogs`),
   getWatch:        ()      => get('/watch'),
   getStormExposure: (pid)  => get(`/portfolio/${pid}/storm-exposure`),
+  /* NOAA post-storm aerial photos covering a point, and single tiles as blobs
+     (fetched with the access header, so password-protected deployments work). */
+  getPostStormFlights: (lat, lon, date) => get(`/imagery/post-storm?lat=${lat}&lon=${lon}&date=${date}`),
+  getImageryTileUrl: async (code, z, x, y) => {
+    const r = await authFetch(`/imagery/tile/${code}/${z}/${x}/${y}`);
+    if (!r.ok) return null;
+    return URL.createObjectURL(await r.blob());
+  },
   /* Learn the storm's dollar scale from settled claims and rescale the book. */
   calibrateLosses: (pid, settled) =>
     authFetch(`/portfolio/${pid}/calibrate-losses`, {

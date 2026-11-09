@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import SarPair from './SarPair.jsx';
 import StreetViewPanel from './StreetViewPanel.jsx';
+import PostStormAerial from './PostStormAerial.jsx';
 import { api } from '../services/api.js';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 
@@ -60,6 +61,9 @@ function Mrow({ label, tech, value }) {
     </tr>
   );
 }
+
+// Demo events are dated by radar window; flights follow the STORM start.
+const STORM_START = { harvey: '2017-08-23', brazos: '2017-08-23', lismore: '2022-02-23' };
 
 export default function PropertyDrawer({ property, eventId, liveEventDate, onClose, onAddToCompare, isInCompare, compareFull, onFeedbackSaved, eventLabel, durationSlices }) {
   const isMobile = useIsMobile();
@@ -418,6 +422,8 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               </div>
             </div>
           )}
+
+          <PostStormAerial property={property} eventDate={liveEventDate || STORM_START[eventId] || null} />
 
           {/* SAR imagery section */}
           <div style={{ marginBottom: 24 }}>

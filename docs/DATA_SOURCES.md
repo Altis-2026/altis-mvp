@@ -53,3 +53,9 @@ for research and validation but need a licence check before outputs derived from
 | **Copernicus EMS rapid mapping** (EC Copernicus EMS) | Analyst-mapped flood extents for activations worldwide | ready | Copernicus open | yes | https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations/?limit=1 |
 | **NOAA Emergency Response Imagery** (NOAA NGS) | Post-hurricane aerial photos (truth for coastal US storms) | ready | US public domain | yes | https://storms.ngs.noaa.gov/ |
 | **Dartmouth Flood Observatory archive** (Univ. of Colorado) | Global flood event list 1985-present | ready | Check terms | yes | https://floodobservatory.colorado.edu/ |
+
+## NOAA Emergency Response Imagery (post-storm aerial photos)
+- Status: **integrated** (property drawer "Post-storm aerial photo"). Public domain, ~30 cm, XYZ tiles from `stormscdn.ngs.noaa.gov`.
+- Catalogue: `pipeline/library/build_eri.py` -> `outputs/library/eri_layers.json` (264 flights; rebuild after new storms).
+- Served through `/api/imagery/post-storm` and `/api/imagery/tile/...` (allowlisted to catalogued layers).
+- Limits: coverage is patchy; water may have receded before the flight; no photo is not "dry". Visual evidence only, not a damage score. Not yet browser-tested end to end.
