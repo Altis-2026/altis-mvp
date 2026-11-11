@@ -15,6 +15,7 @@ import DispatchQueuePanel from './components/DispatchQueuePanel.jsx';
 import OperationsPanel    from './components/OperationsPanel.jsx';
 import DataGrid           from './components/DataGrid.jsx';
 import ChatBar            from './components/ChatBar.jsx';
+import Tutorial           from './components/Tutorial.jsx';
 import { api }            from './services/api.js';
 
 function computeBounds(properties) {
@@ -49,6 +50,20 @@ export default function App() {
   const [flyTarget,        setFlyTarget]        = useState(null);
   const [showUpload,       setShowUpload]       = useState(false);
   const [loading,          setLoading]          = useState(false);
+
+  /* ── One shared, editable assumption: the cost of a field visit. It drives
+     the scoreboard, the ROI calculator and the assistant so they can never
+     disagree. Illustrative until the carrier enters its own figure. ───── */
+  const [costPerVisit, setCostPerVisit] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem('altis_cost_per_visit'));
+      return v > 0 ? v : 450;
+    } catch { return 450; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('altis_cost_per_visit', String(costPerVisit)); }
+    catch { /* storage unavailable: the value just is not remembered */ }
+  }, [costPerVisit]);
 
   /* ── Sidebar ──────────────────────────────────────────────────── */
   const [activePanel, setActivePanel] = useState(null);
@@ -116,7 +131,9 @@ export default function App() {
     if (evt) setFlyTarget({ center: [evt.lon, evt.lat], zoom: evt.zoom || 10 });
 
     // NHC best-track overlay (only exists for hurricane events; 404 = none).
-    api.getStormTrack(eventId).then(setStormTrack).catch(() => setStormTrack(null));
+    api.getStormTrack(eventId)
+      .then(t => setStormTrack(t?.features?.length ? t : null))
+      .catch(() => setStormTrack(null));
 
     try {
       const [propsData, tilesData] = await Promise.all([
@@ -164,6 +181,18 @@ export default function App() {
       }
     }
   }, [refreshPortfolios]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Reload stored live results (after calibrating to settled claims) ── */
+  const reloadLiveResults = useCallback(async () => {
+    if (!portfolioId) return;
+    try {
+      const saved = await api.getResults(portfolioId, 'live');
+      if (saved?.results?.some(r => r.impact_class)) {
+        setPortfolioProps(saved.results);
+        setLiveMeta(saved.meta || null);
+      }
+    } catch { /* keep what is on screen */ }
+  }, [portfolioId]);
 
   /* ── Select a saved portfolio from the sidebar ───────────────── */
   const handlePortfolioSelect = useCallback(async (id) => {
@@ -288,6 +317,54 @@ export default function App() {
   }, [properties, portfolioProps, activePortfolio, selectedEventMeta]);
 
   const canOpenGrid = properties.length > 0 || portfolioProps.length > 0;
+  const portfolioBbox = (() => {
+    const b = computeBounds(portfolioProps);
+    // Padded so a one-property book still forms a valid search box.
+    return b ? [b[0][0] - 0.02, b[0][1] - 0.02, b[1][0] + 0.02, b[1][1] + 0.02] : null;
+  })();
+
+  /* ── Guided tour: drives the real UI step by step ─────────────── */
+  const [showTour, setShowTour] = useState(false);
+  const [tourWantsProperty, setTourWantsProperty] = useState(false);
+
+  const openTour = useCallback(() => {
+    setGrid(null);
+    setShowUpload(false);
+    setShowTour(true);
+  }, []);
+
+  const closeTour = useCallback(() => {
+    setShowTour(false);
+    setTourWantsProperty(false);
+    setSelectedProperty(null);
+    setActivePanel(null);
+  }, []);
+
+  // The tour asks for "the top property"; open it as soon as one exists
+  // (the demo event may still be loading when the step starts).
+  useEffect(() => {
+    if (!tourWantsProperty || properties.length === 0) return;
+    const rank = { 'Dispatch': 0, 'Review': 1, 'Remote-Approve': 2, 'Remote-Deny': 3 };
+    const top = [...properties].sort((a, b) =>
+      ((rank[a.impact_class] ?? 9) - (rank[b.impact_class] ?? 9)) ||
+      ((+b.max_depth_ft || 0) - (+a.max_depth_ft || 0)))[0];
+    setSelectedProperty(top);
+    setTourWantsProperty(false);
+  }, [tourWantsProperty, properties]);
+
+  const tourCtl = {
+    eventLabel: selectedEventMeta?.label,
+    setPanel: setActivePanel,
+    closeProperty: () => { setTourWantsProperty(false); setSelectedProperty(null); },
+    ensureEvent: () => {
+      if (selectedEvent || loading || events.length === 0) return;
+      const demo = events.find(e => e.id === 'harvey') || events[0];
+      handleEventSelect(demo.id);
+    },
+    openTopProperty: () => {
+      if (!selectedProperty) setTourWantsProperty(true);
+    },
+  };
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -304,6 +381,7 @@ export default function App() {
         leftInset={leftInset}
         stormTrack={stormTrack}
         zoneBbox={zoneSummary?.zone_source === 'event' ? zoneSummary.bbox : null}
+        onOpenTutorial={openTour}
       />
 
       <Header
@@ -314,11 +392,12 @@ export default function App() {
       />
 
       {selectedEvent && (
-        <TimeSlider timeMode={timeMode} onTimeChange={setTimeMode} hasTile={!!tileUrl} />
+        <TimeSlider timeMode={timeMode} onTimeChange={setTimeMode} hasTile={!!tileUrl} leftInset={leftInset} />
       )}
 
       {(stats || liveMeta?.exposure) && (
-        <KPIBar stats={stats} exposure={liveMeta?.exposure} leftInset={leftInset} />
+        <KPIBar stats={stats} exposure={liveMeta?.exposure} leftInset={leftInset} drawerOpen={drawerOpen}
+                costPerVisit={costPerVisit} />
       )}
 
       <Sidebar activePanel={activePanel} onSetPanel={setActivePanel} compareCount={compareList.length}>
@@ -385,15 +464,22 @@ export default function App() {
         {activePanel === 'reports' && (
           <ReportsPanel
             events={events}
+            selectedEvent={selectedEvent}
             eventLabel={selectedEventMeta?.label}
             eventProperties={properties}
             portfolioId={portfolioId}
             portfolioLabel={activePortfolio?.id}
             portfolioProperties={portfolioProps}
+            costPerVisit={costPerVisit}
+            onCostPerVisit={setCostPerVisit}
+            onLossesCalibrated={reloadLiveResults}
+            liveMeta={liveMeta}
+            portfolioCenter={portfolioBbox ? [(portfolioBbox[0] + portfolioBbox[2]) / 2, (portfolioBbox[1] + portfolioBbox[3]) / 2] : null}
+            liveEventDate={liveEventDate}
           />
         )}
         {activePanel === 'operations' && (
-          <OperationsPanel selectedEventMeta={selectedEventMeta} />
+          <OperationsPanel selectedEventMeta={selectedEventMeta} portfolioBbox={portfolioBbox} portfolioId={portfolioId} />
         )}
       </Sidebar>
 
@@ -429,13 +515,18 @@ export default function App() {
         />
       )}
 
+      <Tutorial open={showTour} onClose={closeTour} ctl={tourCtl} />
+
       {!grid && (
         <ChatBar
           eventMeta={selectedEventMeta}
-          eventStats={stats}
+          eventStats={stats ? { ...stats, estimated_savings: (stats.remote_total || 0) * costPerVisit,
+                                cost_per_visit_assumption: costPerVisit } : stats}
           selectedProperty={selectedProperty}
           portfolioId={portfolioAnalyzed ? portfolioId : null}
           panelOpen={!!activePanel}
+          leftInset={leftInset}
+          hasTimeSlider={!!selectedEvent}
         />
       )}
 

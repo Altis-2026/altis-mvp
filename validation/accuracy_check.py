@@ -1,44 +1,53 @@
 #!/usr/bin/env python3
 """
-accuracy_check.py — Validate Altis triage output against FEMA ground truth.
+accuracy_check.py — Validate Altis triage output against NFIP insurance claims.
 
-WHY ZIP-CODE LEVEL:
-FEMA's public Individual Assistance (IA) data is released at the zip-code
-level, not per-address, to protect survivor privacy. This means we can't
-validate "this exact house was flooded" — but we CAN validate "this zip
-code had elevated flood damage" and check that against Altis's own
-zip-level aggregation. This is the standard approach used in academic
-remote-sensing flood validation studies, and it's defensible to a
-carrier's actuarial team because it's the same ground truth FEMA itself
-uses to release individual assistance funding.
+WHAT CHANGED (Phase 0) AND WHY
+------------------------------
+This script previously validated against FEMA Individual Assistance housing
+registrants. That ground truth had three defects, and the third one was fatal:
 
-DATA SOURCE:
-OpenFEMA API — IndividualAssistanceHousingRegistrantsLargeDisasters
-  https://www.fema.gov/api/open/v2/IndividualAssistanceHousingRegistrantsLargeDisasters
-  Free, no API key required.
+  1. Self-selected population. IA registrants are people who applied for
+     federal aid. A carrier's insured book is close to the opposite
+     population, so the comparison never really answered the carrier's
+     question.
+  2. Binary labels only. No depth, so the strongest available claim was
+     "our spatial flood pattern is directionally consistent with where people
+     applied for aid."
+  3. Hurricane Ian is not in the dataset. The IA Housing Registrants endpoint
+     returns count: 0 for DR-4673. Not a timeout and not rate limiting — the
+     disaster simply is not in that table, so Ian could not be validated at
+     all. Earlier fixes (retries, smaller pages) were chasing a symptom that
+     was never the cause.
 
-  Harvey -> disasterNumber 4332 (TX, declared Aug 25 2017)
-  Ian    -> disasterNumber 4673 (FL, declared Sep 29 2022)
+The replacement is the OpenFEMA NFIP Redacted Claims dataset: real insurance
+claims, with a reported water depth and the dollar amount actually paid on
+building and contents. See validation/nfip_claims.py for the API details and
+for the `waterDepth` unit problem, which is real and is reported rather than
+smoothed over.
 
-METRICS PRODUCED:
-  1. Zip-level correlation: Altis mean depth vs FEMA mean self-reported water level
-  2. Zip-level correlation: Altis % flagged-flooded vs FEMA % flood-damage registrants
-  3. Confusion-style table: zips Altis calls "high impact" vs FEMA registration volume
-  4. A markdown report saved to outputs/validation_{event_id}.md
+TWO NUMBERS THAT ARE NOT THE SAME THING
+---------------------------------------
+  - `confidence_score` is DECISION confidence: how sure we are that this
+    triage call is right, given sensor agreement, depth, recency.
+  - `flood_probability` is a CALIBRATED PROBABILITY anchored to this ground
+    truth: of properties scoring like this one, what fraction actually
+    flooded.
+They are deliberately kept separate throughout the codebase and must never be
+conflated. This script fits the second one.
 
-LIMITATIONS (stated explicitly in the report, not hidden):
-  - FEMA IA registrants are self-selected (renters/owners who applied for aid),
-    not a random sample of all properties — likely undercounts well-insured
-    or unaffected high-value properties relative to true flood extent.
-  - Zip-code aggregation hides intra-zip variation that Altis resolves at
-    the property level — this is comparing Altis's coarse aggregate to FEMA's
-    coarse aggregate, not validating Altis's actual unit of analysis.
-  - Self-reported water level in FEMA data is unverified at time of registration.
+ZIP RESOLUTION, AND WHY THE HOLD-OUT IS GROUPED
+------------------------------------------------
+NFIP claims carry `reportedZipCode`. The `censusTract` field is empty in v3
+for these events and lat/long is redacted to one decimal place (~11 km), so
+ZIP is the finest honest join key. Labels are therefore zip-resolution, and
+the calibration hold-out is grouped by zip (train and test zips disjoint) so
+no label leaks across the split.
 
 Usage:
     python validation/accuracy_check.py --event harvey
     python validation/accuracy_check.py --event ian
-    python validation/accuracy_check.py --event harvey --event ian   (both)
+    python validation/accuracy_check.py               (both)
 """
 import argparse
 import json
@@ -51,171 +60,69 @@ from typing import Optional
 
 import pandas as pd
 import numpy as np
-import requests
 
-BASE_DIR   = Path(__file__).parent.parent
+BASE_DIR = Path(__file__).parent.parent
 OUTPUT_DIR = BASE_DIR / 'outputs'
-FEMA_API   = "https://www.fema.gov/api/open/v2/IndividualAssistanceHousingRegistrantsLargeDisasters"
 
 # Make the pipeline's calibration core importable from this validation script.
 sys.path.insert(0, str(BASE_DIR / 'pipeline'))
+sys.path.insert(0, str(Path(__file__).parent))
 import calibration as calib  # noqa: E402
+import nfip_claims as nfip  # noqa: E402
 
-# A zip is labelled "flooded" ground-truth when at least this fraction of its
-# FEMA IA registrants reported flood damage (vs wind-only). Surge/flood zones
-# clear this; wind-damage-only zones do not. Documented and configurable.
+# A zip is labelled "flooded" ground truth when at least this percentage of the
+# NFIP policies in force there filed a claim for this event.
+#
+# This is a RATE, not a count, which is the whole point of paying for the
+# policy-in-force denominator: it is a population statistic about insured
+# structures, immune to the "bigger zip files more claims" artifact that a raw
+# count would have. The threshold sits well above background — ordinary years
+# produce claim rates far below 1% — while staying below the rates seen in
+# genuinely inundated zips.
+ZIP_CLAIM_RATE_THRESHOLD_PCT = 5.0
+
+# First fallback denominator: NFIP claims per residential structure. Lower
+# threshold than the policy rate because the denominator is larger (all
+# residential buildings, not just insured ones), so the same flooding produces
+# a smaller percentage. Calibrated against observed Harvey values rather than
+# picked round: badly-flooded Harris County zips run several percent here,
+# untouched ones well under one.
+ZIP_STRUCTURE_RATE_THRESHOLD_PCT = 2.0
+
+# Last-resort fallback with no denominator at all: label on the share of claims
+# reporting standing water above the reference level. Known to collapse to a
+# single class on real data — retained only so the pipeline still produces a
+# report when both denominators are unavailable.
+ZIP_DEPTH_LABEL_THRESHOLD_PCT = 50.0
+
+# Legacy IA-based threshold, retained because derive_property_labels() still
+# supports the old column for backward compatibility.
 ZIP_FLOOD_LABEL_THRESHOLD = 0.5
+
 # Triage classes treated as a positive ("predict flooded") decision.
 POSITIVE_TRIAGE_CLASSES = ('Dispatch', 'Remote-Approve')
 
 EVENT_META = {
     'harvey': {
-        'disaster_number': 4332,
-        'county_filter':   'Harris (County)',
-        'state':           'TX',
-        'label':           'Hurricane Harvey',
+        'label':        'Hurricane Harvey',
+        'county':       'Harris County, TX',
+        # Claims are selected on date of loss, which isolates the event
+        # precisely. This is what makes the method work for Ian, which has no
+        # usable disaster-number join in the claims table.
+        'claims_start': '2017-08-25',
+        'claims_end':   '2017-09-15',
+        'as_of':        '2017-08-25',
     },
-    'ian': {
-        'disaster_number': 4673,
-        'county_filter':   'Charlotte (County)',
-        'state':           'FL',
-        'label':           'Hurricane Ian',
+    'brazos': {
+        'label':        'Hurricane Harvey — Brazos River',
+        'county':       'Fort Bend County, TX',
+        # The Brazos crested days after Harvey's rainfall ended, so the claims
+        # window runs later than the HARVEY box's to cover the actual crest.
+        'claims_start': '2017-08-27',
+        'claims_end':   '2017-09-20',
+        'as_of':        '2017-08-25',
     },
 }
-
-# Candidate field names — OpenFEMA has renamed fields across dataset versions.
-# We probe the live schema first and fall back to this priority list.
-ZIP_FIELD_CANDIDATES   = ['damagedZipCode', 'zipCode', 'damagedZip']
-FLOOD_FIELD_CANDIDATES = ['floodDamage', 'floodDamageIndicator']
-WATER_FIELD_CANDIDATES = ['waterLevel', 'floodWaterLevel', 'highWaterLevel']
-COUNTY_FIELD_CANDIDATES = ['county', 'damagedCounty']
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FEMA DATA FETCH
-# ─────────────────────────────────────────────────────────────────────────────
-
-def discover_fields() -> list[str]:
-    """Probe the live OpenFEMA endpoint for one record to learn actual field names."""
-    try:
-        resp = requests.get(FEMA_API, params={'$top': 1}, timeout=20)
-        resp.raise_for_status()
-        records = resp.json().get('IndividualAssistanceHousingRegistrantsLargeDisasters', [])
-        if records:
-            return list(records[0].keys())
-    except Exception as e:
-        print(f"  Warning: could not probe FEMA schema ({e}). Using known field names.")
-    return []
-
-
-def pick_field(available: list[str], candidates: list[str]) -> Optional[str]:
-    if not available:
-        return candidates[0]  # best guess if probe failed
-    for c in candidates:
-        if c in available:
-            return c
-    # Case-insensitive partial match fallback
-    for c in candidates:
-        for a in available:
-            if c.lower() in a.lower():
-                return a
-    return None
-
-
-def fetch_fema_data(event_id: str) -> pd.DataFrame:
-    """
-    Fetch all FEMA IA registrant records for an event's county, paginated.
-    Returns a DataFrame with normalized columns: zip, flood_flag, water_level.
-    """
-    meta = EVENT_META[event_id]
-    print(f"\nFetching FEMA IA data for {meta['label']} (DR-{meta['disaster_number']})...")
-
-    available_fields = discover_fields()
-    zip_field   = pick_field(available_fields, ZIP_FIELD_CANDIDATES)
-    flood_field = pick_field(available_fields, FLOOD_FIELD_CANDIDATES)
-    water_field = pick_field(available_fields, WATER_FIELD_CANDIDATES)
-    county_field = pick_field(available_fields, COUNTY_FIELD_CANDIDATES)
-
-    print(f"  Using fields: zip={zip_field}, flood={flood_field}, "
-          f"water={water_field}, county={county_field}")
-
-    all_records = []
-    skip = 0
-    page_size = 1000
-
-    while True:
-        filter_str = f"disasterNumber eq {meta['disaster_number']}"
-        try:
-            resp = requests.get(FEMA_API, params={
-                '$filter': filter_str,
-                '$top':    page_size,
-                '$skip':   skip,
-            }, timeout=30)
-            resp.raise_for_status()
-            data    = resp.json()
-            records = data.get('IndividualAssistanceHousingRegistrantsLargeDisasters', [])
-        except Exception as e:
-            print(f"  FEMA API request failed at skip={skip}: {e}")
-            break
-
-        if not records:
-            break
-
-        all_records.extend(records)
-        print(f"  Fetched {len(all_records):,} records so far...")
-        skip += page_size
-
-        if len(records) < page_size:
-            break
-        if skip > 200_000:  # safety cap
-            print("  Reached safety cap of 200k records, stopping pagination.")
-            break
-        time.sleep(0.2)
-
-    if not all_records:
-        print("  No FEMA records retrieved. Check network access or disaster number.")
-        return pd.DataFrame()
-
-    df = pd.DataFrame(all_records)
-
-    # Filter to target county if county field exists (some events span multiple counties)
-    if county_field and county_field in df.columns:
-        before = len(df)
-        df = df[df[county_field].astype(str).str.contains(
-            meta['county_filter'].split(' (')[0], case=False, na=False)]
-        print(f"  Filtered to {meta['county_filter']}: {before:,} -> {len(df):,} records")
-
-    # Normalize output columns
-    out = pd.DataFrame()
-    out['zip'] = df[zip_field].astype(str).str[:5] if zip_field in df.columns else None
-
-    if flood_field and flood_field in df.columns:
-        out['flood_flag'] = df[flood_field].apply(_to_bool)
-    else:
-        out['flood_flag'] = None
-
-    if water_field and water_field in df.columns:
-        out['water_level'] = pd.to_numeric(df[water_field], errors='coerce')
-    else:
-        out['water_level'] = None
-
-    out = out.dropna(subset=['zip'])
-    out = out[out['zip'].str.match(r'^\d{5}$', na=False)]
-
-    print(f"  Final FEMA dataset: {len(out):,} registrant records across "
-          f"{out['zip'].nunique()} zip codes")
-    return out
-
-
-def _to_bool(val) -> Optional[bool]:
-    if pd.isna(val):
-        return None
-    s = str(val).strip().lower()
-    if s in ('y', 'yes', 'true', '1'):
-        return True
-    if s in ('n', 'no', 'false', '0'):
-        return False
-    return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -224,124 +131,390 @@ def _to_bool(val) -> Optional[bool]:
 
 ZIP_REGEX = re.compile(r'\b(\d{5})\b')
 
+
 def extract_zip(address: str) -> Optional[str]:
+    """
+    Last-resort zip parse from an address string.
+
+    RETAINED ONLY AS A FALLBACK. On the Harvey portfolio this approach found no
+    zip at all for 300 of 1000 addresses and mistook street numbers for zips on
+    others ("10005 Main Street, TX" -> 10005, lower Manhattan). Coordinate-based
+    assignment via validation/zip_assign.py is the real path; see that module.
+    """
     if not isinstance(address, str):
         return None
     matches = ZIP_REGEX.findall(address)
-    return matches[-1] if matches else None  # zip is usually the last 5-digit group
+    return matches[-1] if matches else None
 
 
-def load_altis_data(event_id: str) -> pd.DataFrame:
-    """Load Altis final triage CSV and extract zip codes from addresses."""
-    path = OUTPUT_DIR / f"{event_id}_final.csv"
-    if not path.exists():
+def load_altis_data(event_id: str, use_coordinates: bool = True) -> pd.DataFrame:
+    """
+    Load Altis triage output, joined to property coordinates, with a zip
+    assigned to every property.
+
+    Prefers coordinate-based ZIP assignment (point-in-polygon against Census
+    ZCTA boundaries in Earth Engine) and falls back to address parsing only if
+    Earth Engine is unavailable — reporting which path was taken, because the
+    two produce measurably different validation sets.
+    """
+    final_path = OUTPUT_DIR / f"{event_id}_final.csv"
+    if not final_path.exists():
         raise FileNotFoundError(
-            f"{path} not found. Run pipeline/04_triage_notes.py for '{event_id}' first."
-        )
+            f"{final_path} not found. Run pipeline/04_triage_notes.py for "
+            f"'{event_id}' first.")
 
-    df = pd.read_csv(path)
+    df = pd.read_csv(final_path)
+    df['property_id'] = df['property_id'].astype(str)
 
-    if 'zip' not in df.columns:
+    props_path = OUTPUT_DIR / f"{event_id}_properties.csv"
+    if props_path.exists():
+        coords = pd.read_csv(props_path)[['property_id', 'latitude', 'longitude']]
+        coords['property_id'] = coords['property_id'].astype(str)
+        df = df.merge(coords, on='property_id', how='left')
+
+    assigned = False
+    if use_coordinates and {'latitude', 'longitude'} <= set(df.columns):
+        try:
+            from zip_assign import assign_zips
+            zips = assign_zips(df[['property_id', 'latitude', 'longitude']],
+                               cache_path=str(OUTPUT_DIR / f"{event_id}_zips.csv"))
+            if not zips.empty:
+                zips['property_id'] = zips['property_id'].astype(str)
+                zips['zip'] = zips['zip'].astype(str).str.extract(r'^(\d{5})',
+                                                                 expand=False)
+                df = df.merge(zips, on='property_id', how='left')
+                assigned = True
+                print("  ZIP source: coordinates (Census ZCTA point-in-polygon)")
+        except Exception as e:  # noqa: BLE001 - fall back, but say so
+            print(f"  Coordinate ZIP assignment unavailable ({e}); "
+                  f"falling back to address parsing.")
+
+    if not assigned:
         df['zip'] = df['address'].apply(extract_zip)
+        print("  ZIP source: address string parsing (fallback - less reliable)")
 
-    missing = df['zip'].isna().sum()
+    missing = int(df['zip'].isna().sum())
     if missing:
-        print(f"  Note: {missing}/{len(df)} properties had no extractable zip code "
-              f"and will be excluded from zip-level comparison.")
+        print(f"  Note: {missing}/{len(df)} properties have no ZIP and are "
+              f"excluded from the zip-level comparison.")
 
-    df = df.dropna(subset=['zip'])
-    df['flagged_flooded'] = df['impact_class'].isin(['Dispatch', 'Remote-Approve'])
+    df = df.dropna(subset=['zip']).copy()
+    df['zip'] = df['zip'].astype(str).str.zfill(5)
+    df['flagged_flooded'] = df['impact_class'].isin(POSITIVE_TRIAGE_CLASSES)
     return df
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GROUND TRUTH ASSEMBLY
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _population_from_manifest(event_id: str) -> Optional[int]:
+    """
+    Residential structures in the study area, from the properties manifest.
+
+    Validation needs the POPULATION the portfolio was sampled from, not the
+    sample size, to turn per-zip claim counts into a real rate. Returns None
+    when the manifest predates this field, in which case the caller falls back
+    to raw sample counts — correct ordering, meaningless scale, and the report
+    says the denominator is unavailable.
+    """
+    path = OUTPUT_DIR / f"{event_id}_manifest.json"
+    if not path.exists():
+        return None
+    try:
+        blob = json.loads(path.read_text())
+    except Exception:  # noqa: BLE001 - a malformed manifest is not fatal here
+        return None
+    # write_manifest nests stage payloads under blob['stages'][stage_name],
+    # and each stage payload may itself wrap the values under a 'data' key.
+    def find(node):
+        if isinstance(node, dict):
+            if 'residential_structures_in_bbox' in node:
+                try:
+                    return int(node['residential_structures_in_bbox'])
+                except (TypeError, ValueError):
+                    return None
+            for child in node.values():
+                found = find(child)
+                if found:
+                    return found
+        return None
+
+    return find(blob)
+
+
+def build_ground_truth(event_id: str, zips, use_policy_denominator: bool = True,
+                       structures: Optional[pd.DataFrame] = None) -> tuple:
+    """
+    Assemble the NFIP ground truth for one event's zips.
+
+    Returns (zip_agg, claims, diagnostics). `zip_agg` carries one row per zip
+    with claim counts, depth statistics, paid amounts, and — when the policy
+    denominator is retrievable — `nfip_claim_rate_pct`.
+    """
+    meta = EVENT_META[event_id]
+    print(f"\n  Fetching NFIP claims ({meta['claims_start']} -> {meta['claims_end']}) "
+          f"for {len(zips)} zips...")
+    claims = nfip.fetch_event_claims(zips, meta['claims_start'], meta['claims_end'])
+
+    diagnostics = {'unit_split': nfip.unit_split(claims), 'n_claims': len(claims)}
+    if claims.empty:
+        print("  No NFIP claims retrieved for this event/zip set.")
+        return pd.DataFrame(), claims, diagnostics
+
+    print(f"  Retrieved {len(claims):,} claims. "
+          f"waterDepth interpretation: {diagnostics['unit_split'].get('counts')}")
+
+    zip_agg = nfip.aggregate_by_zip(claims)
+
+    policies = pd.DataFrame()
+    if use_policy_denominator:
+        print(f"  Fetching policy-in-force counts as of {meta['as_of']} "
+              f"(the claim-rate denominator)...")
+        policies = nfip.fetch_policies_in_force(zips, meta['as_of'])
+    else:
+        print("  Policy denominator skipped (--no-policies).")
+
+    if not policies.empty:
+        zip_agg = zip_agg.merge(policies, on='zip', how='left')
+        with np.errstate(divide='ignore', invalid='ignore'):
+            zip_agg['nfip_claim_rate_pct'] = (
+                100.0 * zip_agg['nfip_claims'] / zip_agg['policies_in_force'])
+        bad = ~np.isfinite(zip_agg['nfip_claim_rate_pct'].to_numpy(dtype=float))
+        zip_agg.loc[bad, 'nfip_claim_rate_pct'] = np.nan
+        diagnostics['policy_zips'] = int(policies['zip'].nunique())
+        diagnostics['denominator'] = 'policies_in_force'
+    elif structures is not None and not structures.empty:
+        # Fallback denominator: residential structures per zip, from this
+        # study area's own NSI list. Not as good as policies-in-force, but a
+        # real population base — and vastly better than the depth-share label,
+        # which has no denominator at all and collapsed to a single class on
+        # real data (every zip above threshold, nothing to calibrate against).
+        zip_agg = zip_agg.merge(structures, on='zip', how='left')
+        with np.errstate(divide='ignore', invalid='ignore'):
+            zip_agg['claims_per_structure_pct'] = (
+                100.0 * zip_agg['nfip_claims'] / zip_agg['structures_in_zip'])
+        bad = ~np.isfinite(
+            zip_agg['claims_per_structure_pct'].to_numpy(dtype=float))
+        zip_agg.loc[bad, 'claims_per_structure_pct'] = np.nan
+        diagnostics['policy_zips'] = 0
+        diagnostics['denominator'] = 'residential_structures'
+        print(f"  Policy counts unavailable — using residential-structure "
+              f"counts as the denominator instead "
+              f"({structures['zip'].nunique()} zips).")
+    else:
+        diagnostics['policy_zips'] = 0
+        diagnostics['denominator'] = 'none'
+        print("  No denominator available - falling back to depth-share labels.")
+
+    return zip_agg, claims, diagnostics
+
+
+def label_column_for(zip_agg: pd.DataFrame) -> tuple:
+    """
+    Choose the ground-truth column and threshold, preferring the claim RATE.
+
+    Returns (column, threshold_pct, description). Falls back to the share of
+    claims reporting standing water when the policy denominator is missing —
+    a weaker label, and the report says so.
+    """
+    if ('nfip_claim_rate_pct' in zip_agg.columns and
+            zip_agg['nfip_claim_rate_pct'].notna().sum() >= 3):
+        return ('nfip_claim_rate_pct', ZIP_CLAIM_RATE_THRESHOLD_PCT,
+                f"NFIP claim rate (claims per policy in force) "
+                f">= {ZIP_CLAIM_RATE_THRESHOLD_PCT}%")
+    if ('claims_per_structure_pct' in zip_agg.columns and
+            zip_agg['claims_per_structure_pct'].notna().sum() >= 3):
+        return ('claims_per_structure_pct', ZIP_STRUCTURE_RATE_THRESHOLD_PCT,
+                f"NFIP claims per residential structure "
+                f">= {ZIP_STRUCTURE_RATE_THRESHOLD_PCT}% (policies-in-force "
+                f"denominator unavailable; structure counts substituted)")
+    return ('nfip_pct_depth_gt0', ZIP_DEPTH_LABEL_THRESHOLD_PCT,
+            f"share of NFIP claims reporting standing water "
+            f">= {ZIP_DEPTH_LABEL_THRESHOLD_PCT}% (no denominator "
+            f"available - weakest label)")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COMPARISON
 # ─────────────────────────────────────────────────────────────────────────────
 
-def aggregate_by_zip(fema_df: pd.DataFrame, altis_df: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate both datasets to zip level and merge for comparison."""
-    fema_agg = fema_df.groupby('zip').agg(
-        fema_registrants = ('zip', 'count'),
-        fema_pct_flood    = ('flood_flag', lambda s: s.mean() * 100 if s.notna().any() else np.nan),
-        fema_mean_water   = ('water_level', 'mean'),
-    ).reset_index()
+def aggregate_by_zip(zip_agg: pd.DataFrame, altis_df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate Altis to zip level and merge against the NFIP ground truth."""
+    if zip_agg.empty:
+        return pd.DataFrame()
 
     altis_agg = altis_df.groupby('zip').agg(
-        altis_properties     = ('property_id', 'count'),
+        altis_properties      = ('property_id', 'count'),
         altis_pct_flagged     = ('flagged_flooded', lambda s: s.mean() * 100),
         altis_mean_depth_ft   = ('max_depth_ft', 'mean'),
+        altis_max_depth_ft    = ('max_depth_ft', 'max'),
         altis_mean_confidence = ('confidence_score', 'mean'),
     ).reset_index()
 
-    merged = fema_agg.merge(altis_agg, on='zip', how='inner')
-    return merged
+    return zip_agg.merge(altis_agg, on='zip', how='inner')
 
 
 def compute_metrics(merged: pd.DataFrame) -> dict:
-    """Compute correlation and agreement metrics."""
-    metrics = {}
+    """
+    Correlation metrics against the NFIP ground truth.
+
+    The headline is `depth_corr`: Altis's mean detected depth against the mean
+    depth adjusters actually recorded on settled claims, by zip. That is a
+    continuous-to-continuous comparison, which is a materially stronger claim
+    than the binary agreement the IA data supported.
+    """
+    metrics = {'zip_overlap_count': len(merged)}
 
     if len(merged) < 3:
         metrics['warning'] = (
-            f"Only {len(merged)} overlapping zip codes — too few for reliable "
-            "correlation. Results below are indicative only."
-        )
+            f"Only {len(merged)} overlapping zip codes — too few for a reliable "
+            "correlation. Treat the numbers below as indicative only.")
 
-    # % flagged correlation
-    valid = merged.dropna(subset=['fema_pct_flood', 'altis_pct_flagged'])
-    if len(valid) >= 3:
-        metrics['pct_flood_corr'] = round(
-            valid['fema_pct_flood'].corr(valid['altis_pct_flagged']), 3)
-    else:
-        metrics['pct_flood_corr'] = None
+    reasons = {}
 
-    # Depth / water level correlation
-    valid_w = merged.dropna(subset=['fema_mean_water', 'altis_mean_depth_ft'])
-    if len(valid_w) >= 3:
-        metrics['depth_water_corr'] = round(
-            valid_w['fema_mean_water'].corr(valid_w['altis_mean_depth_ft']), 3)
-    else:
-        metrics['depth_water_corr'] = None
+    def corr(a, b, name=None):
+        """
+        Correlation, with the REASON recorded when it can't be computed.
 
-    metrics['zip_overlap_count']    = len(merged)
-    metrics['fema_total_zips']      = merged['zip'].nunique()
-    metrics['fema_total_registrants'] = int(merged['fema_registrants'].sum())
+        Distinguishing the reasons matters. "Not enough zips" and "one side is
+        constant" are very different findings, and reporting the second as the
+        first hides exactly what the reader needs to know: that the detector
+        returned an identical value everywhere, so there is nothing to
+        correlate against real claim depths.
+        """
+        key = name or f'{a}__{b}'
+        if a not in merged.columns or b not in merged.columns:
+            reasons[key] = 'field not available in this run'
+            return None
+        valid = merged.dropna(subset=[a, b])
+        if len(valid) < 3:
+            reasons[key] = (f'only {len(valid)} zips have both values '
+                            f'(need at least 3)')
+            return None
+        if valid[a].nunique() < 2:
+            reasons[key] = (f'`{a}` is constant across all {len(valid)} zips '
+                            f'(= {valid[a].iloc[0]}), so no correlation exists')
+            return None
+        if valid[b].nunique() < 2:
+            reasons[key] = (f'`{b}` is constant across all {len(valid)} zips '
+                            f'(= {valid[b].iloc[0]}) — the detector returned '
+                            f'the same value everywhere, so there is nothing '
+                            f'to correlate')
+            return None
+        return round(float(valid[a].corr(valid[b])), 3)
+
+    metrics['depth_corr'] = corr('nfip_mean_depth_ft', 'altis_mean_depth_ft',
+                                 'depth_corr')
+    metrics['median_depth_corr'] = corr('nfip_median_depth_ft',
+                                        'altis_mean_depth_ft',
+                                        'median_depth_corr')
+    metrics['flagged_vs_claim_rate_corr'] = corr('nfip_claim_rate_pct',
+                                                 'altis_pct_flagged',
+                                                 'flagged_vs_claim_rate_corr')
+    metrics['flagged_vs_structure_rate_corr'] = corr(
+        'claims_per_structure_pct', 'altis_pct_flagged',
+        'flagged_vs_structure_rate_corr')
+    metrics['flagged_vs_depth_share_corr'] = corr('nfip_pct_depth_gt0',
+                                                  'altis_pct_flagged',
+                                                  'flagged_vs_depth_share_corr')
+    metrics['paid_vs_depth_corr'] = corr('nfip_paid_building',
+                                         'altis_mean_depth_ft',
+                                         'paid_vs_depth_corr')
+    metrics['corr_reasons'] = reasons
+
+    metrics['nfip_total_claims'] = int(merged['nfip_claims'].sum())
     metrics['altis_total_properties'] = int(merged['altis_properties'].sum())
-
+    if 'policies_in_force' in merged.columns:
+        total = merged['policies_in_force'].sum()
+        metrics['policies_in_force'] = int(total) if pd.notna(total) else None
     return metrics
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CALIBRATION & PER-PROPERTY LABELS (Round 3)
+# CALIBRATION & PER-PROPERTY LABELS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def derive_property_labels(altis_df: pd.DataFrame, fema_agg: pd.DataFrame,
-                           threshold: float = ZIP_FLOOD_LABEL_THRESHOLD) -> pd.DataFrame:
+def derive_property_labels(altis_df: pd.DataFrame, zip_agg: pd.DataFrame,
+                           threshold: float = ZIP_FLOOD_LABEL_THRESHOLD,
+                           rate_column: str = 'fema_pct_flood',
+                           rate_is_pct: bool = True) -> pd.DataFrame:
     """
-    Attach a binary ground-truth flood label to each Altis property from the
-    FEMA flood-damage rate of its zip code.
+    Attach a binary ground-truth flood label to each Altis property from its
+    zip's ground-truth rate.
 
-    LABEL RESOLUTION IS ZIP-LEVEL (FEMA's release granularity): every property
-    in a given zip shares that zip's label. This is honest but coarse, and it is
-    exactly why the calibration split below must be grouped by zip.
+    LABEL RESOLUTION IS ZIP-LEVEL: every property in a zip shares that zip's
+    label. Honest but coarse, and exactly why the calibration split below must
+    be grouped by zip.
 
-    Returns the subset of altis_df (properties whose zip is present in the FEMA
-    data) with added columns: fema_zip_flood_rate, flooded_truth, raw_flood_score.
+    `rate_column` selects which ground-truth measure to threshold on. The
+    default is the legacy FEMA IA column so existing callers and tests are
+    unaffected; the NFIP path passes `nfip_claim_rate_pct` with its own
+    threshold.
+
+    Returns the subset of altis_df whose zip is present in the ground truth,
+    with added columns: zip_truth_rate, flooded_truth, raw_flood_score.
     """
-    fema_rate = fema_agg.set_index('zip')['fema_pct_flood'] / 100.0  # back to 0-1
-    df = altis_df.copy()
-    df = df[df['zip'].isin(fema_rate.index)].copy()
+    if zip_agg.empty or rate_column not in zip_agg.columns:
+        return altis_df.iloc[0:0].copy()
+
+    rates = zip_agg.set_index('zip')[rate_column]
+    if rate_is_pct:
+        rates = rates / 100.0
+        cutoff = threshold / 100.0 if threshold > 1 else threshold
+    else:
+        cutoff = threshold
+
+    df = altis_df[altis_df['zip'].isin(rates.index)].copy()
     if df.empty:
         return df
-    df['fema_zip_flood_rate'] = df['zip'].map(fema_rate)
-    df = df.dropna(subset=['fema_zip_flood_rate'])
-    df['flooded_truth'] = (df['fema_zip_flood_rate'] >= threshold).astype(int)
+
+    df['zip_truth_rate'] = df['zip'].map(rates)
+    # Preserved for backward compatibility with existing consumers/tests.
+    df['fema_zip_flood_rate'] = df['zip_truth_rate']
+    df = df.dropna(subset=['zip_truth_rate'])
+    if df.empty:
+        return df
+
+    df['flooded_truth'] = (df['zip_truth_rate'] >= cutoff).astype(int)
 
     # pct_flooded in the final CSV is a 0-100 percentage; convert back to 0-1.
     pct_frac = pd.to_numeric(df['pct_flooded'], errors='coerce').fillna(0.0) / 100.0
     depth = pd.to_numeric(df['max_depth_ft'], errors='coerce').fillna(0.0)
+
+    # COVERAGE TERM: prefer the sub-pixel water fraction over the binary mask.
+    #
+    # `pct_flooded` is the mean of an all-or-nothing per-pixel mask, and on real
+    # runs it is EXACTLY 0.0 for ~99.4% of properties (3,978/4,000 Brazos,
+    # 3,948/4,000 Harvey). A score built on it is nearly constant, which is why
+    # calibration kept coming out well-calibrated but with negative Brier skill
+    # — there was almost nothing to discriminate on. `water_fraction` grades
+    # partial inundation instead of discarding it. Falls back to the binary
+    # column for outputs produced before Phase 4a.
+    if 'water_fraction' in df.columns:
+        frac = pd.to_numeric(df['water_fraction'], errors='coerce').fillna(0.0)
+        # Take the larger of the two: the sub-pixel estimate should dominate,
+        # but a property the strict mask called flooded must never score lower
+        # for it.
+        coverage = pd.concat([pct_frac, frac], axis=1).max(axis=1)
+    else:
+        coverage = pct_frac
+
+    # Phase 4b: the dual-pol score is the same graded quantity, measured with a
+    # second polarisation so saturated soil cannot fake it. Only counted where
+    # `dpol_available` says a VH baseline actually existed — a 0 from an
+    # abstaining run means "not measured", and folding that in as evidence of
+    # dryness would be exactly the kind of silent fabrication this pipeline
+    # refuses.
+    if 'dpol_water' in df.columns:
+        dpol = pd.to_numeric(df['dpol_water'], errors='coerce').fillna(0.0)
+        if 'dpol_available' in df.columns:
+            avail = pd.to_numeric(df['dpol_available'], errors='coerce').fillna(0)
+            dpol = dpol.where(avail > 0, 0.0)
+        coverage = pd.concat([coverage, dpol], axis=1).max(axis=1)
+
     df['raw_flood_score'] = [
-        calib.raw_flood_score(p, d) for p, d in zip(pct_frac, depth)]
+        calib.raw_flood_score(p, d) for p, d in zip(coverage, depth)]
     return df
 
 
@@ -376,8 +549,8 @@ def merge_adjuster_labels(labeled_df: pd.DataFrame,
     """
     Override zip-derived ground truth with property-resolution human labels
     wherever adjusters have weighed in. Adjuster verdicts are per-house and
-    human-verified, so they are strictly better truth than the zip-level FEMA
-    label and take precedence. The most recent verdict per property wins.
+    human-verified, so they are strictly better truth than the zip-level label
+    and take precedence. The most recent verdict per property wins.
 
     Returns (merged_df, n_human_labeled). Pure: inputs are not mutated, no DB
     or network access — the caller supplies the feedback frame.
@@ -437,7 +610,6 @@ def precision_recall_by_category(labeled_df: pd.DataFrame) -> dict:
     if labeled_df.empty:
         return out
 
-    truth = labeled_df['flooded_truth'].astype(int)
     for cat in ['Dispatch', 'Remote-Approve', 'Remote-Deny', 'Review']:
         members = labeled_df[labeled_df['impact_class'] == cat]
         n = len(members)
@@ -452,12 +624,14 @@ def precision_recall_by_category(labeled_df: pd.DataFrame) -> dict:
             'pct_truly_dry': round(float((1 - t).mean()) * 100, 1),
         }
 
+    truth = labeled_df['flooded_truth'].astype(int)
     predicted_flood = labeled_df['impact_class'].isin(POSITIVE_TRIAGE_CLASSES).astype(int)
     out['overall'] = calib.classification_metrics(predicted_flood.values, truth.values)
     return out
 
 
-def run_calibration(event_id: str, labeled_df: pd.DataFrame) -> Optional[dict]:
+def run_calibration(event_id: str, labeled_df: pd.DataFrame,
+                    label_source: Optional[str] = None) -> Optional[dict]:
     """
     Fit a calibrated flood-probability map (raw_flood_score -> P(flooded)) with
     a zip-grouped hold-out so the reported numbers are honest, attach
@@ -467,6 +641,43 @@ def run_calibration(event_id: str, labeled_df: pd.DataFrame) -> Optional[dict]:
         print("  Calibration skipped — need both flooded and dry labelled zips.")
         return None
 
+    # DEGENERATE-SCORE GUARD. If the detector produced the same score for every
+    # property, a fitted calibrator can only ever emit one number — the base
+    # rate — and its Brier score is p(1-p) BY CONSTRUCTION, describing the
+    # label prevalence rather than any detection skill.
+    #
+    # This is not hypothetical: Harvey's committed output has max_depth_ft = 0
+    # and pct_flooded = 0 for all 1,000 properties, so every raw_flood_score is
+    # 0.0, and the resulting Brier of 0.0239 is exactly the variance of a 2.45%
+    # base rate. That number was previously mistaken for an accuracy result.
+    # See docs/DETECTION_LIMITS.md.
+    n_distinct = labeled_df['raw_flood_score'].nunique()
+    if n_distinct < 2:
+        only = float(labeled_df['raw_flood_score'].iloc[0])
+        base_rate = float(labeled_df['flooded_truth'].mean())
+        print(f"  Calibration REFUSED — every property has the same "
+              f"raw_flood_score ({only:.4f}), so any calibrator is constant and "
+              f"its Brier score would just be the base rate variance "
+              f"({base_rate:.4f} -> {base_rate * (1 - base_rate):.4f}). "
+              f"The detector found nothing to calibrate.")
+        return {
+            'event_id': event_id,
+            'label_source': label_source,
+            'label_resolution': 'zip_code',
+            'degenerate': True,
+            'n_total': int(len(labeled_df)),
+            'n_positive': int(labeled_df['flooded_truth'].sum()),
+            'distinct_scores': int(n_distinct),
+            'constant_score': only,
+            'base_rate': round(base_rate, 4),
+            'holdout_metrics': None,
+            'warning': (
+                'Calibration not fitted: the detector produced an identical '
+                'score for every property, so no probability model is '
+                'identifiable. Any Brier score here would measure label '
+                'prevalence, not accuracy. See docs/DETECTION_LIMITS.md.'),
+        }
+
     result = calib.fit_and_evaluate(
         scores=labeled_df['raw_flood_score'].values,
         labels=labeled_df['flooded_truth'].values,
@@ -474,22 +685,59 @@ def run_calibration(event_id: str, labeled_df: pd.DataFrame) -> Optional[dict]:
         method='auto',
     )
     result['event_id'] = event_id
-    result['label_source'] = (
+    result['label_source'] = label_source or (
         'FEMA Individual Assistance (zip-level flood-damage rate, '
         f'threshold={ZIP_FLOOD_LABEL_THRESHOLD})')
     result['label_resolution'] = 'zip_code'
     result['score_definition'] = '0.5*coverage_fraction + 0.5*min(depth_ft/3, 1)'
     result['triage_precision_recall'] = precision_recall_by_category(labeled_df)
 
-    out_path = OUTPUT_DIR / f"calibration_{event_id}.json"
-    out_path.write_text(json.dumps(result, indent=2))
-    print(f"  ✓ Calibration written → {out_path}")
+    # ALWAYS REPORT THE BASELINE NEXT TO THE BRIER SCORE.
+    #
+    # A Brier score alone is uninterpretable. The trivial model — predict the
+    # base rate for everyone — scores p(1-p), and on rare-event data that is
+    # already a small number. Harvey's celebrated 0.0239 was exactly this.
+    # Ian's fitted model scores 0.0702 against a 0.0109 baseline, i.e. it is
+    # WORSE than the trivial model, which a bare Brier score would have hidden.
+    #
+    # The skill score makes it unambiguous: > 0 beats the baseline, <= 0 does
+    # not.
+    base_rate = float(labeled_df['flooded_truth'].mean())
+    baseline_brier = base_rate * (1 - base_rate)
+    n_nonzero = int((labeled_df['raw_flood_score'] > 0).sum())
+    result['baseline'] = {
+        'base_rate': round(base_rate, 4),
+        'constant_predictor_brier': round(baseline_brier, 4),
+        'properties_with_any_signal': n_nonzero,
+        'properties_total': int(len(labeled_df)),
+    }
 
-    # Also persist the per-property labels for auditing / re-use.
+    hm = result.get('holdout_metrics') or {}
+    if hm.get('brier_score') is not None and baseline_brier > 0:
+        skill = 1.0 - (hm['brier_score'] / baseline_brier)
+        result['baseline']['brier_skill_score'] = round(skill, 4)
+        result['baseline']['beats_constant_predictor'] = bool(skill > 0)
+
+    # Near-degenerate: technically fittable, but resting on so few detections
+    # that the numbers describe noise. Ian: 3 of 1,000 properties.
+    signal_frac = n_nonzero / max(len(labeled_df), 1)
+    if signal_frac < 0.02:
+        result['baseline']['warning'] = (
+            f'Only {n_nonzero} of {len(labeled_df)} properties '
+            f'({signal_frac * 100:.1f}%) have any flood signal at all. Every '
+            f'metric here rests on those few properties and should not be '
+            f'treated as a validation of the detector.')
+
+    out_path = OUTPUT_DIR / f"calibration_{event_id}.json"
+    out_path.write_text(json.dumps(result, indent=2), encoding='utf-8')
+    print(f"  Calibration written -> {out_path}")
+
     labels_path = OUTPUT_DIR / f"{event_id}_labels.csv"
-    labeled_df[['property_id', 'zip', 'fema_zip_flood_rate', 'flooded_truth',
-                'raw_flood_score', 'impact_class']].to_csv(labels_path, index=False)
-    print(f"  ✓ Per-property labels written → {labels_path}")
+    keep = [c for c in ['property_id', 'zip', 'zip_truth_rate', 'fema_zip_flood_rate',
+                        'flooded_truth', 'raw_flood_score', 'impact_class']
+            if c in labeled_df.columns]
+    labeled_df[keep].to_csv(labels_path, index=False)
+    print(f"  Per-property labels written -> {labels_path}")
     return result
 
 
@@ -498,58 +746,113 @@ def run_calibration(event_id: str, labeled_df: pd.DataFrame) -> Optional[dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def write_report(event_id: str, merged: pd.DataFrame, metrics: dict,
+                 diagnostics: dict, label_desc: str,
                  calibration: Optional[dict] = None):
     meta = EVENT_META[event_id]
     out_path = OUTPUT_DIR / f"validation_{event_id}.md"
 
-    corr_pct   = metrics.get('pct_flood_corr')
-    corr_depth = metrics.get('depth_water_corr')
+    reasons = metrics.get('corr_reasons', {})
 
-    def fmt_corr(c):
+    def fmt_corr(c, key=None):
         if c is None:
-            return "N/A (insufficient overlapping zip codes)"
+            why = reasons.get(key)
+            return f"not computable — {why}" if why else "not computable"
         strength = ("strong" if abs(c) >= 0.6 else
                     "moderate" if abs(c) >= 0.35 else
                     "weak")
-        return f"{c:+.3f} ({strength} {'positive' if c >= 0 else 'negative'} correlation)"
+        return f"{c:+.3f} ({strength} {'positive' if c >= 0 else 'negative'})"
+
+    units = (diagnostics.get('unit_split') or {}).get('counts', {})
+    unit_total = (diagnostics.get('unit_split') or {}).get('total', 0)
 
     lines = [
         f"# Altis Accuracy Validation — {meta['label']}",
         "",
-        f"**Ground truth source:** FEMA OpenFEMA Individual Assistance "
-        f"(DR-{meta['disaster_number']}, {meta['county_filter']})",
+        "**Ground truth source:** OpenFEMA NFIP Redacted Claims v3 "
+        f"(date of loss {meta['claims_start']} to {meta['claims_end']})",
+        "",
+        f"**Study area:** {meta['county']}",
+        "",
+        f"**Ground-truth label:** {label_desc}",
         "",
         "## Summary",
         "",
         f"- Zip codes compared: **{metrics['zip_overlap_count']}**",
-        f"- FEMA IA registrants in comparison: **{metrics['fema_total_registrants']:,}**",
+        f"- NFIP claims in comparison: **{metrics['nfip_total_claims']:,}**",
         f"- Altis properties in comparison: **{metrics['altis_total_properties']:,}**",
+    ]
+    if metrics.get('policies_in_force'):
+        lines.append(f"- NFIP policies in force (denominator): "
+                     f"**{metrics['policies_in_force']:,}**")
+    lines += [
         "",
         "## Correlation Metrics",
         "",
-        f"- **% flagged-flooded** (Altis Dispatch+Remote-Approve) vs "
-        f"**% FEMA flood-damage registrants**, by zip: {fmt_corr(corr_pct)}",
-        f"- **Mean depth (ft)** (Altis) vs **mean self-reported water level** "
-        f"(FEMA), by zip: {fmt_corr(corr_depth)}",
+        "The headline number is the first one: Altis's satellite-derived mean "
+        "depth against the mean water depth adjusters recorded on settled "
+        "insurance claims, by zip. Both sides are continuous, which is a "
+        "materially stronger test than the binary agreement the previous "
+        "Individual Assistance ground truth could support.",
+        "",
+        f"- **Mean detected depth vs mean claimed water depth**, by zip: "
+        f"{fmt_corr(metrics.get('depth_corr'), 'depth_corr')}",
+        f"- Mean detected depth vs *median* claimed depth, by zip: "
+        f"{fmt_corr(metrics.get('median_depth_corr'), 'median_depth_corr')}",
+        f"- % flagged flooded vs NFIP claim rate, by zip: "
+        f"{fmt_corr(metrics.get('flagged_vs_claim_rate_corr'), 'flagged_vs_claim_rate_corr')}",
+        f"- % flagged flooded vs % claims reporting standing water, by zip: "
+        f"{fmt_corr(metrics.get('flagged_vs_depth_share_corr'), 'flagged_vs_depth_share_corr')}",
+        f"- Mean paid building claim vs mean detected depth, by zip: "
+        f"{fmt_corr(metrics.get('paid_vs_depth_corr'), 'paid_vs_depth_corr')}",
         "",
     ]
 
     if metrics.get('warning'):
-        lines += [f"> ⚠ {metrics['warning']}", ""]
+        lines += [f"> {metrics['warning']}", ""]
 
     lines += [
+        "## Data quality: the `waterDepth` unit ambiguity",
+        "",
+        "FEMA documents `waterDepth` as inches while noting that some records "
+        "were entered in feet. That note describes the dominant behaviour, not "
+        "an edge case, so this validation applies an explicit rule (values "
+        f"<= {nfip.FEET_MAX} are read as feet, above that as inches) and "
+        "reports the split rather than hiding it:",
+        "",
+        "| Interpretation | Claims |",
+        "|---|---|",
+    ]
+    for k, v in sorted(units.items()):
+        lines.append(f"| {k} | {v:,} |")
+    lines += [
+        f"| **total** | **{unit_total:,}** |",
+        "",
+        "The rule is justified by the damage data: mean damage ratio rises "
+        "monotonically with the raw value, reaching ~0.6 around raw value 6. "
+        "A 60% loss at six inches is not credible; at six feet it sits on a "
+        "standard one-story residential depth-damage curve.",
+        "",
         "## Zip-Level Detail",
         "",
-        "| Zip | FEMA Registrants | FEMA % Flood | Altis Properties | "
-        "Altis % Flagged | Altis Mean Depth (ft) |",
-        "|---|---|---|---|---|---|",
+        "| Zip | NFIP Claims | Claim Rate % | NFIP Mean Depth (ft) | "
+        "Altis Properties | Altis % Flagged | Altis Mean Depth (ft) |",
+        "|---|---|---|---|---|---|---|",
     ]
 
-    for _, row in merged.sort_values('fema_registrants', ascending=False).iterrows():
+    def num(row, col, fmt="{:.2f}", dash="-"):
+        if col not in row:
+            return dash
+        v = row.get(col)
+        return dash if v is None or pd.isna(v) else fmt.format(v)
+
+    for _, row in merged.sort_values('nfip_claims', ascending=False).iterrows():
         lines.append(
-            f"| {row['zip']} | {int(row['fema_registrants'])} | "
-            f"{row['fema_pct_flood']:.1f}% | {int(row['altis_properties'])} | "
-            f"{row['altis_pct_flagged']:.1f}% | {row['altis_mean_depth_ft']:.2f} |"
+            f"| {row['zip']} | {int(row['nfip_claims'])} | "
+            f"{num(row, 'nfip_claim_rate_pct', '{:.1f}')} | "
+            f"{num(row, 'nfip_mean_depth_ft')} | "
+            f"{int(row['altis_properties'])} | "
+            f"{num(row, 'altis_pct_flagged', '{:.1f}')} | "
+            f"{num(row, 'altis_mean_depth_ft')} |"
         )
 
     if calibration is not None:
@@ -559,38 +862,103 @@ def write_report(event_id: str, merged: pd.DataFrame, metrics: dict,
         "",
         "## Methodology & Limitations",
         "",
-        "- FEMA IA data is released at zip-code level only — this validation "
-        "compares zip-level aggregates, not individual properties.",
-        "- FEMA registrants are self-selected applicants for federal aid, not "
-        "a random or complete sample of affected properties.",
-        "- Self-reported water level in FEMA data is unverified at time of "
-        "registration and may not reflect peak depth.",
-        "- A positive, moderate-to-strong correlation supports that Altis's "
-        "spatial flood pattern is directionally consistent with independently "
-        "reported ground damage. It does not constitute property-level validation.",
+        "- NFIP claims are released at zip-code resolution. `censusTract` is "
+        "empty in the v3 dataset for these events and latitude/longitude are "
+        "redacted to one decimal place (~11 km), so zip is the finest honest "
+        "join key. This compares zip-level aggregates, not individual "
+        "properties.",
+        "- The claim population is NFIP policyholders who filed. That is much "
+        "closer to a carrier's insured book than the previous ground truth "
+        "(self-selected federal aid applicants), but it still excludes "
+        "uninsured structures and insured structures that chose not to file.",
+        "- Reported water depth is recorded during claim settlement. It is "
+        "adjuster-informed rather than instrumented, and carries the unit "
+        "ambiguity described above.",
+        "- Depth above GROUND is what the detector measures; NFIP depth is "
+        "reported relative to the building. Phase 2 (first-floor height from "
+        "the National Structure Inventory) is what closes that gap — until "
+        "then a systematic offset of roughly the foundation height is "
+        "expected, and it is larger for pier and crawlspace construction than "
+        "for slab.",
+        "- Labels are zip-resolution, so the calibration hold-out is grouped "
+        "by zip (train and test zips disjoint) to prevent leakage.",
         "",
-        f"_Generated by validation/accuracy_check.py_",
+        "_Generated by validation/accuracy_check.py_",
     ]
 
-    out_path.write_text('\n'.join(lines))
-    print(f"\n✓ Report saved → {out_path}")
+    out_path.write_text('\n'.join(lines), encoding='utf-8')
+    print(f"\n  Report saved -> {out_path}")
 
 
 def _calibration_report_lines(cal: dict) -> list:
     lines = ["", "## Calibrated Flood Probability (held-out)", ""]
+
+    # Degenerate case: the detector produced one score for every property, so
+    # no calibrator was fitted and none was persisted. Say exactly that, and
+    # show the arithmetic, rather than printing a Brier score that would only
+    # describe label prevalence.
+    if cal.get('degenerate'):
+        base = cal.get('base_rate', 0.0)
+        lines += [
+            "**No calibration was fitted, and no calibrator file was written.**",
+            "",
+            f"- Labelled properties: **{cal.get('n_total')}** "
+            f"({cal.get('n_positive')} flooded-truth)",
+            f"- Distinct `raw_flood_score` values: "
+            f"**{cal.get('distinct_scores')}** (constant at "
+            f"{cal.get('constant_score')})",
+            f"- Label base rate: **{base}**",
+            "",
+            "With a constant score, any fitted calibrator emits a single "
+            f"number and its Brier score is `p(1-p)` = "
+            f"**{round(base * (1 - base), 4)}** by construction — a restatement "
+            "of the base rate, not a measure of detection accuracy.",
+            "",
+            f"> {cal.get('warning', '')}",
+            "",
+        ]
+        return lines
+
     lines.append(f"- Labelled properties: **{cal['n_total']}** "
                  f"({cal['n_positive']} flooded-truth), split **{cal['split_kind']}** "
-                 f"→ train {cal['n_train']} / test {cal['n_test']}")
+                 f"-> train {cal['n_train']} / test {cal['n_test']}")
     hm = cal.get('holdout_metrics')
     if not hm:
-        lines += ["", f"> ⚠ {cal.get('warning', 'Held-out metrics unavailable.')}", ""]
+        lines += ["", f"> {cal.get('warning', 'Held-out metrics unavailable.')}", ""]
         return lines
+    base = cal.get('baseline') or {}
     lines += [
         f"- Calibration method: **{hm['method']}**",
         f"- **Brier score:** {hm['brier_score']} (lower is better; "
         "0 is perfect, 0.25 is uninformative)",
         f"- **Expected calibration error:** {hm['expected_calibration_error']} "
         "(lower is better)",
+    ]
+
+    # The Brier score is meaningless without the trivial baseline beside it.
+    if base:
+        skill = base.get('brier_skill_score')
+        lines += [
+            "",
+            "### Is this better than guessing?",
+            "",
+            f"- Label base rate: **{base.get('base_rate')}**",
+            f"- A constant predictor (base rate for everyone) scores Brier "
+            f"**{base.get('constant_predictor_brier')}**",
+        ]
+        if skill is not None:
+            verdict = ("**beats** the constant predictor"
+                       if base.get('beats_constant_predictor')
+                       else "**does NOT beat** the constant predictor")
+            lines.append(f"- Brier skill score: **{skill}** — this model "
+                         f"{verdict}.")
+        lines.append(f"- Properties with any flood signal: "
+                     f"**{base.get('properties_with_any_signal')}** of "
+                     f"{base.get('properties_total')}")
+        if base.get('warning'):
+            lines += ["", f"> {base['warning']}"]
+
+    lines += [
         "",
         "### Precision / Recall by Triage Category (held-out positive = "
         "Dispatch + Remote-Approve)",
@@ -615,7 +983,7 @@ def _calibration_report_lines(cal: dict) -> list:
         f"Score: {cal.get('score_definition')}._",
         "> Labels are zip-resolution, so the hold-out is grouped by zip (train "
         "and test zips disjoint) to avoid leakage. Treat these as directional, "
-        "FEMA-anchored accuracy — not per-house verified ground truth.",
+        "claims-anchored accuracy — not per-house verified ground truth.",
     ]
     return lines
 
@@ -624,65 +992,79 @@ def _calibration_report_lines(cal: dict) -> list:
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_validation(event_id: str):
+def run_validation(event_id: str, use_policy_denominator: bool = True):
     print(f"\n{'=' * 60}")
     print(f"  Validating: {EVENT_META[event_id]['label']}")
     print(f"{'=' * 60}")
 
-    fema_df = fetch_fema_data(event_id)
-    if fema_df.empty:
-        print(f"  Skipping {event_id} — no FEMA data retrieved.")
+    altis_df = load_altis_data(event_id)
+    print(f"  Loaded {len(altis_df)} Altis properties across "
+          f"{altis_df['zip'].nunique()} zips")
+
+    zips = sorted(altis_df['zip'].unique())
+    zip_agg, claims, diagnostics = build_ground_truth(
+        event_id, zips, use_policy_denominator=use_policy_denominator,
+        structures=nfip.structure_counts_by_zip(
+            altis_df, total_structures_in_bbox=_population_from_manifest(event_id)))
+    if zip_agg.empty:
+        print(f"  Skipping {event_id} — no NFIP ground truth retrieved.")
         return
 
-    altis_df = load_altis_data(event_id)
-    print(f"  Loaded {len(altis_df)} Altis properties with zip codes")
-
-    merged = aggregate_by_zip(fema_df, altis_df)
+    merged = aggregate_by_zip(zip_agg, altis_df)
     if merged.empty:
-        print("  No overlapping zip codes between FEMA data and Altis output. "
-              "Check that county/disaster filters match your event's bounding box.")
+        print("  No overlapping zip codes between NFIP claims and Altis output.")
         return
 
     metrics = compute_metrics(merged)
+    print(f"\n  Zip overlap:                  {metrics['zip_overlap_count']}")
+    print(f"  Depth correlation (headline): {metrics['depth_corr']}")
+    print(f"  Flagged vs claim-rate corr:   {metrics['flagged_vs_claim_rate_corr']}")
 
-    print(f"\n  Zip overlap:        {metrics['zip_overlap_count']}")
-    print(f"  % flood correlation: {metrics['pct_flood_corr']}")
-    print(f"  Depth/water correlation: {metrics['depth_water_corr']}")
+    label_col, label_thresh, label_desc = label_column_for(zip_agg)
+    print(f"  Ground-truth label: {label_desc}")
 
-    # Round 3: per-property labels + calibrated flood probability + precision/
-    # recall by triage category, on a zip-grouped hold-out (the honest number).
-    labeled = derive_property_labels(altis_df, merged)
-    # Human-in-the-loop: where adjusters have given verdicts, their per-house
-    # labels override the coarse zip-level FEMA truth.
+    labeled = derive_property_labels(altis_df, zip_agg, threshold=label_thresh,
+                                     rate_column=label_col)
     feedback = load_adjuster_feedback(event_id)
     labeled, n_human = merge_adjuster_labels(labeled, feedback)
     if n_human:
-        print(f"  Merged {n_human} property-resolution adjuster labels "
-              f"(override zip-level truth).")
+        print(f"  Merged {n_human} property-resolution adjuster labels.")
     print(f"  Labelled properties: {len(labeled)} "
-          f"({int(labeled['flooded_truth'].sum()) if not labeled.empty else 0} flooded-truth)")
-    calibration = run_calibration(event_id, labeled)
+          f"({int(labeled['flooded_truth'].sum()) if not labeled.empty else 0} "
+          f"flooded-truth)")
+
+    calibration = run_calibration(
+        event_id, labeled,
+        label_source=f"OpenFEMA NFIP Redacted Claims v3 — {label_desc}")
     if calibration and calibration.get('holdout_metrics'):
         hm = calibration['holdout_metrics']
         print(f"  Held-out Brier: {hm['brier_score']}  ECE: "
               f"{hm['expected_calibration_error']}  "
               f"(method={hm['method']}, n_test={calibration['n_test']})")
 
-    write_report(event_id, merged, metrics, calibration)
+    write_report(event_id, merged, metrics, diagnostics, label_desc, calibration)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Validate Altis output against FEMA IA data')
-    parser.add_argument('--event', action='append', choices=['harvey', 'ian'],
+    parser = argparse.ArgumentParser(
+        description='Validate Altis output against NFIP claims ground truth')
+    parser.add_argument('--event', action='append', choices=['harvey', 'brazos'],
                         help='Event to validate (repeatable). Default: both.')
+    parser.add_argument('--no-policies', action='store_true',
+                        help="Skip the NFIP policy-in-force denominator. That "
+                             "query is expensive and OpenFEMA often 503s on "
+                             "it; skipping falls back to a weaker "
+                             "depth-share label, which the report states.")
     args = parser.parse_args()
 
-    events = args.event or ['harvey', 'ian']
+    events = args.event or ['harvey', 'brazos']
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    for evt in events:
+    for i, evt in enumerate(events):
+        if i > 0:
+            time.sleep(5)
         try:
-            run_validation(evt)
+            run_validation(evt, use_policy_denominator=not args.no_policies)
         except FileNotFoundError as e:
             print(f"\n  {e}")
         except Exception as e:

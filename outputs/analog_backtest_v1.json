@@ -1,0 +1,66 @@
+{
+ "full": {
+  "n_events": 231,
+  "payout_median_abs_err_log10": {
+   "analogs": 0.2573,
+   "baseline": 0.2586,
+   "diff_ci95": [
+    -0.0372,
+    0.0312
+   ]
+  },
+  "payout_spearman_analogs": 0.239,
+  "share_paid_median_abs_err": {
+   "analogs": 0.065,
+   "baseline": 0.063,
+   "diff_ci95": [
+    -0.008,
+    0.0105
+   ]
+  },
+  "share_paid_spearman_analogs": 0.351
+ },
+ "location_only": {
+  "n_events": 231,
+  "payout_median_abs_err_log10": {
+   "analogs": 0.2513,
+   "baseline": 0.2586,
+   "diff_ci95": [
+    -0.0431,
+    0.0324
+   ]
+  },
+  "payout_spearman_analogs": 0.237,
+  "share_paid_median_abs_err": {
+   "analogs": 0.064,
+   "baseline": 0.063,
+   "diff_ci95": [
+    -0.0095,
+    0.0105
+   ]
+  },
+  "share_paid_spearman_analogs": 0.291
+ },
+ "cause_only": {
+  "n_events": 231,
+  "payout_median_abs_err_log10": {
+   "analogs": 0.3179,
+   "baseline": 0.2586,
+   "diff_ci95": [
+    0.0046,
+    0.1038
+   ]
+  },
+  "payout_spearman_analogs": -0.067,
+  "share_paid_median_abs_err": {
+   "analogs": 0.085,
+   "baseline": 0.063,
+   "diff_ci95": [
+    0.0045,
+    0.042
+   ]
+  },
+  "share_paid_spearman_analogs": 0.221
+ },
+ "reading_guide": "diff_ci95 is analogs minus baseline error: entirely below 0 means analogs are reliably better; straddling 0 means not shown to help."
+}

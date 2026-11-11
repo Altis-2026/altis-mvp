@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import AnalogsCard from './AnalogsCard.jsx';
+import LossCalibrationCard from './LossCalibrationCard.jsx';
 import { api } from '../services/api.js';
 import { downloadCSV } from '../utils/csv.js';
 
@@ -92,15 +94,26 @@ function renderMiniMarkdown(md) {
 }
 
 const EVENT_EXPORT_COLS = ['property_id', 'address', 'impact_class', 'max_depth_ft',
-  'pct_flooded', 'confidence_score', 'urban_flag', 'adjuster_note'];
+  'pct_flooded', 'confidence_score', 'urban_flag', 'adjuster_note', 'gauge_depth_ft', 'gauge_river', 'gauge_conflict'];
 const PORTFOLIO_EXPORT_COLS = ['property_id', 'policy_number', 'address', 'coverage_amount',
   'impact_class', 'max_depth_ft', 'confidence_score', 'adjuster_note'];
 
 export default function ReportsPanel({
-  events = [], eventLabel, eventProperties = [],
+  events = [], selectedEvent, eventLabel, eventProperties = [],
   portfolioId, portfolioLabel, portfolioProperties = [],
+  portfolioCenter = null, liveEventDate = null,
+  costPerVisit = 450, onCostPerVisit, onLossesCalibrated, liveMeta = null,
 }) {
-  const [reportEventId, setReportEventId] = useState(events[0]?.id || '');
+  const [reportEventId, setReportEventId] = useState(selectedEvent || events[0]?.id || '');
+  // Follow the event the user is looking at; fall back to the first event once
+  // the list arrives. Clears any report loaded for a different event.
+  useEffect(() => {
+    const next = selectedEvent || events[0]?.id || '';
+    if (next && next !== reportEventId) {
+      setReportEventId(next);
+      setReport(null); setReportError(''); setCalibration(null); setCalibError('');
+    }
+  }, [selectedEvent, events]);  // eslint-disable-line react-hooks/exhaustive-deps
   const [report,         setReport]        = useState(null);
   const [reportError,    setReportError]   = useState('');
   const [loadingReport,  setLoadingReport] = useState(false);
@@ -120,10 +133,11 @@ export default function ReportsPanel({
   };
 
   const downloadReport = async () => {
-    if (!reportEventId || downloading) return;
+    // The audit PDF describes the event currently loaded, never a default one.
+    if (!selectedEvent || downloading) return;
     setDownloading(true);
     try {
-      _saveBlob(await api.downloadEventReport(reportEventId), `altis_audit_${reportEventId}.pdf`);
+      _saveBlob(await api.downloadEventReport(selectedEvent), `altis_audit_${selectedEvent}.pdf`);
     } catch (err) {
       setReportError(err?.detail || 'Could not download the report.');
     } finally {
@@ -201,17 +215,19 @@ export default function ReportsPanel({
 
         <button
           onClick={downloadReport}
-          disabled={!reportEventId || downloading}
+          disabled={!selectedEvent || downloading}
           style={{
-            ...exportBtnStyle(!reportEventId || downloading),
+            ...exportBtnStyle(!selectedEvent || downloading),
             display: 'flex', alignItems: 'center', gap: 8,
-            color: (!reportEventId || downloading) ? 'var(--text-disabled)' : 'var(--teal)',
-            background: (!reportEventId || downloading) ? 'var(--wa-02)' : 'rgba(168,212,230,0.08)',
+            color: (!selectedEvent || downloading) ? 'var(--text-disabled)' : 'var(--teal)',
+            background: (!selectedEvent || downloading) ? 'var(--wa-02)' : 'rgba(168,212,230,0.08)',
             border: '1px solid rgba(168,212,230,0.2)',
           }}
         >
           <span style={{ fontSize: '0.9rem' }}>📄</span>
-          {downloading ? 'Downloading…' : 'Download audit PDF'} {events.find(e => e.id === reportEventId)?.label ? `(${events.find(e => e.id === reportEventId).label})` : ''}
+          {downloading ? 'Downloading…'
+            : !selectedEvent ? 'Audit PDF: select an event first'
+            : `Download audit PDF (${events.find(e => e.id === selectedEvent)?.label || selectedEvent})`}
         </button>
         <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', margin: '-2px 2px 0 2px', lineHeight: 1.4 }}>
           Methodology, scene sources + dates, triage table, top dispatch priorities,
@@ -246,7 +262,20 @@ export default function ReportsPanel({
 
         {/* ROI section — the per-event business case, computed from the live
             triage numbers on screen. This is the pricing conversation. */}
-        <RoiWidget rows={hasAnalyzedPortfolio ? portfolioProperties : eventProperties} />
+        <RoiWidget rows={hasAnalyzedPortfolio ? portfolioProperties : eventProperties}
+                   tripCost={costPerVisit} onTripCost={onCostPerVisit} />
+
+        {/* Loss estimates exist only for live analyses with coverage amounts. */}
+        {hasAnalyzedPortfolio && portfolioProperties.some(r => r.severity_mid_usd != null) && (
+          <LossCalibrationCard portfolioId={portfolioId} exposure={liveMeta?.exposure}
+                               onDone={onLossesCalibrated} />
+        )}
+
+        {/* Historical analogs from the free flood library */}
+        {selectedEvent ? <AnalogsCard eventId={selectedEvent} />
+          : (portfolioCenter && liveEventDate) ? (
+            <AnalogsCard lat={portfolioCenter[1]} lon={portfolioCenter[0]} date={liveEventDate} />
+          ) : null}
 
         {/* Validation section */}
         <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--teal)', textTransform: 'uppercase', margin: '22px 0 10px' }}>
@@ -254,7 +283,7 @@ export default function ReportsPanel({
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          <select value={reportEventId} onChange={e => setReportEventId(e.target.value)} style={{
+          <select value={reportEventId} onChange={e => { setReportEventId(e.target.value); setReport(null); setReportError(''); setCalibration(null); setCalibError(''); }} style={{
             flex: 1, padding: '6px 8px', fontSize: '0.74rem', background: 'var(--wa-03)',
             border: '1px solid var(--wa-08)', borderRadius: 'var(--r-sm)', color: 'var(--text-primary)',
           }}>
@@ -303,8 +332,10 @@ export default function ReportsPanel({
 /* ROI on this event: field visits avoided times trip cost, against Altis
    priced per property. Assumptions are editable on the spot so a skeptical
    claims VP can plug in their own numbers live and watch it recompute. */
-function RoiWidget({ rows = [] }) {
-  const [tripCost, setTripCost] = useState(450);
+function RoiWidget({ rows = [], tripCost = 450, onTripCost }) {
+  // The cost per visit is the app-wide shared assumption (also drives the
+  // scoreboard), so editing it here updates every figure that uses it.
+  const setTripCost = (v) => onTripCost?.(Math.max(0, Number(v) || 0));
   const [perProp,  setPerProp]  = useState(5);
 
   const analyzed = rows.filter(r => r.impact_class);

@@ -404,3 +404,178 @@ def fit_and_evaluate(scores, labels, groups=None, method: str = "auto",
     production_cal = fit_calibrator(scores, labels, method)
     result["calibrator"] = calibrator_to_dict(production_cal)
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REPEATED / PAIRED HOLD-OUT EVALUATION (Phase 4c)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# WHY THIS EXISTS. fit_and_evaluate() draws ONE grouped split at seed 42. With
+# 15 zips and a 30% test fraction, that is 4-5 zips deciding the headline
+# number, and a single Brier score from ~550 properties. Two candidate signals
+# whose true difference is small are then compared through a lens that is
+# mostly noise: Phase 4b's dual-pol score moved the held-out Brier from 0.1714
+# to 0.1719, and there was no way to tell whether that 0.0005 was a real
+# regression or which zips happened to land in the test fold.
+#
+# The fix is not a bigger test set — there are only 15 zips. It is to draw MANY
+# splits and look at the distribution, and crucially to compare candidates on
+# the SAME splits (paired), so the split noise cancels in the difference. An
+# unpaired comparison of two noisy means needs a large effect to resolve; a
+# paired one only needs the DIFFERENCE to be consistent.
+
+def repeated_group_evaluation(scores, labels, groups, n_repeats: int = 200,
+                              method: str = "auto", test_fraction: float = 0.3,
+                              seed: int = 0) -> dict:
+    """
+    Distribution of held-out metrics across `n_repeats` grouped splits.
+
+    Returns per-metric mean, standard deviation and 5th/95th percentiles, plus
+    the raw per-split values so a caller can pair them against another
+    candidate. Splits that fail the both-classes-present guard are skipped and
+    counted rather than silently treated as zeros.
+    """
+    scores = np.asarray(scores, dtype=float)
+    labels = np.asarray(labels, dtype=float)
+
+    briers, eces, skills, aucs = [], [], [], []
+    used_seeds = []
+    for i in range(n_repeats):
+        s = seed + i
+        train_idx, test_idx = group_train_test_split(groups, test_fraction, s)
+        if len(train_idx) == 0 or len(test_idx) == 0:
+            continue
+        y_tr, y_te = labels[train_idx], labels[test_idx]
+        if not (0 < y_tr.sum() < len(y_tr)) or not (0 < y_te.sum() < len(y_te)):
+            continue
+        cal = fit_calibrator(scores[train_idx], y_tr, method)
+        p = cal.predict(scores[test_idx])
+        b = brier_score(p, y_te)
+        # Skill is measured against the TRAIN base rate, not the test one:
+        # a production model does not get to see the test set's base rate, so
+        # scoring it against that would flatter the baseline's competitor.
+        base = float(y_tr.mean())
+        b_const = brier_score(np.full(len(y_te), base), y_te)
+        briers.append(b)
+        eces.append(expected_calibration_error(p, y_te))
+        skills.append(1.0 - b / b_const if b_const > 0 else float('nan'))
+        aucs.append(_auc(scores[test_idx], y_te))
+        used_seeds.append(s)
+
+    def summarise(v):
+        a = np.asarray([x for x in v if np.isfinite(x)], dtype=float)
+        if len(a) == 0:
+            return None
+        return {
+            "mean": round(float(a.mean()), 5),
+            "std": round(float(a.std(ddof=1)), 5) if len(a) > 1 else 0.0,
+            "p05": round(float(np.percentile(a, 5)), 5),
+            "p95": round(float(np.percentile(a, 95)), 5),
+        }
+
+    return {
+        "n_splits_used": len(used_seeds),
+        "n_splits_requested": n_repeats,
+        "seeds": used_seeds,
+        "brier": summarise(briers),
+        "ece": summarise(eces),
+        "brier_skill_score": summarise(skills),
+        "auc": summarise(aucs),
+        "raw": {"brier": briers, "ece": eces,
+                "brier_skill_score": skills, "auc": aucs},
+    }
+
+
+def paired_candidate_comparison(candidates: dict, labels, groups,
+                                n_repeats: int = 200, method: str = "auto",
+                                test_fraction: float = 0.3, seed: int = 0) -> dict:
+    """
+    Compare several score variants on IDENTICAL splits.
+
+    `candidates` maps a name to a score array. Every candidate sees the same
+    train/test partition at every repeat, so per-split noise — which zips
+    landed in the test fold — cancels when differences are taken. This is the
+    only way to resolve a small effect against 15 zips of ground truth.
+
+    Returns each candidate's distribution plus, for every candidate after the
+    first, the paired difference against the first (treated as the baseline):
+    mean difference, its standard error, and the fraction of splits the
+    candidate won. A mean difference smaller than its own standard error is
+    noise, and is reported as such rather than as a direction.
+    """
+    names = list(candidates)
+    if not names:
+        raise ValueError("No candidates supplied.")
+
+    per = {n: repeated_group_evaluation(candidates[n], labels, groups,
+                                        n_repeats=n_repeats, method=method,
+                                        test_fraction=test_fraction, seed=seed)
+           for n in names}
+
+    # Pair only over splits every candidate actually used, so the difference is
+    # taken like-for-like.
+    common = set(per[names[0]]["seeds"])
+    for n in names[1:]:
+        common &= set(per[n]["seeds"])
+    common = sorted(common)
+
+    def series(n, metric):
+        idx = {s: i for i, s in enumerate(per[n]["seeds"])}
+        return np.array([per[n]["raw"][metric][idx[s]] for s in common], float)
+
+    baseline = names[0]
+    comparisons = {}
+    for n in names[1:]:
+        cmp_metrics = {}
+        for metric, better in (("brier", "lower"), ("ece", "lower"),
+                               ("brier_skill_score", "higher"), ("auc", "higher")):
+            a, b = series(baseline, metric), series(n, metric)
+            ok = np.isfinite(a) & np.isfinite(b)
+            d = b[ok] - a[ok]
+            if len(d) == 0:
+                cmp_metrics[metric] = None
+                continue
+            se = float(d.std(ddof=1) / np.sqrt(len(d))) if len(d) > 1 else 0.0
+            wins = float((d < 0).mean() if better == "lower" else (d > 0).mean())
+            mean_d = float(d.mean())
+            cmp_metrics[metric] = {
+                "mean_difference": round(mean_d, 6),
+                "standard_error": round(se, 6),
+                "win_rate": round(wins, 4),
+                "n_paired": int(len(d)),
+                # The honest verdict. "noise" is not a hedge — it is the
+                # correct reading when the effect is smaller than the
+                # uncertainty on its own estimate.
+                "verdict": ("noise" if se == 0 or abs(mean_d) < se
+                            else ("better" if ((mean_d < 0) == (better == "lower"))
+                                  else "worse")),
+            }
+        comparisons[n] = cmp_metrics
+
+    return {"baseline": baseline, "per_candidate": per,
+            "n_paired_splits": len(common), "comparisons": comparisons}
+
+
+def _auc(scores, labels):
+    """Rank-based AUC with ties averaged. NaN when labels are single-class."""
+    scores = np.asarray(scores, dtype=float)
+    labels = np.asarray(labels, dtype=float)
+    n1 = labels.sum()
+    n0 = len(labels) - n1
+    if n1 == 0 or n0 == 0:
+        return float('nan')
+    order = np.argsort(scores, kind='mergesort')
+    ranks = np.empty(len(scores), dtype=float)
+    ranks[order] = np.arange(1, len(scores) + 1, dtype=float)
+    # Average ranks within tied score groups, which matters here: most
+    # properties share a score of exactly 0.0.
+    s_sorted = scores[order]
+    i = 0
+    while i < len(s_sorted):
+        j = i
+        while j + 1 < len(s_sorted) and s_sorted[j + 1] == s_sorted[i]:
+            j += 1
+        if j > i:
+            ranks[order[i:j + 1]] = ranks[order[i:j + 1]].mean()
+        i = j + 1
+    return float((ranks[labels == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))

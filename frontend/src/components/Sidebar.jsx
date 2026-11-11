@@ -20,6 +20,8 @@ function NavIcon({ item, active, onClick, badge }) {
     <button
       onClick={onClick}
       title={item.label}
+      aria-label={item.label}
+      data-tour={`nav-${item.id}`}
       style={{
         width: 40, height: 40, borderRadius: 'var(--r-md)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -61,7 +63,7 @@ export default function Sidebar({ activePanel, onSetPanel, compareCount, childre
   return (
     <>
       {/* Icon rail */}
-      <div style={{
+      <div data-tour="rail" style={{
         position: 'fixed', top: 0, left: 0, bottom: 0, width: RAIL_WIDTH,
         zIndex: 'var(--z-ui)', background: 'var(--panel-strong)',
         borderRight: '1px solid var(--wa-06)', backdropFilter: 'blur(16px)',
@@ -83,6 +85,7 @@ export default function Sidebar({ activePanel, onSetPanel, compareCount, childre
       {activePanel && (
         <div
           className="anim-fade-in"
+          data-tour="panel"
           style={{
             position: 'fixed', top: 0, left: RAIL_WIDTH, bottom: 0,
             width: isMobile ? `calc(100vw - ${RAIL_WIDTH}px)` : PANEL_WIDTH,

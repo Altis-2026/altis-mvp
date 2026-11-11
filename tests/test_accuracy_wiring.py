@@ -93,6 +93,45 @@ def test_run_calibration_writes_files_and_holdout(tmp_path, monkeypatch):
     assert blob['label_resolution'] == 'zip_code'
 
 
+def test_run_calibration_refuses_degenerate_constant_scores(tmp_path, monkeypatch):
+    """
+    The Harvey trap: when the detector finds nothing, every property gets the
+    same raw_flood_score, and any calibrator fitted on it is constant. Its
+    Brier score is then p(1-p) — the base rate variance — which looks like a
+    good accuracy number but measures only label prevalence.
+
+    Calibration must refuse, and must NOT persist a calibrator file, since
+    backend/calibrated_confidence.py would otherwise replay it at inference
+    and show a meaningless flood_probability on every property.
+    """
+    monkeypatch.setattr(acc, 'OUTPUT_DIR', tmp_path)
+    labeled = acc.derive_property_labels(_altis_df(), _fema_agg())
+    labeled['raw_flood_score'] = 0.0          # what a zero-detection event gives
+
+    res = acc.run_calibration('harvey', labeled)
+
+    assert res is not None
+    assert res['degenerate'] is True
+    assert res['holdout_metrics'] is None
+    assert res['distinct_scores'] == 1
+    assert 'DETECTION_LIMITS' in res['warning']
+    # Nothing persisted — a degenerate calibrator must never reach inference.
+    assert not (tmp_path / "calibration_harvey.json").exists()
+
+
+def test_degenerate_calibration_report_states_the_arithmetic(tmp_path, monkeypatch):
+    """The report must show why the number is meaningless, not just omit it."""
+    monkeypatch.setattr(acc, 'OUTPUT_DIR', tmp_path)
+    labeled = acc.derive_property_labels(_altis_df(), _fema_agg())
+    labeled['raw_flood_score'] = 0.0
+    res = acc.run_calibration('harvey', labeled)
+
+    lines = "\n".join(acc._calibration_report_lines(res))
+    assert 'No calibration was fitted' in lines
+    assert 'by construction' in lines
+    assert 'Brier' in lines
+
+
 def test_run_calibration_single_class_returns_none(tmp_path, monkeypatch):
     monkeypatch.setattr(acc, 'OUTPUT_DIR', tmp_path)
     altis = _altis_df()
@@ -101,3 +140,66 @@ def test_run_calibration_single_class_returns_none(tmp_path, monkeypatch):
     fema['fema_pct_flood'] = 90.0
     labeled = acc.derive_property_labels(altis, fema)
     assert acc.run_calibration('harvey', labeled) is None
+
+
+# ── Phase 4b: dual-pol in the coverage term ─────────────────────────────────
+
+def _dpol_df(dpol_values, available):
+    """
+    Minimal frame for the coverage term: no binary detection anywhere, so any
+    resulting score has to have come from the dual-pol column.
+    """
+    return pd.DataFrame({
+        'property_id': [f"P-{i}" for i in range(len(dpol_values))],
+        'zip': ["77000"] * len(dpol_values),
+        'pct_flooded': [0.0] * len(dpol_values),
+        'max_depth_ft': [0.0] * len(dpol_values),
+        'impact_class': ['Remote-Deny'] * len(dpol_values),
+        'dpol_water': dpol_values,
+        'dpol_available': available,
+    })
+
+
+def test_dpol_score_reaches_the_coverage_term():
+    """A measured dual-pol score must lift the raw score off the floor."""
+    df = acc.derive_property_labels(
+        _dpol_df([0.0, 0.4, 0.9], [1, 1, 1]),
+        pd.DataFrame([{'zip': "77000", 'fema_pct_flood': 80.0}]))
+    scores = df.sort_values('property_id')['raw_flood_score'].tolist()
+    assert scores[0] == pytest.approx(0.0)
+    assert scores[1] > scores[0]
+    assert scores[2] > scores[1]
+
+
+def test_unavailable_dpol_is_not_read_as_dry():
+    """
+    The abstention contract. With dpol_available clear, the score was never
+    measured — folding its 0 in as evidence would be fabricating a dry reading.
+    Both properties must land on the same floor as a run with no dual-pol
+    column at all, rather than the 0.9 one being credited.
+    """
+    df = acc.derive_property_labels(
+        _dpol_df([0.0, 0.9], [0, 0]),
+        pd.DataFrame([{'zip': "77000", 'fema_pct_flood': 80.0}]))
+    assert (df['raw_flood_score'] == 0.0).all()
+
+
+def test_dpol_never_lowers_an_existing_detection():
+    """
+    Coverage is a max(), so a property the binary mask flagged cannot be
+    dragged down by a low or abstaining dual-pol score.
+    """
+    fema = pd.DataFrame([{'zip': "77000", 'fema_pct_flood': 80.0}])
+    df = _dpol_df([0.0, 0.0], [0, 1])
+    df['pct_flooded'] = [90.0, 90.0]
+    df['max_depth_ft'] = [3.0, 3.0]
+
+    # The same portfolio scored with no dual-pol column at all is the
+    # reference: adding an abstaining or zero dual-pol reading must not move it.
+    reference = acc.derive_property_labels(
+        df.drop(columns=['dpol_water', 'dpol_available']), fema)
+    out = acc.derive_property_labels(df, fema)
+
+    assert (out['raw_flood_score'] > 0).all()
+    assert out['raw_flood_score'].tolist() == pytest.approx(
+        reference['raw_flood_score'].tolist())

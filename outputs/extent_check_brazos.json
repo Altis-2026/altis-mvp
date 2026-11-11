@@ -1,0 +1,123 @@
+{
+  "event": "brazos",
+  "ground_truth": "USGS SIR 2018-5070 (doi:10.5066/F7VH5N3N) mapped boundary + flood inundation extent, upper Brazos",
+  "edge_buffer_m": 0.0,
+  "radius_m": 50,
+  "n_structures": 2999,
+  "n_flooded": 1095,
+  "n_dry": 1904,
+  "detector": {
+    "dem_resolution_m": 1,
+    "sar_orbit_pass": "DESCENDING",
+    "pre_event_scene_count": 3,
+    "post_event_scene_count": 3,
+    "optical_scene_count": 7,
+    "baseline_window": [
+      "2016-08-27",
+      "2017-08-27"
+    ],
+    "baseline_scene_count": 59,
+    "baseline_active": true,
+    "cross_orbit_passes": [
+      "ASCENDING",
+      "DESCENDING"
+    ],
+    "cross_orbit_combine": "union",
+    "hand_source": "MERIT/Hydro/v1_0_1",
+    "dualpol_enabled": true,
+    "dualpol_active": true,
+    "vh_post_scene_count": 3,
+    "vh_baseline_scene_count": 59
+  },
+  "results": [
+    {
+      "tp": 0,
+      "fp": 2,
+      "fn": 1095,
+      "tn": 1902,
+      "precision": 0.0,
+      "recall": 0.0,
+      "specificity": 0.9989495798319328,
+      "f1": NaN,
+      "base_rate": 0.3651217072357453,
+      "auc": 0.4992121848739496,
+      "precision_lift": 0.0,
+      "name": "shipped detector (max_depth_ft > 0.1)"
+    },
+    {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1095,
+      "tn": 1904,
+      "precision": NaN,
+      "recall": 0.0,
+      "specificity": 1.0,
+      "f1": NaN,
+      "base_rate": 0.3651217072357453,
+      "auc": 0.5,
+      "precision_lift": NaN,
+      "name": "sub-pixel water fraction > 0 (Phase 4a)"
+    },
+    {
+      "tp": 22,
+      "fp": 28,
+      "fn": 1073,
+      "tn": 1876,
+      "precision": 0.44,
+      "recall": 0.02009132420091324,
+      "specificity": 0.9852941176470589,
+      "f1": 0.03842794759825327,
+      "base_rate": 0.3651217072357453,
+      "auc": 0.5026466751083996,
+      "precision_lift": 1.2050776255707762,
+      "name": "dual-pol score > 0 (Phase 4b)"
+    },
+    {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1095,
+      "tn": 1904,
+      "precision": NaN,
+      "recall": 0.0,
+      "specificity": 1.0,
+      "f1": NaN,
+      "base_rate": 0.3651217072357453,
+      "auc": 0.5,
+      "precision_lift": NaN,
+      "name": "double-bounce > 0 (Phase 4e)"
+    },
+    {
+      "tp": 50,
+      "fp": 82,
+      "fn": 1045,
+      "tn": 1822,
+      "precision": 0.3787878787878788,
+      "recall": 0.045662100456621,
+      "specificity": 0.9569327731092437,
+      "f1": 0.08149959250203749,
+      "base_rate": 0.3651217072357453,
+      "auc": 0.501559802002993,
+      "precision_lift": 1.0374290853742907,
+      "name": "Sentinel-2 optical water > 0"
+    },
+    {
+      "tp": 999,
+      "fp": 1604,
+      "fn": 96,
+      "tn": 300,
+      "precision": 0.3837879369957741,
+      "recall": 0.9123287671232877,
+      "specificity": 0.15756302521008403,
+      "f1": 0.5402920497566253,
+      "base_rate": 0.3651217072357453,
+      "auc": 0.5520591113157591,
+      "precision_lift": 1.0511233087217593,
+      "name": "HAND terrain only, <= 10 ft (NO event observation)"
+    }
+  ],
+  "caveats": [
+    "The inundation polygon is interpolated from water-surface elevations surveyed at high water marks, not directly observed.",
+    "Covers the mapped riverine corridor only, not the whole bbox.",
+    "Structures outside the mapped boundary are dropped, never labelled dry."
+  ]
+}

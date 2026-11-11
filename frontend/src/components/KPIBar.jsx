@@ -40,24 +40,27 @@ function money(v) {
 
 import { useIsNarrow } from '../hooks/useIsMobile.js';
 
-export default function KPIBar({ stats, exposure, leftInset = 72 }) {
+export default function KPIBar({ stats, exposure, leftInset = 72, drawerOpen = false, costPerVisit = 450 }) {
   const narrow = useIsNarrow();
   if (!stats && !exposure) return null;
 
-  const savings = stats?.estimated_savings
-    ? `$${(stats.estimated_savings / 1000).toFixed(0)}k`
-    : '$0';
+  // One shared, editable assumption (set in Reports), so this number can never
+  // disagree with the ROI calculator or the assistant.
+  const savings = stats?.remote_total ? money(stats.remote_total * costPerVisit) : '$0';
+  const perVisitNote = `at $${Number(costPerVisit).toLocaleString()}/visit (assumption, editable in Reports)`;
 
   return (
     <div
       className="anim-slide-in-up"
+      data-tour="kpis"
       style={{
         position:   'fixed',
         top:        narrow ? 64 : 72,
         left:       narrow ? 64 : leftInset + 16,
         right:      narrow ? 8 : 'auto',
-        maxWidth:   narrow ? 'none' : `calc(100vw - ${leftInset + 32}px)`,
-        overflowX:  'auto',
+        maxWidth:   narrow ? 'none'
+          : drawerOpen ? `calc(100vw - ${leftInset + 48}px - clamp(380px, 36vw, 520px))`
+          : `calc(100vw - ${leftInset + 32}px)`,
         transition: 'left 0.25s ease',
         zIndex:     'var(--z-ui)',
         display:    'flex',
@@ -65,7 +68,8 @@ export default function KPIBar({ stats, exposure, leftInset = 72 }) {
         border:     '1px solid var(--wa-06)',
         borderRadius: 'var(--r-lg)',
         backdropFilter: 'blur(20px)',
-        overflow:   'hidden',
+        overflowX:  'auto',
+        overflowY:  'hidden',
         whiteSpace: 'nowrap',
       }}
     >
@@ -97,9 +101,9 @@ export default function KPIBar({ stats, exposure, leftInset = 72 }) {
           />
           <KPI
             label="Savings vs Full Deployment"
-            value={money(remote * 750)}
+            value={money(remote * costPerVisit)}
             color="var(--teal)"
-            sub={`${remote.toLocaleString()} truck rolls avoided`}
+            sub={`${remote.toLocaleString()} truck rolls avoided ${perVisitNote}`}
           />
         </>
           );
@@ -125,7 +129,7 @@ export default function KPIBar({ stats, exposure, leftInset = 72 }) {
             label="Savings vs Full Deployment"
             value={savings}
             color="var(--teal)"
-            sub={`${stats.remote_total?.toLocaleString()} truck rolls avoided`}
+            sub={`${stats.remote_total?.toLocaleString()} truck rolls avoided ${perVisitNote}`}
           />
         </>
       )}

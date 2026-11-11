@@ -16,3 +16,18 @@ def load_pipeline_module(filename):
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _isolate_event_library(tmp_path, monkeypatch):
+    """Live-analysis tests must not append fake runs to the real event library."""
+    try:
+        from backend import event_library
+    except Exception:  # noqa: BLE001
+        return
+    if not str(getattr(event_library, "LIB_DIR", "")).startswith(str(tmp_path)):
+        monkeypatch.setattr(event_library, "LIB_DIR", tmp_path / "library")
+        event_library._cache.clear()

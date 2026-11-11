@@ -51,11 +51,13 @@ TRACKS = {
     'harvey': {'name': 'Hurricane Harvey (2017)', 'points': _HARVEY},
     'ian':    {'name': 'Hurricane Ian (2022)',    'points': _IAN},
 }
+# Sub-events that share a parent storm's track (Brazos River flooding was Harvey).
+TRACK_ALIASES = {'brazos': 'harvey'}
 
 
 def storm_track_geojson(event_id: str) -> dict | None:
     """GeoJSON FeatureCollection: track line + per-fix points, or None."""
-    track = TRACKS.get(event_id)
+    track = TRACKS.get(TRACK_ALIASES.get(event_id, event_id))
     if track is None:
         return None
 

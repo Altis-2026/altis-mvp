@@ -62,6 +62,31 @@ export const api = {
   getTiles:       (id)     => get(`/events/${id}/tiles`),
   getStormTrack:  (id)     => get(`/events/${id}/storm-track`),  // throws on 404 → caller treats as "no track"
 
+  /* Free public data: satellite pass timing (Copernicus) and river gauges (NOAA) */
+  getEventPasses: (id)     => get(`/events/${id}/passes`),
+  getPasses:      (bbox)   => get(`/passes?bbox=${bbox.join(',')}`),
+  getGauges:      (bbox)   => get(`/gauges?bbox=${bbox.join(',')}`),
+  getEventGauges: (id)     => get(`/events/${id}/gauges`),
+  getEventAnalogs: (id)    => get(`/events/${id}/analogs`),
+  getWatch:        ()      => get('/watch'),
+  getStormExposure: (pid)  => get(`/portfolio/${pid}/storm-exposure`),
+  /* NOAA post-storm aerial photos covering a point, and single tiles as blobs
+     (fetched with the access header, so password-protected deployments work). */
+  getPostStormFlights: (lat, lon, date) => get(`/imagery/post-storm?lat=${lat}&lon=${lon}&date=${date}`),
+  getImageryTileUrl: async (code, z, x, y) => {
+    const r = await authFetch(`/imagery/tile/${code}/${z}/${x}/${y}`);
+    if (!r.ok) return null;
+    return URL.createObjectURL(await r.blob());
+  },
+  /* Learn the storm's dollar scale from settled claims and rescale the book. */
+  calibrateLosses: (pid, settled) =>
+    authFetch(`/portfolio/${pid}/calibrate-losses`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settled }),
+    }).then(r => r.json().then(j => (r.ok ? j : Promise.reject({ detail: j.detail })))),
+  getAnalogs: ({ lat, lon, date, cause }) => get(`/analogs?lat=${lat}&lon=${lon}`
+    + (date ? `&date=${date}` : '') + (cause ? `&cause=${encodeURIComponent(cause)}` : '')),
+
   /* Pre-event flood risk score (1–5), no event date needed */
   getRiskScore:   (id)     => get(`/portfolio/${id}/risk-score`),
 

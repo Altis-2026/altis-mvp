@@ -44,6 +44,83 @@ def gee_available() -> bool:
     return bool(GEE_SERVICE_ACCOUNT_KEY or GEE_SERVICE_ACCOUNT_KEY_JSON)
 
 
+def _net_loss(prop, nsi, row, sev_ci, duration_days):
+    """Net-of-terms expected loss via pipeline.loss_model, or None.
+
+    Terms come from the uploaded policy (deductible, valuation basis, ACV,
+    replacement cost, contents); anything missing is filled by labelled
+    assumptions inside policy_terms and reported in `terms_provenance`.
+    """
+    try:
+        from pipeline import loss_model as lm
+        from pipeline.policy_terms import PolicyTerms
+    except Exception:  # noqa: BLE001
+        return None
+    model = lm.load_model()
+    cov = float(prop.get('coverage_amount') or 0)
+    depth = float(row.get('max_depth_ft') or 0)
+    if not model or cov <= 0 or depth < 0.1:
+        return None
+    t = prop.get('terms') or {}
+    nsi = nsi or {}
+    ffe = _depth_ffe(nsi or None, depth)
+    basis = 'above_first_floor' if ffe is not None else 'above_ground'
+    d = ffe if ffe is not None else depth
+    occ = nsi.get('occtype')
+    basement = str(occ or '').upper().endswith('WB') or str(nsi.get('basement_type') or '') in ('1', '2', '1.0', '2.0')
+    seg = lm.segment_for(occ, basement)
+    terms = PolicyTerms(limit=cov, deductible=t.get('deductible'), valuation=t.get('valuation_basis'),
+                        acv_value=t.get('acv_value'), replacement_cost=t.get('replacement_cost'))
+    out = lm.expected_loss(max(0.0, d), sev_ci, terms, coverage='building', depth_basis=basis,
+                           segment=seg, model=model)
+    if not out:
+        return None
+    # The model is calibrated on US NFIP claims; say so when it is applied elsewhere.
+    lat, lon = prop.get('latitude'), prop.get('longitude')
+    try:
+        out['outside_calibration_region'] = not (17 <= float(lat) <= 72 and -170 <= float(lon) <= -65)
+    except (TypeError, ValueError):
+        out['outside_calibration_region'] = True
+    ccov = float(prop.get('contents_coverage_amount') or t.get('contents_coverage_amount') or 0)
+    if ccov > 0:
+        cval = ccov * model.get('fallbacks', {}).get('contents_value_over_coverage', 0.97)
+        cterms = PolicyTerms(limit=ccov, deductible=t.get('contents_deductible'), valuation='ACV', acv_value=cval,
+                             replacement_cost=cval)
+        out['contents'] = lm.expected_loss(max(0.0, d), sev_ci, cterms, coverage='contents', depth_basis=basis,
+                                           segment=seg, model=model)
+    return out
+
+
+def _ffh(match):
+    """First-floor height (ft) from an NSI match row, or None."""
+    if not match:
+        return None
+    from pipeline.structures import first_floor_height_ft
+    return first_floor_height_ft(match.get('found_ht'))
+
+
+def _foundation(match):
+    """Human-readable foundation type from an NSI match row, or None."""
+    if not match:
+        return None
+    from pipeline.structures import foundation_label
+    return foundation_label(match.get('found_type'))
+
+
+def _depth_ffe(match, depth_above_ground_ft):
+    """
+    Depth above first floor, or None when the foundation height is unknown.
+
+    Never falls back to depth above ground — reporting an unadjusted number in
+    a field labelled "above first floor" is exactly the confusion Phase 2
+    exists to remove.
+    """
+    if not match:
+        return None
+    from pipeline.structures import depth_above_first_floor
+    return depth_above_first_floor(depth_above_ground_ft, match.get('found_ht'))
+
+
 def init_ee() -> bool:
     """
     Initialize Earth Engine with the service-account credentials. Idempotent.
@@ -249,13 +326,157 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         else f'unavailable: only {with_scenes} post-window slice(s) have scenes')
     print(f"  [signals] {signal_status}")
 
+    # ── Phase 1a: multi-temporal baseline (per-pixel mean/std over ~a year of
+    #    same-orbit pre-event scenes). Degrades to the single pre-event
+    #    composite exactly like every other auxiliary signal here.
+    baseline_mean = baseline_std = None
+    baseline_n = 0
+    base_start = base_end = None
+    try:
+        from pipeline.flood_detect import load_sar_baseline, baseline_window
+        from pipeline.config import BASELINE
+        base_start, base_end = baseline_window(windows['post_start'])
+        baseline_mean, baseline_std, baseline_n = load_sar_baseline(
+            bbox, base_start, base_end, orbit)
+        if baseline_n < BASELINE['min_scenes']:
+            baseline_mean = baseline_std = None
+            signal_status['baseline'] = (
+                f'unavailable: only {baseline_n} pre-event scenes on orbit '
+                f'{orbit} (need {BASELINE["min_scenes"]})')
+        else:
+            signal_status['baseline'] = f'ok: {baseline_n} scenes'
+    except Exception as e:
+        baseline_mean = baseline_std = None
+        signal_status['baseline'] = f'error: {e}'
+        print(f"  [signal] multi-temporal baseline failed: {e}")
+
+    # ── Phase 4b: VH's own multi-temporal baseline, which is what makes the
+    #    dual-pol water score possible. `post_vh` was already loaded above for
+    #    the binary VH cross-check; this adds the history to compare it against.
+    #    Abstains loudly rather than degrading silently — a VH baseline too
+    #    short to estimate σ from produces arbitrarily large z-scores.
+    vh_base_mean = vh_base_std = None
+    try:
+        from pipeline.flood_detect import load_sar_baseline
+        from pipeline.config import DUALPOL
+        if not DUALPOL.get('enabled', True):
+            signal_status['dual_pol_score'] = 'disabled in config'
+        elif post_vh is None:
+            signal_status['dual_pol_score'] = 'unavailable: no VH post-event scene'
+        elif not base_start:
+            signal_status['dual_pol_score'] = 'unavailable: no baseline window'
+        else:
+            vh_base_mean, vh_base_std, vh_base_n = load_sar_baseline(
+                bbox, base_start, base_end, orbit, band='VH')
+            if vh_base_n < DUALPOL['min_vh_baseline_scenes']:
+                vh_base_mean = vh_base_std = None
+                signal_status['dual_pol_score'] = (
+                    f'unavailable: only {vh_base_n} VH baseline scenes on orbit '
+                    f'{orbit} (need {DUALPOL["min_vh_baseline_scenes"]})')
+            else:
+                signal_status['dual_pol_score'] = f'ok: {vh_base_n} VH baseline scenes'
+    except Exception as e:
+        vh_base_mean = vh_base_std = None
+        signal_status['dual_pol_score'] = f'error: {e}'
+        print(f"  [signal] dual-pol baseline failed: {e}")
+
+    # ── Phase 1c: cross-orbit stacking — every other orbit with post-event
+    #    coverage contributes an independently-thresholded mask.
+    orbit_stack = {}
+    try:
+        from pipeline.flood_detect import (load_sar_orbits, load_sar_baseline,
+                                           load_sar_vh_composite)
+        from pipeline.config import CROSS_ORBIT, BASELINE, DUALPOL
+        if CROSS_ORBIT['enabled']:
+            for other, (composite, n_sc) in load_sar_orbits(
+                    bbox, windows['post_start'], windows['post_end']).items():
+                if other == orbit:
+                    continue
+                o_mean, o_std, o_n = (None, None, 0)
+                if base_start:
+                    o_mean, o_std, o_n = load_sar_baseline(
+                        bbox, base_start, base_end, other)
+                    if o_n < BASELINE['min_scenes']:
+                        o_mean = o_std = None
+                spec = {'post': composite, 'pre': None,
+                        'baseline_mean': o_mean, 'baseline_std': o_std}
+                # Phase 4b for this orbit, all-or-nothing: a partial set is
+                # omitted so the cross-orbit max() never sees a zero that
+                # merely means "not measured here".
+                if vh_base_mean is not None:
+                    try:
+                        o_vh, _ = load_sar_vh_composite(
+                            bbox, windows['post_start'], windows['post_end'], other)
+                        if o_vh is not None:
+                            m, s, n_vh = load_sar_baseline(
+                                bbox, base_start, base_end, other, band='VH')
+                            if n_vh >= DUALPOL['min_vh_baseline_scenes']:
+                                spec.update({'post_vh': o_vh,
+                                             'vh_baseline_mean': m,
+                                             'vh_baseline_std': s})
+                    except Exception:
+                        pass
+                orbit_stack[other] = spec
+            signal_status['cross_orbit'] = (
+                f'ok: {len(orbit_stack) + 1} orbits' if orbit_stack
+                else 'unavailable: only one orbit covers this window')
+    except Exception as e:
+        orbit_stack = {}
+        signal_status['cross_orbit'] = f'error: {e}'
+        print(f"  [signal] cross-orbit stacking failed: {e}")
+
+    # ── Phase 1b: HAND for the DEM-hydrology plausibility vote.
+    hand_img, hand_source = None, 'unavailable'
+    try:
+        from pipeline.flood_detect import load_hand
+        hand_img, hand_source = load_hand(bbox)
+        signal_status['hand'] = ('ok' if hand_img is not None
+                                 else f'unavailable: {hand_source}')
+    except Exception as e:
+        signal_status['hand'] = f'error: {e}'
+        print(f"  [signal] HAND failed: {e}")
+
     combined = build_flood_depth_image(
         bbox, pre_img, post_img, dem, wse_radius_m,
         optical_water=optical_water, optical_valid=optical_valid,
         pre_vh=pre_vh, post_vh=post_vh, rain=rain_img,
-        ndvi_pre=ndvi_pre, ndvi_post=ndvi_post, post_slices=post_slices)
+        ndvi_pre=ndvi_pre, ndvi_post=ndvi_post, post_slices=post_slices,
+        hand=hand_img, baseline_mean=baseline_mean, baseline_std=baseline_std,
+        orbit_stack=orbit_stack,
+        vh_baseline_mean=vh_base_mean, vh_baseline_std=vh_base_std)
 
-    sampled = sample_properties(combined, props_df, batch_size=100, throttle=False)
+    # ── Phase 2: structure attributes (CONUS only). When a property matches an
+    #    NSI structure we sample its footprint at Sentinel-1's native 10m
+    #    spacing instead of a 50m circle centred on the geocoded point.
+    nsi_by_pid = {}
+    sample_df = props_df.copy()
+    sample_scale = 30
+    try:
+        from pipeline import structures as struct
+        nsi_df = struct.fetch_nsi_structures(bbox, verbose=False)
+        nsi_match = struct.match_properties_to_structures(props_df, nsi_df)
+        n_matched = int(nsi_match['nsi_matched'].sum())
+        nsi_by_pid = {r['property_id']: r for r in nsi_match.to_dict('records')}
+        if n_matched:
+            m = nsi_match.set_index('property_id')
+            sample_df['sample_lat'] = sample_df['property_id'].map(
+                m['nsi_lat'].where(m['nsi_matched']))
+            sample_df['sample_lon'] = sample_df['property_id'].map(
+                m['nsi_lon'].where(m['nsi_matched']))
+            sample_df['sample_radius_m'] = sample_df['property_id'].map(
+                {pid: struct.footprint_radius_m(a) if ok else None
+                 for pid, a, ok in zip(m.index, m['ftprntsqft'], m['nsi_matched'])})
+            sample_scale = 10
+        signal_status['structures'] = (
+            f'ok: {n_matched}/{len(props_df)} matched to NSI structures'
+            if n_matched else 'unavailable: no NSI structures (outside CONUS?)')
+    except Exception as e:
+        nsi_by_pid = {}
+        signal_status['structures'] = f'error: {e}'
+        print(f"  [signal] NSI structures failed: {e}")
+
+    sampled = sample_properties(combined, sample_df, batch_size=100,
+                                throttle=False, scale=sample_scale)
     sampled = sampled.set_index('property_id')
 
     # FEMA NFHL flood zones (US properties only; non-US resolve to None
@@ -297,6 +518,16 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'wse_spread_ft':     float(s.get('wse_spread_ft', 0.0)),
             'vh_available':      int(s.get('vh_available', 0) or 0),
             'vh_water_pct':      float(s.get('vh_water_pct', 0.0) or 0.0),
+            # Phase 4b: graded dual-pol water score, with the flag saying
+            # whether a VH baseline existed. A 0 score with the flag clear
+            # means "not measured", never "dry".
+            'dpol_available':    int(s.get('dpol_available', 0) or 0),
+            'dpol_water':        float(s.get('dpol_water', 0.0) or 0.0),
+            # Phase 1: HAND drives the DEM-hydrology vote when present. Passed
+            # through as-is (including None) — ensemble_votes must be able to
+            # tell "no HAND here" from "HAND is 0", which means at the drainage
+            # line and is the most flood-prone value there is.
+            'hand_ft':           s.get('hand_ft'),
         }
 
         breakdown = confidence_breakdown(row, event_cfg)
@@ -341,8 +572,28 @@ def analyze_portfolio_live(props: list, event_date: str = None,
         # relative-error component (≈25% of depth, floor 0.5ft) rather than
         # letting a coarse global DEM push every low estimate to $0.
         sev_ci = min(ci, max(0.5, 0.25 * row['max_depth_ft']))
-        sev = estimate_claim_range(row['max_depth_ft'], sev_ci,
-                                   prop.get('coverage_amount'))
+        # Phase 3: select the depth-damage curve from the structure's own NSI
+        # attributes and index it on depth above the FIRST FLOOR, which is what
+        # published curves take. All of these degrade to None outside CONUS or
+        # without an NSI match, in which case estimate_claim_range falls back
+        # to the generic curve on depth above ground exactly as before.
+        _nsi = nsi_by_pid.get(pid) or {}
+        sev = estimate_claim_range(
+            row['max_depth_ft'], sev_ci, prop.get('coverage_amount'),
+            contents_coverage=prop.get('contents_coverage_amount')
+                              or _nsi.get('val_cont'),
+            occupancy_type=_nsi.get('occtype'),
+            num_stories=_nsi.get('num_story'),
+            basement_type=_nsi.get('basement_type'),
+            depth_above_first_floor_ft=_depth_ffe(_nsi or None,
+                                                  row['max_depth_ft']),
+            duration_days=duration_days)
+
+        # Claims-calibrated NET estimate: what the carrier would pay after the
+        # policy's valuation basis, deductible and limit (pipeline/loss_model.py,
+        # validated on held-out storms in docs/PREREG_LOSS_MODEL.md). Falls back
+        # to the gross national-curve figure when no model/coverage exists.
+        net = _net_loss(prop, _nsi, row, sev_ci, duration_days)
 
         # Subrogation candidate: flooded AND adjacent to permanent water /
         # drainage — worth checking whether third-party infrastructure
@@ -382,6 +633,8 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'rain_mm':           float(s.get('rain_mm', 0.0) or 0.0),
             'vh_available':      row['vh_available'],
             'vh_water_pct':      round(row['vh_water_pct'], 4),
+            'dpol_available':    row['dpol_available'],
+            'dpol_water':        round(row['dpol_water'], 4),
             'duration_days':     duration_days,
             # Per-slice flooded fraction across the post window (None where no
             # scene covered the slice) — powers the drawer's inundation
@@ -400,10 +653,54 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'surge_check_flag':  int(surge_check),
             'flood_zone':        fema['flood_zone'],
             'sfha_flag':         fema['sfha'],
-            'severity_low_usd':  sev['low'] if sev else None,
-            'severity_mid_usd':  sev['mid'] if sev else None,
-            'severity_high_usd': sev['high'] if sev else None,
-            'severity_damage_pct': sev['damage_pct'] if sev else None,
+            # ── Phase 2: what the adjuster needs to see which number drove the
+            #    call. depth_above_ffe_ft is None (not 0) where the first-floor
+            #    height is unknown, so the drawer can say "unavailable" instead
+            #    of implying the adjustment was made.
+            'first_floor_height_ft': _ffh(nsi_by_pid.get(pid)),
+            'foundation_type':   _foundation(nsi_by_pid.get(pid)),
+            'depth_above_ffe_ft': _depth_ffe(nsi_by_pid.get(pid),
+                                             row['max_depth_ft']),
+            'first_floor_source': ('USACE NSI (modeled)'
+                                   if _ffh(nsi_by_pid.get(pid)) is not None
+                                   else 'unavailable'),
+            'hand_ft':           (round(float(s['hand_ft']), 2)
+                                  if s.get('hand_ft') is not None
+                                  and not (isinstance(s.get('hand_ft'), float)
+                                           and math.isnan(s['hand_ft']))
+                                  else None),
+            # Headline reserve: the NET (after policy terms) claims-calibrated
+            # estimate when available, else the gross national-curve one. The
+            # gross physical figure is always kept separately.
+            'severity_low_usd':  (net['low'] if net else (sev['low'] if sev else None)),
+            'severity_mid_usd':  (net['mid'] if net else (sev['mid'] if sev else None)),
+            'severity_high_usd': (net['high'] if net else (sev['high'] if sev else None)),
+            'severity_damage_pct': (net['expected_damage_pct'] if net else (sev['damage_pct'] if sev else None)),
+            'loss_method':       ('claims_calibrated_net_of_terms' if net else ('national_curve_gross' if sev else None)),
+            'net_claim_p10_usd': net['claim_p10'] if net else None,
+            'net_claim_p90_usd': net['claim_p90'] if net else None,
+            'net_terms_provenance': net['terms_provenance'] if net else None,
+            'net_support_claims': net['support_claims'] if net else None,
+            'net_depth_basis':   net['depth_basis'] if net else None,
+            'net_outside_calibration_region': net.get('outside_calibration_region') if net else None,
+            'gross_physical_mid_usd': sev['mid'] if sev else None,
+            # ── Phase 3: which curve produced the number, what depth it was
+            #    indexed on, and contents kept SEPARATE from structure because
+            #    NFIP settles them as separate coverages and carriers reserve
+            #    them separately.
+            'severity_curve':        sev.get('curve') if sev else None,
+            'severity_depth_basis':  sev.get('depth_basis') if sev else None,
+            'severity_duration_mult': sev.get('duration_multiplier') if sev else None,
+            'contents_low_usd':      (net['contents']['low'] if net and net.get('contents') else (sev.get('contents_low') if sev else None)),
+            'contents_mid_usd':      (net['contents']['mid'] if net and net.get('contents') else (sev.get('contents_mid') if sev else None)),
+            'contents_high_usd':     (net['contents']['high'] if net and net.get('contents') else (sev.get('contents_high') if sev else None)),
+            'contents_damage_pct':   (net['contents']['expected_damage_pct'] if net and net.get('contents') else (sev.get('contents_damage_pct') if sev else None)),
+            # Headline = BUILDING only on the calibrated path. The contents
+            # estimate overshoots paid contents by 39-87% before calibration on
+            # held-out storms (outputs/loss_model_contents_check.json), so it is
+            # reported separately and flagged, never summed into the total.
+            'total_mid_usd':         (net['mid'] if net else (sev.get('total_mid') if sev else None)),
+            'contents_validated':    (False if net and net.get('contents') else None),
             'adjuster_note':     _note(prop.get('address', ''), row, impact_class),
             'color':             COLOR_MAP.get(impact_class, '#6B8FA3'),
         })

@@ -1,0 +1,198 @@
+{
+  "event": "harvey",
+  "study_name": "West & Northwest Houston (Addicks/Barker corridor), TX",
+  "bbox": [
+    -95.88,
+    29.66,
+    -95.46,
+    30.0
+  ],
+  "post_window": [
+    "2017-08-27",
+    "2017-09-10"
+  ],
+  "stn_event_id": 180,
+  "ground_truth": "USGS Short-Term Network high water marks (height_above_gnd, surveyed feet above ground)",
+  "headline_radius_m": 50,
+  "mark_selection": {
+    "in_bbox": 253,
+    "usable": 63,
+    "dropped_null_height": 65,
+    "dropped_zero_height": 125
+  },
+  "detector": {
+    "dem_resolution_m": 1,
+    "sar_orbit_pass": "DESCENDING",
+    "pre_event_scene_count": 3,
+    "post_event_scene_count": 2,
+    "optical_scene_count": 10,
+    "baseline_window": [
+      "2016-08-25",
+      "2017-08-25"
+    ],
+    "baseline_scene_count": 58,
+    "baseline_active": true,
+    "cross_orbit_passes": [
+      "ASCENDING",
+      "DESCENDING"
+    ],
+    "cross_orbit_combine": "union",
+    "hand_source": "MERIT/Hydro/v1_0_1",
+    "dualpol_enabled": true,
+    "dualpol_active": true,
+    "vh_post_scene_count": 2,
+    "vh_baseline_scene_count": 58
+  },
+  "summaries": [
+    {
+      "label": "radius 10 m",
+      "n_marks": 63,
+      "n_sites": 48,
+      "surveyed_mean_ft": 2.858,
+      "surveyed_median_ft": 2.23,
+      "detected_mean_ft": 0.0,
+      "recall_at_0.1ft": 0.0,
+      "n_detected": 0,
+      "bias_ft": -2.858,
+      "mae_ft": 2.858,
+      "rmse_ft": 3.365,
+      "site_recall": 0.0,
+      "site_recall_detected": 0,
+      "site_recall_n_sites": 48,
+      "site_recall_ci95": [
+        0.0,
+        0.074
+      ],
+      "all_pearson_r": null,
+      "all_pearson_p": null,
+      "all_spearman_r": null,
+      "all_spearman_p": null,
+      "all_pearson_ci95": null
+    },
+    {
+      "label": "radius 20 m",
+      "n_marks": 63,
+      "n_sites": 48,
+      "surveyed_mean_ft": 2.858,
+      "surveyed_median_ft": 2.23,
+      "detected_mean_ft": 0.0,
+      "recall_at_0.1ft": 0.0,
+      "n_detected": 0,
+      "bias_ft": -2.858,
+      "mae_ft": 2.858,
+      "rmse_ft": 3.365,
+      "site_recall": 0.0,
+      "site_recall_detected": 0,
+      "site_recall_n_sites": 48,
+      "site_recall_ci95": [
+        0.0,
+        0.074
+      ],
+      "all_pearson_r": null,
+      "all_pearson_p": null,
+      "all_spearman_r": null,
+      "all_spearman_p": null,
+      "all_pearson_ci95": null
+    },
+    {
+      "label": "radius 30 m",
+      "n_marks": 63,
+      "n_sites": 48,
+      "surveyed_mean_ft": 2.858,
+      "surveyed_median_ft": 2.23,
+      "detected_mean_ft": 0.0,
+      "recall_at_0.1ft": 0.0,
+      "n_detected": 0,
+      "bias_ft": -2.858,
+      "mae_ft": 2.858,
+      "rmse_ft": 3.365,
+      "site_recall": 0.0,
+      "site_recall_detected": 0,
+      "site_recall_n_sites": 48,
+      "site_recall_ci95": [
+        0.0,
+        0.074
+      ],
+      "all_pearson_r": null,
+      "all_pearson_p": null,
+      "all_spearman_r": null,
+      "all_spearman_p": null,
+      "all_pearson_ci95": null
+    },
+    {
+      "label": "radius 50 m",
+      "n_marks": 63,
+      "n_sites": 48,
+      "surveyed_mean_ft": 2.858,
+      "surveyed_median_ft": 2.23,
+      "detected_mean_ft": 0.189,
+      "recall_at_0.1ft": 0.0476,
+      "n_detected": 3,
+      "bias_ft": -2.67,
+      "mae_ft": 2.912,
+      "rmse_ft": 3.442,
+      "site_recall": 0.0625,
+      "site_recall_detected": 3,
+      "site_recall_n_sites": 48,
+      "site_recall_ci95": [
+        0.0131,
+        0.172
+      ],
+      "all_pearson_r": -0.07180487477403905,
+      "all_pearson_p": 0.575995668535888,
+      "all_spearman_r": 0.0783956988063242,
+      "all_spearman_p": 0.5413802025104248,
+      "all_pearson_ci95": [
+        -0.222,
+        0.538
+      ],
+      "detected_only_n": 3,
+      "detected_only_bias_ft": -0.777,
+      "detected_only_mae_ft": 5.857,
+      "detected_only_pearson_r": -0.9916776301858456,
+      "detected_only_pearson_p": 0.0821902465369765,
+      "detected_only_spearman_r": -1.0,
+      "detected_only_spearman_p": 0.0
+    },
+    {
+      "label": "radius 100 m",
+      "n_marks": 63,
+      "n_sites": 48,
+      "surveyed_mean_ft": 2.858,
+      "surveyed_median_ft": 2.23,
+      "detected_mean_ft": 0.72,
+      "recall_at_0.1ft": 0.1111,
+      "n_detected": 7,
+      "bias_ft": -2.139,
+      "mae_ft": 3.05,
+      "rmse_ft": 3.652,
+      "site_recall": 0.125,
+      "site_recall_detected": 6,
+      "site_recall_n_sites": 48,
+      "site_recall_ci95": [
+        0.0473,
+        0.2525
+      ],
+      "all_pearson_r": -0.021906436827294953,
+      "all_pearson_p": 0.8646834023368677,
+      "all_spearman_r": 0.050381890817058315,
+      "all_spearman_p": 0.6949583176398563,
+      "all_pearson_ci95": [
+        -0.306,
+        0.448
+      ],
+      "detected_only_n": 7,
+      "detected_only_bias_ft": 2.579,
+      "detected_only_mae_ft": 5.624,
+      "detected_only_pearson_r": -0.8191127832966231,
+      "detected_only_pearson_p": 0.024184474854844273,
+      "detected_only_spearman_r": -0.7142857142857144,
+      "detected_only_spearman_p": 0.07134356146753766
+    }
+  ],
+  "caveats": [
+    "HWMs define no negative class \u2014 precision and false-positive rate are NOT measurable from this dataset.",
+    "An HWM is the peak stage; Sentinel-1 samples an instant every 6-12 days, so underestimate is expected where the pass missed the crest.",
+    "Marks cluster by survey site; n_sites is the independent sample size, not n_marks."
+  ]
+}

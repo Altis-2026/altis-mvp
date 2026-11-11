@@ -119,6 +119,20 @@ CANONICAL_FIELD_ALIASES = {
                          'total insured value', 'coverage', 'sum insured',
                          'limit', 'insured value', 'dwelling limit',
                          'dwelling coverage', 'coverage a', 'building limit'],
+    # Optional policy terms. With these, Altis reports what the carrier would
+    # PAY (after deductible, valuation basis and limit); without them it uses
+    # clearly labelled assumptions.
+    'deductible':      ['deductible', 'building deductible', 'deductible amount',
+                         'ded', 'ded amount', 'dwelling deductible'],
+    'replacement_cost': ['replacement cost', 'replacement value', 'rcv',
+                          'building replacement cost', 'rc value', 'replacement cost value'],
+    'acv_value':       ['actual cash value', 'acv', 'building value', 'building acv',
+                         'cash value'],
+    'valuation_basis': ['valuation', 'valuation basis', 'loss settlement',
+                         'settlement basis', 'rcv or acv', 'replacement cost basis'],
+    'contents_coverage_amount': ['contents coverage', 'contents limit', 'coverage c',
+                                  'contents amount', 'personal property limit'],
+    'contents_deductible': ['contents deductible', 'contents ded'],
     'city':            ['city', 'town', 'suburb', 'locality'],
     'state':           ['state', 'st', 'province'],
     'zip':             ['zip', 'zip code', 'postal code', 'zipcode', 'postcode'],
@@ -128,6 +142,8 @@ CANONICAL_FIELD_ALIASES = {
 }
 
 REQUIRED_FIELDS = ('address',)
+POLICY_TERM_FIELDS = ('deductible', 'replacement_cost', 'acv_value', 'valuation_basis',
+                      'contents_coverage_amount', 'contents_deductible')
 MATCH_THRESHOLD = 60.0
 
 
@@ -283,7 +299,7 @@ def apply_mapping(df: pd.DataFrame, mapping: dict[str, Optional[str]]) -> pd.Dat
     """
     out = pd.DataFrame(index=df.index)
 
-    for field in ('policy_number', 'coverage_amount', 'latitude', 'longitude'):
+    for field in ('policy_number', 'coverage_amount', 'latitude', 'longitude') + POLICY_TERM_FIELDS:
         col = mapping.get(field)
         out[field] = df[col] if col and col in df.columns else ''
 

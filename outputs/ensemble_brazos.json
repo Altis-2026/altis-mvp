@@ -1,0 +1,120 @@
+{
+  "event": "brazos",
+  "model": {
+    "coef": [
+      0.003973688754627387,
+      0.003975287302305158,
+      0.005262137803823318,
+      0.0,
+      0.0,
+      -0.007735633775765601,
+      0.0,
+      -0.0010383750580388604,
+      0.0,
+      0.011654942152442112,
+      0.00466499992885258,
+      -0.008126721202983501,
+      0.003913317855411759,
+      0.0
+    ],
+    "intercept": -1.3308788022368425,
+    "feature_names": [
+      "coverage_binary",
+      "depth_ft",
+      "dpol_water",
+      "dpol_available",
+      "water_fraction",
+      "optical_water_pct",
+      "optical_available",
+      "hand_proximity",
+      "hand_known",
+      "rel_elev_ft",
+      "wse_spread_ft",
+      "urban_flag",
+      "depth_above_ffe_ft",
+      "ffe_known"
+    ],
+    "x_mean": [
+      1.384145728643216e-05,
+      0.0070402010050251256,
+      0.002099497487437187,
+      1.0,
+      0.0,
+      0.005960150753768841,
+      1.0,
+      0.3250476511198382,
+      1.0,
+      8.712496984924657,
+      0.0027680904522613056,
+      0.7917085427135678,
+      0.004158291457286433,
+      1.0
+    ],
+    "x_std": [
+      0.0002682775258838523,
+      0.16879303550838629,
+      0.021857354815861606,
+      1.0,
+      1.0,
+      0.047385760482025495,
+      1.0,
+      0.21039460514885275,
+      1.0,
+      5.752873569903776,
+      0.05831064563045739,
+      0.4060863530185675,
+      0.1318891344578313,
+      1.0
+    ],
+    "l2": 10000.0,
+    "n_train": 3980,
+    "method": "logistic_l2"
+  },
+  "feature_names": [
+    "coverage_binary",
+    "depth_ft",
+    "dpol_water",
+    "dpol_available",
+    "water_fraction",
+    "optical_water_pct",
+    "optical_available",
+    "hand_proximity",
+    "hand_known",
+    "rel_elev_ft",
+    "wse_spread_ft",
+    "urban_flag",
+    "depth_above_ffe_ft",
+    "ffe_known"
+  ],
+  "evaluation": {
+    "n_paired_splits": 106,
+    "test_fraction": 0.3,
+    "split_kind": "grouped_by_zip",
+    "comparisons_vs_hand_tuned": {
+      "brier": {
+        "mean_difference": -0.000826,
+        "standard_error": 0.000204,
+        "win_rate": 0.5,
+        "verdict": "BETTER"
+      },
+      "ece": {
+        "mean_difference": -0.000573,
+        "standard_error": 0.000344,
+        "win_rate": 0.3396,
+        "verdict": "BETTER"
+      },
+      "brier_skill_score": {
+        "mean_difference": 0.008178,
+        "standard_error": 0.001797,
+        "win_rate": 0.5,
+        "verdict": "BETTER"
+      },
+      "auc": {
+        "mean_difference": -0.096207,
+        "standard_error": 0.009454,
+        "win_rate": 0.1698,
+        "verdict": "WORSE"
+      }
+    }
+  }
+}

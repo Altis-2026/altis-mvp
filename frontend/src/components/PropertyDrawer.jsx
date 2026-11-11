@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import SarPair from './SarPair.jsx';
 import StreetViewPanel from './StreetViewPanel.jsx';
+import PostStormAerial from './PostStormAerial.jsx';
 import { api } from '../services/api.js';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 
@@ -61,6 +62,9 @@ function Mrow({ label, tech, value }) {
   );
 }
 
+// Demo events are dated by radar window; flights follow the STORM start.
+const STORM_START = { harvey: '2017-08-23', brazos: '2017-08-23', lismore: '2022-02-23' };
+
 export default function PropertyDrawer({ property, eventId, liveEventDate, onClose, onAddToCompare, isInCompare, compareFull, onFeedbackSaved, eventLabel, durationSlices }) {
   const isMobile = useIsMobile();
   const [sarView, setSarView] = useState('sar'); // 'sar' | 'optical'
@@ -89,6 +93,19 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
     setFbStatus('idle'); setFbError('');
     setDraft(null); setDrafting(false); setDraftErr(''); setCopied(false);
   }, [property?.property_id]);
+
+  // Escape closes the drawer (unless the user is typing in a field).
+  useEffect(() => {
+    if (!property) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [property, onClose]);
 
   const runDraftNote = async () => {
     if (drafting) return;
@@ -136,12 +153,40 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
   // value or a reason. Never a silent blank, never a placeholder zero.
   const num = (v) => (v == null || v === '' || Number.isNaN(+v) ? null : +v);
   const isLiveResult = property.rain_mm !== undefined;
+  // Calibrated P(flooded), present only once a calibration has been fitted.
+  const floodProb = num(property.flood_probability);
   const rainMm    = num(property.rain_mm);
   const durDays   = num(property.duration_days);
   const sevLow    = num(property.severity_low_usd);
   const sevMid    = num(property.severity_mid_usd);
   const sevHigh   = num(property.severity_high_usd);
+  // Net-of-policy-terms estimate from the claims-calibrated model, with the
+  // terms that were assumed (not supplied) listed so a guess is never hidden.
+  const netCalibrated = property.loss_method === 'claims_calibrated_net_of_terms';
+  const claimP10 = num(property.net_claim_p10_usd);
+  const claimP90 = num(property.net_claim_p90_usd);
+  const grossMid = num(property.gross_physical_mid_usd);
+  const assumedTerms = Object.entries(property.net_terms_provenance || {})
+    .filter(([, v]) => typeof v === 'string' && v.startsWith('assumed'))
+    .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v.replace(/^assumed:\s*/, '')}`);
+  const stormFactor = num(property.storm_factor);
+  const gaugeDepth = num(property.gauge_depth_ft);
+  const gaugeDist  = num(property.gauge_dist_m);
+  const gaugeConflict = property.gauge_conflict == 1;
+  const gaugeNear = gaugeDist != null && gaugeDist <= 1000;   // depth skill measured best within 1 km
   const floodZone = property.flood_zone && property.flood_zone !== 'null' ? property.flood_zone : null;
+
+  // Phase 2 structure attributes. Each stays null when unknown so the drawer
+  // renders an explicit "unavailable" reason rather than a misleading 0.
+  const numOrNull = (v) =>
+    v == null || v === '' || Number.isNaN(parseFloat(v)) ? null : parseFloat(v);
+  const firstFloorHeight = numOrNull(property.first_floor_height_ft);
+  const depthAboveFfe    = numOrNull(property.depth_above_ffe_ft);
+  const handFt           = numOrNull(property.hand_ft);
+  const foundationType   = property.foundation_type || null;
+  const firstFloorSource = property.first_floor_source &&
+    property.first_floor_source !== 'unavailable'
+      ? property.first_floor_source : null;
   const sfha      = property.sfha_flag === true || property.sfha_flag === 1 || property.sfha_flag === '1';
   const vhAvail   = property.vh_available == 1;
   const vhAgrees  = vhAvail && (
@@ -193,18 +238,20 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
 
   return (
     <>
-      {/* Backdrop (closes drawer on click, doesn't block globe) */}
+      {/* Backdrop: a click on the map closes the drawer. It starts right of
+          the sidebar rail so the rail's buttons stay clickable. */}
       <div
         onClick={onClose}
         style={{
-          position: 'fixed', inset: 0, zIndex: 'var(--z-drawer)',
-          pointerEvents: 'all',
+          position: 'fixed', top: 0, bottom: 0, right: 0, left: isMobile ? '100%' : 56,
+          zIndex: 'var(--z-drawer)', pointerEvents: 'all',
         }}
       />
 
       {/* Drawer panel */}
       <div
         className="anim-slide-in-right"
+        data-tour="drawer"
         onClick={e => e.stopPropagation()}
         style={{
           position:   'fixed',
@@ -238,12 +285,12 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.08em', fontWeight: 600 }}>
               {property.property_id}
             </span>
-            <button onClick={onClose} style={{
+            <button onClick={onClose} aria-label="Close property details" title="Close (Esc)" style={{
               background: 'none', border: 'none', color: 'var(--text-muted)',
               cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '0 0 0 12px',
               transition: 'color 0.15s',
             }}
-              onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
               onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
             >
               ✕
@@ -283,11 +330,36 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <ConfidenceGauge value={conf} color={color} />
-              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
-                CONFIDENCE
+              <span
+                title="How sure the model is about this triage decision. A model-internal score, not a validated probability."
+                style={{ fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.08em', cursor: 'help' }}>
+                DECISION CONFIDENCE
               </span>
             </div>
           </div>
+          )}
+
+          {/* Calibrated probability that this property actually flooded.
+              Distinct from decision confidence above: this one is fitted
+              against real FEMA ground truth and is only shown once that
+              calibration exists. */}
+          {!notAnalyzed && floodProb != null && (
+            <div style={{
+              marginTop: 14, padding: '10px 12px', borderRadius: 'var(--r-md)',
+              background: 'rgba(76,175,130,0.06)', border: '1px solid rgba(76,175,130,0.22)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--approve)', textTransform: 'uppercase' }}>
+                  Calibrated flood probability
+                </span>
+                <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  {floodProb.toFixed(0)}%
+                </strong>
+              </div>
+              <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
+                {calibrationNote(property)}
+              </div>
+            </div>
           )}
         </div>
 
@@ -351,6 +423,8 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             </div>
           )}
 
+          <PostStormAerial property={property} eventDate={liveEventDate || STORM_START[eventId] || null} />
+
           {/* SAR imagery section */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -394,6 +468,38 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
             googleKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
           />
 
+          {/* River-gauge evidence: an independent physics estimate that does
+              not depend on radar seeing the water (validation/gauge_depth_check.py). */}
+          {gaugeDepth != null && (
+            <div style={{
+              marginBottom: 24, padding: '12px 14px', borderRadius: 'var(--r-md)',
+              background: gaugeConflict ? 'rgba(255,179,71,0.08)' : 'var(--wa-02)',
+              border: `1px solid ${gaugeConflict ? 'rgba(255,179,71,0.35)' : 'var(--wa-05)'}`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em', color: gaugeConflict ? '#FFB347' : 'var(--teal)', textTransform: 'uppercase' }}>
+                  {gaugeConflict ? 'River gauge disagrees with radar' : 'River gauge estimate'}
+                </span>
+                <strong style={{ fontSize: '1rem', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  {gaugeNear ? `${gaugeDepth.toFixed(1)} ft` : gaugeDepth > 0 ? `~${Math.round(gaugeDepth)} ft` : '0 ft'}
+                </strong>
+              </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.5 }}>
+                The {property.gauge_river || 'river'} crest, carried along the channel to this spot
+                {gaugeDist != null ? ` (${(gaugeDist / 1000).toFixed(1)} km from the channel)` : ''}, puts the
+                peak water surface {gaugeDepth > 0 ? `${gaugeDepth.toFixed(1)} ft above this ground level` : 'below this ground level'}.
+                {!gaugeNear && gaugeDepth > 0 && ' Beyond 1 km from the channel this reliably says water reached here, but the depth itself is rough.'}
+                {gaugeConflict && ' Radar saw no water here, so this is a possible missed claim: worth a review before closing.'}
+              </div>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
+                NOAA gauge crest + USGS 1 m lidar ground. Models main-river flooding only, not rain ponding.
+                Tested against USGS surveyed high-water marks on three storms (including a pre-registered test on
+                Hurricane Florence): it found water at most flooded sites near gauged rivers, far more than radar;
+                depth is within a few feet near the channel and rougher farther out.
+              </div>
+            </div>
+          )}
+
           {/* Measurements */}
           <div style={{ marginBottom: 24 }}>
             <div style={{
@@ -411,6 +517,25 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   <Mrow label="Max Flood Depth"   value={depthLabel} />
+                  {/* Phase 2: depth-damage curves take depth above the FIRST
+                      FLOOR, not above ground. The two differ by the foundation
+                      height, so both are shown with the source of the
+                      adjustment — an adjuster can see exactly which number
+                      drove the call. Absent (not zero) when unknown. */}
+                  <Mrow label="First-Floor Height"
+                        tech={firstFloorSource || 'USACE National Structure Inventory'}
+                        value={firstFloorHeight != null
+                          ? `${firstFloorHeight.toFixed(2)} ft${foundationType ? ` (${foundationType})` : ''}`
+                          : unavailable('no matched structure — NSI is US-only')} />
+                  <Mrow label="Depth Above First Floor"
+                        tech="water depth minus foundation height"
+                        value={depthAboveFfe != null
+                          ? `${depthAboveFfe.toFixed(2)} ft`
+                          : unavailable('first-floor height unknown')} />
+                  <Mrow label="Height Above Nearest Drainage" tech="HAND, MERIT Hydro"
+                        value={handFt != null
+                          ? `${handFt.toFixed(1)} ft`
+                          : unavailable('no HAND coverage here')} />
                   <Mrow label="Flooded Area" tech="SAR amplitude change" value={`${pct}%`} />
                   <Mrow label="Confidence Score"   value={`${conf}%`} />
                   <Mrow label="Water Visible from Optical" tech="Sentinel-2 MNDWI"
@@ -518,7 +643,7 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
               padding: '13px 15px',
             }}>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', color: '#D4B068', textTransform: 'uppercase', marginBottom: 5 }}>
-                Estimated Claim Severity
+                {netCalibrated ? 'Estimated Insured Loss (net of policy terms)' : 'Estimated Claim Severity'}
               </div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                 {sevMid != null ? `$${sevMid.toLocaleString()}` : `$${sevLow.toLocaleString()} – $${sevHigh.toLocaleString()}`}
@@ -528,10 +653,45 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                   range ${sevLow.toLocaleString()} – ${sevHigh.toLocaleString()}
                 </div>
               )}
-              <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
-                Depth-damage curve × dwelling coverage; range reflects depth uncertainty.
-                Reserving aid, not an adjuster estimate.
-              </div>
+              {netCalibrated ? (
+                <>
+                  {claimP10 != null && claimP90 != null && (
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+                      a single claim at this depth: ${claimP10.toLocaleString()} – ${claimP90.toLocaleString()} (10th–90th percentile)
+                    </div>
+                  )}
+                  {stormFactor != null && (
+                    <div style={{ fontSize: '0.66rem', color: 'var(--teal)', marginTop: 4 }}>
+                      Calibrated to this storm's settled claims (×{stormFactor}).
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.45 }}>
+                    Built from 100,000+ real settled flood claims, then your deductible, valuation basis and limit.
+                    The range reflects depth uncertainty. The estimate is for a claim that is filed
+                    {grossMid != null ? `; the gross physical damage before policy terms is $${grossMid.toLocaleString()} on the older national curve.` : '.'}
+                  </div>
+                  {property.net_outside_calibration_region && (
+                    <div style={{ fontSize: '0.64rem', color: '#FFB347', marginTop: 5, lineHeight: 1.45 }}>
+                      Outside the United States: this model is calibrated on US flood-insurance claims and has not
+                      been validated here. Treat it as indicative until calibrated to local settled claims.
+                    </div>
+                  )}
+                  {assumedTerms.length > 0 && (
+                    <div style={{ fontSize: '0.64rem', color: '#FFB347', marginTop: 5, lineHeight: 1.45 }}>
+                      Assumed because they were not in the uploaded file: {assumedTerms.join('; ')}. Add these columns for a firmer number.
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 5, lineHeight: 1.45 }}>
+                    Tested on four later storms: before calibration a storm's total was typically within about 20%,
+                    individual claims are rough. Reserving aid, not an adjuster estimate.
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>
+                  Depth-damage curve × dwelling coverage; range reflects depth uncertainty.
+                  Reserving aid, not an adjuster estimate.
+                </div>
+              )}
             </div>
           )}
 
@@ -932,6 +1092,20 @@ function verdictBtn(active, color) {
     color: active ? color : 'var(--text-secondary)',
     transition: 'all 0.15s ease',
   };
+}
+
+/* Plain-language provenance for the calibrated probability — built from what
+   the backend actually reports, never a hardcoded data-source claim. */
+function calibrationNote(property) {
+  const src = property.flood_probability_source;
+  const labels = property.flood_probability_label_source;
+  const labelText = labels && /NFIP/i.test(labels) ? 'FEMA NFIP flood-insurance claims'
+                  : labels ? labels.split(' — ')[0] : 'FEMA claims ground truth';
+  const fitted = src ? ` fitted on the ${src.charAt(0).toUpperCase() + src.slice(1)} event` : '';
+  const borrowed = property.flood_probability_borrowed === true || property.flood_probability_borrowed === 1;
+  return `Calibrated against ${labelText}${fitted}.${borrowed
+    ? ' This analysis has no calibration of its own, so it borrows that fit; treat it as indicative.'
+    : ''} Labels are zip-code resolution, so this is a calibrated area-level estimate, not a per-house verification.`;
 }
 
 function parseJsonField(value) {

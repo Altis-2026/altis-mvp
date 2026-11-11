@@ -48,13 +48,14 @@ from backend.database import (
     save_run, list_runs, update_run_status,
 )
 from backend.priority import rank_dispatch
+from backend.calibrated_confidence import attach_flood_probability
 from backend.geocoder import geocode_batch
 from backend.gee_service import get_flood_tile_url, get_sar_thumbnails
 from backend.ingestion import (
     parse_upload, suggest_column_mapping, apply_mapping,
     build_preview, IngestionError,
 )
-from pipeline.config import EVENTS
+from pipeline.config import EVENTS, ASSUMED_COST_PER_FIELD_VISIT_USD
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Free public-data integrations (satellite passes, river gauges, event library).
+from backend.free_data_api import router as free_data_router  # noqa: E402
+app.include_router(free_data_router)
+
 # GEE tile URL cache (generated once per server start if GEE available)
 _tile_cache: dict = {}
 
@@ -148,10 +153,15 @@ def get_properties(event_id: str):
             if isinstance(v, float) and (v != v):  # NaN check
                 p[k] = None
 
+    # Calibrated P(flooded) from this event's own FEMA-fitted calibrator when
+    # one exists. Absent (not zero, not guessed) until validation has run.
+    calib_prov = attach_flood_probability(properties, event_id)
+
     return {
         "event_id":   event_id,
         "properties": properties,
         "stats":      get_event_stats(df),
+        "calibration": calib_prov,
     }
 
 
@@ -265,6 +275,42 @@ async def upload_portfolio(file: UploadFile = File(...)):
     }
 
 
+def _money_or_none(v):
+    s = str(v if v is not None else '').replace(',', '').replace('$', '').strip()
+    if not s or s.lower() in ('nan', 'none', 'null', 'n/a', '-'):
+        return None
+    try:
+        x = float(s)
+    except ValueError:
+        return None
+    return x if x >= 0 else None
+
+
+def _parse_valuation(v):
+    """'RCV'/'ACV' from the many ways a policy admin system writes it; None if unclear."""
+    s = str(v or '').strip().lower()
+    if s in ('r', 'rc', 'rcv', 'replacement', 'replacement cost', 'replacement cost value'):
+        return 'RCV'
+    if s in ('a', 'acv', 'actual cash value', 'actual cash', 'cash value'):
+        return 'ACV'
+    return None
+
+
+def _parse_policy_terms(row: dict) -> dict:
+    """Optional per-policy terms from an upload row. Only fields actually
+    present are returned, so anything missing is treated as unknown (and later
+    labelled as assumed), never silently defaulted to zero."""
+    out = {}
+    for key in ('deductible', 'replacement_cost', 'acv_value', 'contents_coverage_amount', 'contents_deductible'):
+        v = _money_or_none(row.get(key))
+        if v is not None:
+            out[key] = v
+    val = _parse_valuation(row.get('valuation_basis'))
+    if val:
+        out['valuation_basis'] = val
+    return out
+
+
 @app.post("/api/portfolio/{upload_id}/confirm")
 async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
     """
@@ -328,6 +374,7 @@ async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
         except ValueError:
             coverage_amount = 0
 
+        terms = _parse_policy_terms(row)
         prop = {
             'property_id':     f"PORT-{portfolio_id}-{str(r['i']+1).zfill(4)}",
             'policy_number':   str(row.get('policy_number', '') or ''),
@@ -339,6 +386,10 @@ async def confirm_portfolio_upload(upload_id: str, body: dict = Body(...)):
             'state':           str(row.get('state', '') or ''),
             'zip':             str(row.get('zip', '') or ''),
         }
+        if terms:
+            prop['terms'] = terms
+            if terms.get('contents_coverage_amount'):
+                prop['contents_coverage_amount'] = terms['contents_coverage_amount']
 
         if r['lat'] is not None and r['lon'] is not None:
             prop['latitude']  = r['lat']
@@ -456,6 +507,7 @@ async def analyze_portfolio(portfolio_id: str, event_id: str,
             }
         results.append(result)
 
+    attach_flood_probability(results, event_id)
     save_analysis_results(portfolio_id, event_id, results)
 
     return {
@@ -471,12 +523,14 @@ async def analyze_portfolio(portfolio_id: str, event_id: str,
 def get_storm_track(event_id: str):
     """
     NHC best-track overlay (simplified, public-domain HURDAT2) for events that
-    have one. 404 for events without a track — the UI just draws nothing.
+    have one. Events without a track (river floods, live analysis) get an
+    empty FeatureCollection rather than a 404, so the browser console stays
+    clean; the UI simply draws nothing.
     """
     from backend.storm_tracks import storm_track_geojson
     gj = storm_track_geojson(event_id)
     if gj is None:
-        raise HTTPException(404, f"No storm track available for '{event_id}'.")
+        return {"type": "FeatureCollection", "features": []}
     return gj
 
 
@@ -579,6 +633,42 @@ def analyze_portfolio_live_endpoint(portfolio_id: str, body: dict = Body(...)):
                                  f"(days before/after the event date).")
 
     results = out['results'] + excluded
+
+    # Calibrated P(flooded) per property, replayed from a calibrator fitted
+    # against real FEMA ground truth (validation/accuracy_check.py). Live runs
+    # have no disaster of their own, so this borrows a fitted event's
+    # calibration and records which one. Silently absent (never fabricated)
+    # until a calibration has actually been fitted.
+    calib_prov = attach_flood_probability(results, None)
+    if calib_prov:
+        out['meta']['calibration'] = calib_prov
+
+    # River-gauge evidence (US): independent of radar, so it can flag
+    # properties the satellite missed. Never fails the run.
+    from backend.gauges import attach_gauge_depth_live
+    gauge_meta = attach_gauge_depth_live(results, out['meta'].get('windows') or windows)
+    if gauge_meta:
+        out['meta']['gauges'] = gauge_meta
+
+    # Grow the event library with this run so later analog searches see it.
+    try:
+        from backend.event_library import record_altis_run
+        pts = [r for r in results if r.get('latitude') is not None and r.get('impact_class')
+               and r.get('impact_class') != 'No Coverage']
+        if pts:
+            counts = {}
+            for r in pts:
+                counts[r['impact_class']] = counts.get(r['impact_class'], 0) + 1
+            record_altis_run(
+                name=str(body.get('label', 'Live analysis')),
+                lat=sum(float(r['latitude']) for r in pts) / len(pts),
+                lon=sum(float(r['longitude']) for r in pts) / len(pts),
+                event_date=event_date, cause=body.get('cause'),
+                summary={'portfolio_id': portfolio_id, 'n_analyzed': len(pts), 'classes': counts,
+                         'gauge_conflicts': (gauge_meta or {}).get('n_conflicts')})
+    except Exception as e:  # noqa: BLE001 — library bookkeeping must never fail a run
+        print(f"  [library] could not record run: {e}")
+
     save_analysis_results(portfolio_id, 'live', results)
     save_analysis_meta(portfolio_id, 'live', out['meta'])
     if event_date:
@@ -601,6 +691,9 @@ def get_results(portfolio_id: str, event_id: str):
     results = get_analysis_results(portfolio_id, event_id)
     if not results:
         raise HTTPException(404, "No analysis results found. Run analyze first.")
+    # Live runs already persisted a calibrated probability; re-attaching is
+    # idempotent and backfills rows analysed before a calibration existed.
+    attach_flood_probability(results, None if event_id == 'live' else event_id)
     return {
         "portfolio_id": portfolio_id,
         "event_id":     event_id,
@@ -767,7 +860,7 @@ def _portfolio_stats(results: list) -> dict:
         'dispatch':         dispatch,
         'remote_total':     remote,
         'review':           review,
-        'estimated_savings': remote * 750,
+        'estimated_savings': remote * ASSUMED_COST_PER_FIELD_VISIT_USD,
     }
 
 
@@ -833,6 +926,7 @@ def get_dispatch_queue(event_id: str, classes: str = "Dispatch,Review"):
                 p[k] = None
 
     queue = rank_dispatch(records, classes=wanted)
+    attach_flood_probability(queue, event_id)
     return {
         "event_id":  event_id,
         "count":     len(queue),

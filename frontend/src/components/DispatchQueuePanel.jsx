@@ -40,7 +40,16 @@ export default function DispatchQueuePanel({
     [portfolioProps, hasPortfolio]
   );
 
-  const queue = source === 'event' ? eventQueue : portfolioQueue;
+  // Possible missed claims: the river-gauge crest puts >= 1 ft of water here
+  // but radar saw none. Ranked by gauge depth; not a triage decision.
+  const missedQueue = useMemo(() => {
+    const rows = [...eventProperties, ...(hasPortfolio ? portfolioProps : [])]
+      .filter(p => p.gauge_conflict == 1)
+      .sort((a, b) => (+b.gauge_depth_ft || 0) - (+a.gauge_depth_ft || 0));
+    return rows.map((p, i) => ({ ...p, priority_rank: i + 1, priority_score: +p.gauge_depth_ft || 0 }));
+  }, [eventProperties, portfolioProps, hasPortfolio]);
+
+  const queue = source === 'event' ? eventQueue : source === 'missed' ? missedQueue : portfolioQueue;
   const maxScore = queue.length ? queue[0].priority_score || 1 : 1;
   const label = source === 'event' ? eventLabel : portfolioLabel;
 
@@ -57,15 +66,15 @@ export default function DispatchQueuePanel({
           Ranked by severity × coverage
         </div>
 
-        {hasEvent && hasPortfolio && (
+        {((hasEvent && hasPortfolio) || missedQueue.length > 0) && (
           <div style={{ display: 'flex', gap: 4, marginTop: 10, background: 'var(--wa-03)', borderRadius: 'var(--r-sm)', padding: 3 }}>
-            {['event', 'portfolio'].map(s => (
+            {[hasEvent && 'event', hasPortfolio && 'portfolio', missedQueue.length > 0 && 'missed'].filter(Boolean).map(s => (
               <button key={s} onClick={() => setSource(s)} style={{
                 flex: 1, padding: '6px 0', borderRadius: 4, fontSize: '0.68rem', fontWeight: 700,
                 background: source === s ? 'rgba(168,212,230,0.12)' : 'transparent',
                 border: 'none', color: source === s ? 'var(--teal)' : 'var(--text-muted)',
                 cursor: 'pointer', fontFamily: 'var(--font)', textTransform: 'capitalize',
-              }}>{s}</button>
+              }}>{s === 'missed' ? `Possible missed (${missedQueue.length})` : s}</button>
             ))}
           </div>
         )}
@@ -82,9 +91,15 @@ export default function DispatchQueuePanel({
           </div>
         )}
 
-        {!loading && queue.length > 0 && (
+        {!loading && queue.length > 0 && source !== 'missed' && (
           <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', margin: '0 6px 8px' }}>
             {queue.length} properties prioritized {label ? `for ${label}` : ''}
+          </div>
+        )}
+        {!loading && source === 'missed' && (
+          <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', margin: '0 6px 8px', lineHeight: 1.45 }}>
+            Radar saw no water, but the river-gauge crest puts at least 1 ft above ground here.
+            Worth a review before closing. Ranked by gauge depth; how many are real claims has not been measured yet.
           </div>
         )}
 
@@ -117,14 +132,16 @@ export default function DispatchQueuePanel({
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 3 }}>
                     <span className={`badge badge-${p.impact_class}`} style={{ fontSize: '0.58rem', padding: '1px 5px' }}>{p.impact_class}</span>
                     <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
-                      {parseFloat(p.max_depth_ft || 0).toFixed(1)}ft
+                      {source === 'missed'
+                        ? `radar dry · gauge ${parseFloat(p.gauge_depth_ft || 0).toFixed(1)} ft`
+                        : `${parseFloat(p.max_depth_ft || 0).toFixed(1)}ft`}
                       {p.coverage_amount > 0 && ` · $${(p.coverage_amount / 1000).toFixed(0)}k`}
                       {` · ${p.confidence_score || 0}%`}
                     </span>
                   </div>
                 </div>
                 <span style={{ flexShrink: 0, fontSize: '0.74rem', fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>
-                  {Math.round(p.priority_score)}
+                  {source === 'missed' ? `${(+p.priority_score).toFixed(1)}′` : Math.round(p.priority_score)}
                 </span>
               </div>
               <div style={{ height: 3, borderRadius: 2, marginTop: 8, background: 'var(--wa-05)', overflow: 'hidden' }}>

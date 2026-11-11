@@ -10,7 +10,7 @@ from openai import OpenAI
 import json
 import math
 import time
-from config import (OPENROUTER_API_KEY, HARVEY, IAN, TRIAGE, OUTPUT_DIR,
+from config import (OPENROUTER_API_KEY, HARVEY, BRAZOS, TRIAGE, OUTPUT_DIR,
                     PIPELINE_VERSION, OPTICAL, ENSEMBLE)
 from provenance import write_manifest
 from uncertainty import depth_interval_ft
@@ -101,34 +101,94 @@ def generate_notes_batch(batch_rows):
         return fallback
 
 
+# After this many consecutive LLM failures, stop trying for the rest of the
+# run and go straight to the deterministic note generator.
+#
+# WHY: the failure that matters here is the endpoint being unreachable
+# (no API key, no egress, provider down), which fails identically for every
+# batch. On a 4,000-property portfolio that is 200 doomed HTTP calls, each
+# paying a full connection timeout, to produce exactly the fallback text we
+# would have written instantly. Observed adding tens of minutes to a run whose
+# real work was already done. A transient blip still recovers, because the
+# counter resets on any success.
+LLM_GIVE_UP_AFTER = 3
+
+
+def _fallback_note(row):
+    street = row['address'].split(',')[0]
+    return (f"Satellite data at {street} indicates {row['max_depth_ft']:.1f}ft depth; "
+            f"{row['impact_class'].lower()} per {row['confidence_score']}% confidence.")
+
+
 def add_adjuster_notes(df):
     BATCH_SIZE = 20
     all_notes  = []
     rows       = df.to_dict('records')
     print(f"  Generating notes for {len(rows)} properties...")
 
+    consecutive_failures = 0
+    llm_available = client is not None
+    if not llm_available:
+        print("  No OPENROUTER_API_KEY configured — using deterministic notes.")
+
     for i in range(0, len(rows), BATCH_SIZE):
         batch = rows[i : i + BATCH_SIZE]
-        try:
-            notes = generate_notes_batch(batch)
-            all_notes.extend(notes)
-        except Exception as e:
-            print(f"  Claude API batch error: {e}. Using fallback.")
-            for row in batch:
-                street = row['address'].split(',')[0]
-                all_notes.append(
-                    f"Satellite data at {street} indicates {row['max_depth_ft']:.1f}ft depth; "
-                    f"{row['impact_class'].lower()} per {row['confidence_score']}% confidence."
-                )
+
+        if llm_available:
+            try:
+                all_notes.extend(generate_notes_batch(batch))
+                consecutive_failures = 0
+            except Exception as e:
+                consecutive_failures += 1
+                print(f"  Claude API batch error: {e}. Using fallback.")
+                all_notes.extend(_fallback_note(r) for r in batch)
+                if consecutive_failures >= LLM_GIVE_UP_AFTER:
+                    llm_available = False
+                    print(f"  {consecutive_failures} consecutive API failures — "
+                          f"generating the remaining "
+                          f"{len(rows) - min(i + BATCH_SIZE, len(rows))} notes "
+                          f"deterministically without further API calls.")
+        else:
+            all_notes.extend(_fallback_note(r) for r in batch)
 
         processed = min(i + BATCH_SIZE, len(rows))
         if processed % 100 == 0 or processed == len(rows):
             print(f"  Progress: {processed}/{len(rows)}")
-        time.sleep(0.6)
+        if llm_available:
+            time.sleep(0.6)
 
     df = df.copy()
     df['adjuster_note'] = all_notes
     return df
+
+
+def _crest_verdict(event_id):
+    """
+    The crest-timing verdict recorded by this event's detection run.
+
+    Returns 'unknown' when the manifest is missing, unreadable, or predates the
+    crest check. That is the safe direction: 'unknown' blocks Remote-Deny, so a
+    stale or absent manifest cannot silently re-enable denials on a flood the
+    satellite never observed.
+
+    write_manifest nests each stage, so the value lives at
+    stages.flood_detection.crest_observed. Reading the top level instead
+    returns None and pins every event to 'unknown', which would block
+    Remote-Deny forever — safe, but it makes the gate useless rather than
+    selective, so the path is asserted by test rather than assumed.
+    """
+    path = os.path.join(OUTPUT_DIR, f'{event_id}_manifest.json')
+    try:
+        with open(path) as fh:
+            manifest = json.load(fh)
+    except (OSError, ValueError):
+        return 'unknown'
+    stages = manifest.get('stages')
+    if isinstance(stages, dict):
+        detection = stages.get('flood_detection')
+        if isinstance(detection, dict) and detection.get('crest_observed'):
+            return detection['crest_observed']
+    return 'unknown'
 
 
 def run_triage_pipeline(event_config):
@@ -182,8 +242,18 @@ def run_triage_pipeline(event_config):
     print(f"  Mean: {df['confidence_score'].mean():.0f}%  "
           f"Urban-penalized: {urban_penalized}")
 
+    # The detection run recorded whether the satellite actually observed the
+    # flood crest. Remote-Deny is the only class that acts on the ABSENCE of a
+    # signal, so it is the only one whose correctness depends on that. Anything
+    # other than 'observed' downgrades those to Review rather than denying on a
+    # pass that flew days off the peak.
+    crest = _crest_verdict(event_id)
     print("\nStep 2: Triage classification...")
-    results = df.apply(lambda r: classify_triage(r, TRIAGE), axis=1)
+    if crest != 'observed':
+        print(f"  crest_observed = {crest!r} → Remote-Deny is BLOCKED for this "
+              f"event; those properties become Review")
+    results = df.apply(lambda r: classify_triage(r, TRIAGE,
+                                                 crest_observed=crest), axis=1)
     df['impact_class']       = results.apply(lambda x: x[0])
     df['recommended_action'] = results.apply(lambda x: x[1])
 
@@ -227,7 +297,14 @@ def run_triage_pipeline(event_config):
         'impact_class', 'confidence_score', 'recommended_action',
         'adjuster_note', 'urban_flag', 'optical_available', 'optical_water_pct',
         'confidence_factors', 'ensemble_disagreement', 'ensemble_note',
-        'ensemble_votes'
+        'ensemble_votes',
+        # Phase 4a: graded sub-pixel water fraction, carried through so
+        # validation can score on it instead of the all-or-nothing mask.
+        'water_fraction',
+        # Phase 4b: dual-pol water score plus the flag saying whether a VH
+        # baseline existed at all, so validation can tell "measured, dry" from
+        # "never measured".
+        'dpol_water', 'dpol_available',
     ]
     final_df = df[[c for c in final_cols if c in df.columns]].copy()
 
@@ -252,5 +329,13 @@ def run_triage_pipeline(event_config):
 
 if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    run_triage_pipeline(HARVEY)
-    run_triage_pipeline(IAN)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--event', action='append', choices=['harvey', 'brazos'],
+                        help='Run only this event (repeatable). Default: both.')
+    args = parser.parse_args()
+    events = args.event or ['harvey', 'brazos']
+    if 'harvey' in events:
+        run_triage_pipeline(HARVEY)
+    if 'brazos' in events:
+        run_triage_pipeline(BRAZOS)

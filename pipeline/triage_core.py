@@ -23,6 +23,27 @@ except ImportError:  # pragma: no cover - import path guard
 CONFIDENCE_BASE = 65
 
 
+def _as_float(value):
+    """Parse a measurement to float, treating None/NaN/garbage as 'unknown'."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if math.isnan(v) else v
+
+
+def _hand_cfg(key):
+    """
+    Read a HAND threshold. Imported lazily so this module keeps working against
+    an older config.py that predates the HAND block.
+    """
+    try:
+        from config import HAND
+    except ImportError:  # pragma: no cover - import path guard
+        from pipeline.config import HAND
+    return HAND[key]
+
+
 def confidence_breakdown(row, event_config):
     """
     The 'why this decision' explainability view: returns the confidence score
@@ -142,10 +163,25 @@ def calculate_confidence(row, event_config):
     return confidence_breakdown(row, event_config)['final_score']
 
 
-def classify_triage(row, thresholds=TRIAGE):
+def classify_triage(row, thresholds=TRIAGE, crest_observed=None):
     """
     Assign property to one of four triage categories.
     Returns (impact_class, recommended_action).
+
+    `crest_observed` is the event-level verdict from `crest_timing.assess`
+    ('observed' / 'partial' / 'missed' / 'unknown'). Anything other than
+    'observed' BLOCKS Remote-Deny and downgrades it to Review.
+
+    WHY THIS GATE EXISTS. Remote-Deny is the only class that acts on the
+    ABSENCE of a signal, so it is the only one whose correctness depends on the
+    satellite having actually looked at the right moment. Sentinel-1 revisits
+    every 6-12 days and a crest lasts hours; measured on our own events, the
+    Brazos crested 40.9 hours after the nearest pass. A "no flood detected"
+    from that pass is not evidence the property stayed dry, and turning it into
+    a denial is how a genuinely flooded house gets refused.
+
+    Passing None keeps the historical behaviour, so callers that have not been
+    updated do not silently change — but the batch pipeline supplies it.
     """
     depth = row['max_depth_ft']
     pct   = row['pct_flooded']
@@ -162,6 +198,12 @@ def classify_triage(row, thresholds=TRIAGE):
     if (depth <= t['remote_deny_depth_ft'] and
             pct   <= t['remote_deny_pct'] and
             conf  >= t['remote_deny_conf']):
+        if crest_observed is not None and crest_observed != 'observed':
+            return ('Review',
+                    'Flag for manual review — no flooding detected, but the '
+                    'satellite did not observe the flood crest '
+                    f'({crest_observed}), so the absence of a signal is not '
+                    'evidence this property stayed dry')
         return 'Remote-Deny', 'Deny remotely — no significant flooding detected by satellite'
 
     if (t['remote_approve_min_depth'] <= depth <= t['remote_approve_max_depth'] and
@@ -192,21 +234,29 @@ def ensemble_votes(row, cfg=ENSEMBLE):
     else:
         optical = 'abstain'
 
-    rel = row.get('rel_elev_ft', None)
-    try:
-        rel = float(rel)
-        rel_known = not (isinstance(rel, float) and math.isnan(rel))
-    except (TypeError, ValueError):
-        rel_known = False
-    if rel_known:
-        if rel <= cfg['dem_plausible_rel_ft']:
+    # DEM-hydrology vote. HAND (height above the nearest drainage channel) is
+    # the hydrologically correct terrain descriptor and takes precedence when
+    # present. The old relative-elevation heuristic — height above the minimum
+    # within a fixed circle — remains the fallback for rows produced before
+    # HAND existed and for locations MERIT Hydro doesn't cover.
+    #
+    # The distinction matters most on flat coastal ground, where nearly every
+    # parcel sits within a few feet of its neighbourhood minimum, so the old
+    # measure abstained almost everywhere it was needed most.
+    dem = 'abstain'
+    hand = _as_float(row.get('hand_ft'))
+    if hand is not None:
+        if hand <= _hand_cfg('plausible_ft'):
             dem = 'flood'
-        elif rel >= cfg['dem_implausible_rel_ft']:
+        elif hand >= _hand_cfg('implausible_ft'):
             dem = 'dry'
-        else:
-            dem = 'abstain'
     else:
-        dem = 'abstain'
+        rel = _as_float(row.get('rel_elev_ft'))
+        if rel is not None:
+            if rel <= cfg['dem_plausible_rel_ft']:
+                dem = 'flood'
+            elif rel >= cfg['dem_implausible_rel_ft']:
+                dem = 'dry'
 
     return {'sar': sar, 'optical': optical, 'dem_hydrology': dem}
 

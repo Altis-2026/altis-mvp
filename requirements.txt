@@ -21,3 +21,8 @@ pdfplumber>=0.11.0
 usaddress>=0.5.10
 rapidfuzz>=3.5.0
 reportlab>=4.0.0
+
+# Point-in-polygon labelling of structures against the USGS mapped flood
+# extent (validation/extent_check.py). Validation-only; the pipeline and the
+# backend do not import it.
+shapely>=2.0.0

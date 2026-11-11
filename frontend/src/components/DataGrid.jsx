@@ -21,6 +21,9 @@ const EVENT_COLUMNS = [
   { key: 'max_depth_ft',     label: 'Depth (ft)',  w: 95,  type: 'num' },
   { key: 'pct_flooded',      label: 'Area %',      w: 80,  type: 'num' },
   { key: 'confidence_score', label: 'Conf %',      w: 80,  type: 'num' },
+  { key: 'flood_probability', label: 'Flood prob %', w: 100, type: 'num' },
+  { key: 'gauge_depth_ft',   label: 'Gauge depth (ft)', w: 120, type: 'num' },
+  { key: 'gauge_conflict',   label: 'Gauge≠radar', w: 100, type: 'num' },
   { key: 'adjuster_note',    label: 'Adjuster note', w: 320, type: 'text' },
 ];
 const PORTFOLIO_COLUMNS = [
@@ -31,6 +34,7 @@ const PORTFOLIO_COLUMNS = [
   { key: 'impact_class',     label: 'Triage',      w: 130, type: 'badge' },
   { key: 'max_depth_ft',     label: 'Depth (ft)',  w: 95,  type: 'num' },
   { key: 'confidence_score', label: 'Conf %',      w: 80,  type: 'num' },
+  { key: 'flood_probability', label: 'Flood prob %', w: 100, type: 'num' },
   { key: 'adjuster_note',    label: 'Adjuster note', w: 300, type: 'text' },
 ];
 

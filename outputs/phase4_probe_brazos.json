@@ -1,0 +1,59 @@
+{
+  "event": "brazos",
+  "orbit": "DESCENDING",
+  "radius_m": 50,
+  "post_scenes": 3,
+  "baseline_scenes": 59,
+  "s2_scenes": 7,
+  "marks": 28,
+  "sites": 18,
+  "mean_vv_z_at_marks": 0.3390055808676916,
+  "signals": {
+    "open_water": {
+      "marks": 0,
+      "n_marks": 28,
+      "sites": 0,
+      "n_sites": 18,
+      "bbox_fraction": 0.002369365647123943,
+      "recall": 0.0,
+      "lift": 0.0
+    },
+    "subpixel": {
+      "marks": 6,
+      "n_marks": 28,
+      "sites": 3,
+      "n_sites": 18,
+      "bbox_fraction": 0.05714280184725624,
+      "recall": 0.21428571428571427,
+      "lift": 3.750003628777321
+    },
+    "dualpol": {
+      "marks": 0,
+      "n_marks": 28,
+      "sites": 0,
+      "n_sites": 18,
+      "bbox_fraction": 0.003987983031426102,
+      "recall": 0.0,
+      "lift": 0.0
+    },
+    "double_bounce": {
+      "marks": 0,
+      "n_marks": 28,
+      "sites": 0,
+      "n_sites": 18,
+      "bbox_fraction": 0.00018363283263231038,
+      "recall": 0.0,
+      "lift": 0.0
+    },
+    "optical": {
+      "marks": 7,
+      "n_marks": 28,
+      "sites": 3,
+      "n_sites": 18,
+      "bbox_fraction": 0.03843745742520031,
+      "recall": 0.25,
+      "lift": 6.5040722448018995
+    }
+  },
+  "caveat": "HWMs define no negative class, so recall alone cannot rank these. bbox_fraction is a dry-land false-positive proxy and lift = recall / bbox_fraction is the comparable number."
+}

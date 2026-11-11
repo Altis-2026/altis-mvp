@@ -9,6 +9,13 @@ load_dotenv()
 PIPELINE_VERSION = '1.0.0'
 
 # ─── GOOGLE EARTH ENGINE ─────────────────────────────────────────────────────
+# ILLUSTRATIVE cost of one field adjuster visit, used for "truck rolls avoided"
+# savings everywhere (scoreboard, ROI calculator, audit PDF, assistant). It is an
+# assumption, not a measurement: the app lets the user replace it with the
+# carrier's own number. 450 is the conservative of the two figures previously
+# hard-coded in different places (450 and 750), so savings are not overstated.
+ASSUMED_COST_PER_FIELD_VISIT_USD = 450
+
 GEE_PROJECT = os.getenv('GEE_PROJECT', 'altis-mvp')
 
 # Path to a GEE service-account JSON key. When set (and the file exists), the
@@ -54,43 +61,101 @@ HARVEY = {
     'event_name':         'Hurricane Harvey',
     'event_id':           'harvey',
     'label':              'Hurricane Harvey',
-    'sub':                'Harris County, TX  •  August 2017',
+    'sub':                'Addicks/Barker Reservoir area, Harris County, TX  •  August 2017',
     'county':             'Harris County, TX',
     'pre_start':          '2017-08-01',
     'pre_end':            '2017-08-24',
     'post_start':         '2017-08-27',
     'post_end':           '2017-09-10',
-    # Bounding box [west, south, east, north] — Meyerland + Braeswood (most documented Harvey flooding)
-    'bbox':               [-95.60, 29.62, -95.38, 29.80],
-    'study_name':         'Meyerland and Braeswood, Houston TX',
+    # Bounding box [west, south, east, north] — the Addicks/Barker Reservoir
+    # corridor and surrounding west/northwest Houston. Measured SAR flood-mask
+    # coverage at the reservoir edge is 0.68-2.65% per scene versus 0.00-0.02%
+    # for the original Meyerland/Braeswood box (0.18% over that box's full
+    # extent) — open, low-vegetation reservoir-adjacent terrain is SAR's
+    # strongest case, dense suburb under tree canopy its worst. See
+    # docs/DETECTION_LIMITS.md for the measurements behind this change.
+    #
+    # Widened from the tight [-95.72, 29.75, -95.60, 29.85] reservoir-edge box.
+    # WHY: validation correlates per-ZIP flood rate against per-ZIP NFIP claim
+    # rate, so it needs CONTRAST — zips that flooded badly and zips that barely
+    # did. The tight box gave 8 zips that ALL cleared the ground-truth
+    # threshold, leaving no negative class to correlate against or calibrate
+    # on, and 542 of 1000 properties landed in a single zip. This box spans
+    # west and northwest Houston either side of the Addicks/Barker pools,
+    # covering both the neighborhoods that flooded on reservoir release and
+    # surrounding ones that stayed dry.
+    'bbox':               [-95.88, 29.66, -95.46, 30.00],
+    'study_name':         'West & Northwest Houston (Addicks/Barker corridor), TX',
     'days_since_event':   3,
     'wse_radius_m':       300,    # Water surface elevation focal radius — tighter for rainfall flooding
-    'cost_per_inspection': 750,
-    'lat':                29.700,
-    'lon':               -95.500,
+    # Sample a 50m buffer centered on the real structure point instead of the
+    # Phase 2 footprint-tight circle. Measured directly here: of 32,607
+    # residential structures in this bbox, only 1 has a detected flood pixel
+    # literally under its own footprint; widening to 50m finds real signal at
+    # 15. Residential lots are graded so the building sits on the highest
+    # ground; flood water reaches the yard, driveway, and street first. A
+    # buffer captures that claims-relevant exposure; the tight footprint
+    # (the default everywhere else) captures only water under the roof.
+    # See docs/DETECTION_LIMITS.md.
+    'exposure_radius_m':  50,
+    'cost_per_inspection': ASSUMED_COST_PER_FIELD_VISIT_USD,
+    'lat':                29.830,
+    'lon':               -95.670,
     'zoom':               10,
 }
 
-# ─── HURRICANE IAN CONFIGURATION ─────────────────────────────────────────────
-IAN = {
-    'event_name':         'Hurricane Ian',
-    'event_id':           'ian',
-    'label':              'Hurricane Ian',
-    'sub':                'Charlotte County, FL  •  September 2022',
-    'county':             'Charlotte County, FL',
-    'pre_start':          '2022-09-01',
-    'pre_end':            '2022-09-25',
-    'post_start':         '2022-09-28',
-    'post_end':           '2022-10-12',
-    # Bounding box [west, south, east, north] — Port Charlotte + Punta Gorda
-    'bbox':               [-82.15, 26.88, -81.92, 27.08],
-    'study_name':         'Port Charlotte and Punta Gorda, FL',
-    'days_since_event':   2,
-    'wse_radius_m':       600,    # Wider for storm surge (more spatially uniform WSE)
-    'cost_per_inspection': 750,
-    'lat':                26.970,
-    'lon':               -82.050,
-    'zoom':               10,
+# ─── HURRICANE IAN — REMOVED ─────────────────────────────────────────────────
+# Ian (Port Charlotte / Punta Gorda, Sept 2022) was dropped as a demo and
+# benchmark event. It is not a tuning problem and not fixable by relocating the
+# study area: Sentinel-1's first usable pass over the area was 2 October, four
+# days after the 28 September landfall, by which time the surge had receded.
+# Only ASCENDING scenes covered the window. The large dark fractions present in
+# those scenes (14-32% below -16 dB) are Port Charlotte's permanent canal
+# network and coastline — they show near-zero z-scores against a 12-month
+# baseline, i.e. they are dark all the time, not flooded.
+#
+# The satellite never observed the event, so no amount of detection work
+# recovers it. Keeping it as a demo meant repeatedly explaining a number that
+# could not improve. Measurements behind this: docs/DETECTION_LIMITS.md.
+#
+# The revisit-gap limitation Ian illustrates is real and still disclosed in the
+# product; it just no longer needs a broken demo event to represent it.
+
+# ─── BRAZOS RIVER FLOODPLAIN (HARVEY) CONFIGURATION ──────────────────────────
+# Second US validation area, same storm as HARVEY. The Brazos crested at a
+# record ~55 ft at Richmond on 1 September 2017, inundating the floodplain
+# through Richmond, Rosenberg, and Simonton.
+#
+# WHY THIS ONE: it is open riverine floodplain — SAR's strongest detection
+# case, the same physical setting as the Lismore event that has always worked
+# in this repo — and it is a genuinely independent second sample. Addicks and
+# Barker are reservoir-release flooding; the Brazos is river-crest flooding, so
+# agreement across both is stronger evidence than either alone. Measured flood
+# coverage here is 0.79-2.21% per scene (docs/DETECTION_LIMITS.md section 3).
+BRAZOS = {
+    'event_name':         'Hurricane Harvey — Brazos River',
+    'event_id':           'brazos',
+    'label':              'Harvey: Brazos River',
+    'sub':                'Fort Bend County, TX  •  August–September 2017',
+    'county':             'Fort Bend County, TX',
+    'pre_start':          '2017-08-01',
+    'pre_end':            '2017-08-24',
+    # The Brazos crested days AFTER Harvey's rainfall ended — river flooding
+    # lags the storm, unlike the reservoir releases in the HARVEY box. The post
+    # window is shifted later to cover the actual crest.
+    'post_start':         '2017-08-29',
+    'post_end':           '2017-09-12',
+    'bbox':               [-95.90, 29.45, -95.60, 29.72],
+    'study_name':         'Brazos River floodplain: Richmond, Rosenberg, Simonton TX',
+    'days_since_event':   3,
+    'wse_radius_m':       300,
+    # Same claims-relevant exposure standard as HARVEY — see that entry and
+    # docs/DETECTION_LIMITS.md section 6 for the measurements behind it.
+    'exposure_radius_m':  50,
+    'cost_per_inspection': ASSUMED_COST_PER_FIELD_VISIT_USD,
+    'lat':                29.585,
+    'lon':               -95.755,
+    'zoom':               11,
 }
 
 # ─── NORTHERN RIVERS (LISMORE) FLOODS CONFIGURATION ──────────────────────────
@@ -114,7 +179,7 @@ LISMORE = {
     'study_name':         'Richmond River floodplain: Lismore, Coraki, Woodburn, Broadwater',
     'days_since_event':   3,
     'wse_radius_m':       300,    # riverine flooding
-    'cost_per_inspection': 750,
+    'cost_per_inspection': ASSUMED_COST_PER_FIELD_VISIT_USD,
     'lat':               -28.94,
     'lon':               153.31,
     'zoom':               10,
@@ -134,7 +199,7 @@ EVENTS = {
         'bbox':  cfg['bbox'],          # zone-summary + globe event-zone box
         'event_date': cfg['post_start'],  # prefill for live analysis settings
     }
-    for cfg in (LISMORE, HARVEY, IAN)
+    for cfg in (LISMORE, HARVEY, BRAZOS)
 }
 
 # ─── TRIAGE THRESHOLDS ────────────────────────────────────────────────────────
@@ -177,6 +242,381 @@ SAR = {
     # certainly DEM/WSE artifacts, not real water. Depth is clamped here so a
     # single-family home never reports a 40-foot flood.
     'max_plausible_depth_ft': 20.0,
+}
+
+# ─── MULTI-TEMPORAL SAR BASELINE (Phase 1) ───────────────────────────────────
+# Replaces the single pre-event composite with a per-pixel statistical baseline
+# built from a long run of pre-event Sentinel-1 scenes.
+#
+# WHY: a single pre-event median can be skewed by one wet, windy, or
+# agriculturally disturbed scene, and there is no way to tell from the output
+# that it happened. With a mean and a standard deviation per pixel we can ask a
+# strictly better question — "is this pixel's post-event backscatter anomalous
+# RELATIVE TO ITS OWN NORMAL VARIABILITY?" — instead of "is it darker than one
+# arbitrary earlier picture?".
+#
+# The variance term also hands us a genuine per-pixel confidence for free:
+# permanently noisy pixels (vegetation, agriculture, rough water) need a much
+# larger drop before they count as flooded, while consistently stable pixels
+# (pavement, rooftops, bare ground) trip on a smaller one.
+#
+# Baselines are built PER ORBIT. Ascending and descending passes view the same
+# ground at different incidence angles and azimuths, so their backscatter
+# distributions are genuinely different — pooling them would inflate the
+# variance and blunt the whole method.
+BASELINE = {
+    'enabled':        True,
+    # 12 months captures a full seasonal cycle, so a flood isn't confused with
+    # normal seasonal wetness. Ends 2 days before the event window opens.
+    'months':          12,
+    'gap_days':        2,
+    # Below this many scenes the per-pixel std is not estimated reliably, and
+    # the detector falls back to the single pre-event composite. Sentinel-1's
+    # 6-12 day repeat gives ~30-60 scenes/year per orbit, so this is a floor
+    # for genuinely data-poor regions, not a normal operating point.
+    'min_scenes':      8,
+    # How many standard deviations below the baseline mean counts as a real
+    # change. 2.0 ≈ the 2.3rd percentile of a normal baseline.
+    'z_threshold':     2.0,
+    # Floor on the per-pixel std (dB). Without it, a pixel that happens to be
+    # near-constant across the baseline divides by ~0 and produces an enormous
+    # z-score from a physically trivial change.
+    'min_std_db':      0.8,
+    # Require BOTH the change test (z-score) and the absolute test (Otsu water
+    # threshold). Change alone flags any darkening — harvested fields, dry
+    # pavement after rain. Absolute alone is the old single-threshold method.
+    # Requiring both is what actually cuts false positives.
+    'require_absolute': True,
+}
+
+# ─── SUB-PIXEL WATER FRACTION (Phase 4a) ─────────────────────────────────────
+# The single change with the most leverage on RECALL, which measurement showed
+# is the binding constraint — not correctness.
+#
+# THE PROBLEM: the flood mask is binary per pixel. A property's exposure is the
+# mean of that mask over its sampling buffer, so at 30m a ~50m buffer covers
+# roughly nine pixels, and if none of them individually clears the open-water
+# threshold the property scores EXACTLY zero. Measured on the validation runs:
+# 3,978 of 4,000 Brazos properties and 3,948 of 4,000 Harvey properties scored
+# exactly 0.0. A calibrator handed a column that is 99.4% one identical value
+# has nothing to discriminate on, which is precisely why the Brier skill score
+# came out negative in both study areas despite honest zip-level agreement.
+#
+# THE PHYSICS: SAR backscatter in LINEAR POWER (not dB) mixes linearly by area
+# fraction within a resolution cell. For a pixel that is fraction f water and
+# (1-f) its normal dry self:
+#
+#     sigma_obs = f * sigma_water + (1 - f) * sigma_dry
+#     =>      f = (sigma_dry - sigma_obs) / (sigma_dry - sigma_water)
+#
+# We already have a per-pixel sigma_dry for free: the multi-temporal baseline
+# mean built in Phase 1. So this is a genuine physical unmixing against that
+# pixel's own measured normal state, not a tuned heuristic — a half-flooded
+# suburban lot that never reads as "open water" still returns a real, graded
+# ~0.5 instead of a zero.
+#
+# WHY THIS DOES NOT JUST INVENT SIGNAL: the fraction is only computed where the
+# darkening is statistically significant against that pixel's own baseline
+# variability. The gate is looser than the binary detector's (that is the
+# point — it is what recovers the partial cases) but it is still a gate, so
+# ordinary speckle does not produce spurious fractions everywhere.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# MEASURED RESULT: THIS DOES NOT WORK, AND IS DISABLED BY DEFAULT.
+#
+# It was implemented, run end to end on Brazos (4,000 properties, 15 zips,
+# 3,135 real NFIP claims), and measured against the same ground truth as
+# everything else. It did exactly what it was designed to do mechanically, and
+# that turned out to be worthless:
+#
+#   signal density   22 -> 1,441 properties nonzero (0.55% -> 36%)
+#   distinct scores  23 -> 602
+#   depth correlation      +0.366 -> +0.366   (unchanged)
+#   Brier                  0.1714 -> 0.1712   (unchanged)
+#   Brier skill score     -0.0366 -> -0.0354  (still negative)
+#
+# The direct test is damning: as a standalone predictor of whether a property's
+# zip actually flooded, the water fraction scores **AUC 0.4862** (0.5 is no
+# information at all) with Mann-Whitney p=0.92. It is fractionally MORE common
+# on dry-truth properties (36.9% nonzero) than on flooded-truth ones (33.5%).
+#
+# WHY, which is the part worth keeping: after a rain event of Harvey's scale
+# the whole region has saturated soil, and wet ground darkens C-band SAR in
+# the same direction and a similar magnitude as shallow standing water. The
+# loose z gate that is required to recover partial inundation is also loose
+# enough to admit soil moisture everywhere. Tightening it back to the binary
+# detector's threshold just reproduces the binary detector. Single-polarisation
+# amplitude at 30m simply does not separate "wet ground" from "standing water",
+# and no amount of tuning inside this method will change that — the information
+# is not in the measurement.
+#
+# The code and its tests are retained deliberately, not deleted: the physics is
+# correct (the unmixing recovers known fractions exactly), and the method is
+# sound where the confound is absent — dual-pol or polarimetric data, finer
+# resolution, or events without basin-wide antecedent rainfall. Turning it on
+# is a one-line change plus a re-validation. Shipping it enabled would inflate
+# apparent sensitivity 65x while adding zero accuracy, which is precisely the
+# kind of plausible-looking number this codebase refuses everywhere else.
+#
+# See docs/DETECTION_LIMITS.md section 9.
+# ─────────────────────────────────────────────────────────────────────────────
+SUBPIXEL = {
+    'enabled': False,
+    # Open-water VV endmember. Physically motivated rather than tuned: calm
+    # open water at Sentinel-1's incidence angles sits near -20 dB, well below
+    # the -12 dB upper bound the Otsu range guard uses for "could be water".
+    'water_endmember_db': -20.0,
+    # Significance gate, in standard deviations below the pixel's own baseline
+    # mean. Deliberately looser than BASELINE['z_threshold'] (2.0) used by the
+    # binary mask — partial inundation produces a partial darkening, which is
+    # exactly the signal the strict gate was discarding.
+    'z_min': 1.0,
+    # Fractions below this are treated as zero. Guards against a long tail of
+    # physically meaningless 1-2% values driven by residual speckle.
+    'min_fraction': 0.05,
+    # A pixel darker than the water endmember is fully water, not >100% water.
+    'clamp_to_one': True,
+}
+
+# ─── PHASE 4b: DUAL-POLARISATION WATER DISCRIMINATION ────────────────────────
+# The direct answer to what killed Phase 4a.
+#
+# Phase 4a failed for one specific, diagnosable reason: VV amplitude alone
+# cannot separate saturated soil from shallow standing water. Both darken
+# C-band in the same direction. That is a limit of the MEASUREMENT, not of the
+# unmixing maths — so the fix has to add a measurement, not tune a threshold.
+#
+# Sentinel-1 IW already transmits the second measurement and we were throwing
+# it away: every scene carries VH as well as VV, at no extra acquisition cost
+# and no extra download (the existing VH cross-check reads it, but only as a
+# second independent binary detector, which inherits the same confound).
+#
+# THE PHYSICS THAT SEPARATES THEM. Radar backscatter has three regimes here:
+#   - Open/standing water: specular. The surface reflects energy away from the
+#     sensor. VV drops hard AND VH collapses toward the noise floor, because a
+#     smooth surface also destroys the depolarisation that produces cross-pol
+#     return. Both channels fall; VH falls proportionally further.
+#   - Saturated bare soil: the surface stays rough, only its dielectric
+#     constant changes. This does NOT suppress depolarisation — VH holds
+#     roughly steady, or moves far less than VV does.
+#   - Flooded vegetation: double-bounce off trunks/walls. VV RISES sharply.
+#     Not what we are gating on here, but it is why VV alone is unreliable in
+#     both directions.
+#
+# So the discriminating question is not "did this pixel darken?" (Phase 4a's
+# question, which soil moisture answers yes to) but "did BOTH channels darken
+# together, cross-pol at least as hard as co-pol?" — which is true for water
+# and false for wet ground.
+#
+# THE RULE. Per pixel, against each channel's OWN multi-temporal baseline:
+#     z_vv = (post_vv - base_vv_mean) / base_vv_std      (negative = darker)
+#     z_vh = (post_vh - base_vh_mean) / base_vh_std
+# Evidence is the WEAKER of the two normalised drops, not their average or
+# their sum. Taking the minimum is the whole design: a channel that fails to
+# corroborate CAPS the score rather than being outvoted. Wet soil produces a
+# large VV drop and a small VH drop, so min() returns the small number and the
+# pixel scores near zero. Standing water drops both, so min() stays large.
+# Averaging would let the VV drop carry the pixel and reproduce Phase 4a.
+#
+# `ratio_gate` adds the second-order check. The co/cross ratio (VV-VH in dB)
+# RISES over water — VH collapses further than VV — and stays flat or falls
+# over wet soil. Requiring a rise is nearly free and rejects the case where
+# both channels drop simply because the whole scene got darker.
+#
+# HOW THE TWO GATES INTERACT, since it is not obvious and was only noticed by
+# writing the test: requiring (VV-VH) to rise is algebraically the same as
+# requiring VH to fall by MORE dB than VV. When the two channels happen to
+# share a baseline sigma, that already forces evidence_vh >= evidence_vv, so
+# min() would always return the VV term and the ratio gate alone would be
+# doing all the work. They separate as soon as the sigmas differ — which is
+# the normal case, because VH sits closer to the noise floor and is the
+# noisier channel. A 5 dB VH drop at sigma=3 is LESS significant than a 4 dB
+# VV drop at sigma=1, and min() catches that while the dB-domain ratio gate
+# cannot see it at all. Both are kept because each covers what the other
+# misses; neither is redundant on real data. See tests/test_dualpol.py.
+#
+# HONEST STATUS: enabled here so it can be MEASURED, not because it is known
+# to work. Phase 4a was equally well motivated and failed. The acceptance test
+# is the same one it failed: standalone AUC against NFIP claim truth at Brazos,
+# plus Brier and Brier skill score. If it does not beat AUC 0.5 by a margin
+# that survives its p-value, it gets set to False with the numbers recorded
+# right here, exactly as SUBPIXEL was.
+DUALPOL = {
+    'enabled': True,
+    # Standard deviations below each channel's own baseline mean required
+    # before that channel contributes any evidence. Deliberately the same
+    # loose gate Phase 4a used (1.0) — the point of this phase is that a
+    # second channel, not a stricter threshold, is what rejects soil moisture.
+    'z_min': 1.0,
+    # Drop, in standard deviations, that counts as full confidence for a
+    # channel. Evidence per channel ramps linearly from z_min to z_full.
+    'z_full': 4.0,
+    # Require the co/cross ratio (VV-VH, dB) to rise by at least this much
+    # versus baseline. Water raises it; uniform scene darkening does not.
+    # Set to None to disable the second-order check.
+    'ratio_gate': True,
+    'ratio_rise_db': 0.5,
+    # Minimum VH baseline scenes before the VH channel is trusted at all.
+    # Below this the score abstains (returns 0) rather than guessing from a
+    # noisy std estimate — a bad std makes z_vh arbitrarily large.
+    'min_vh_baseline_scenes': 8,
+    # Scores below this are treated as zero (residual speckle tail).
+    'min_score': 0.05,
+}
+
+# ─── PHASE 4e: URBAN DOUBLE-BOUNCE ───────────────────────────────────────────
+# The detector has been looking for the wrong sign in exactly the places that
+# matter most, and Phase 4c is what finally proved it.
+#
+# THE EVIDENCE. Brazos ground truth resolves to 14 zips. Split by truth label:
+#     flooded-truth zips (5):  90.2% urban, mean detection 0.0993%
+#     dry-truth zips     (9):  80.0% urban, mean detection 0.1520%
+# Detection is LOWER where the claims actually are. Four of the five
+# flooded-truth zips are 94-100% urban and return essentially nothing. That is
+# not a threshold that needs tuning; it is the wrong physics.
+#
+# THE PHYSICS. Open water is specular: it reflects energy away from the sensor,
+# so a flooded field goes DARK. That is the only case the detector tests for.
+# But water standing against a vertical wall forms a dihedral corner reflector
+# — the flat water surface and the building side bounce the pulse back along
+# the path it arrived on. Double-bounce sends MORE energy to the sensor, not
+# less, and a flooded street in a built-up block gets BRIGHTER, routinely by
+# 3-10 dB. A detector that only tests `post < threshold` cannot see it, and a
+# multi-temporal z-score gate that only accepts negative z actively rejects it.
+#
+# This is standard in the SAR flood-mapping literature and is why operational
+# urban flood products treat built-up areas as a separate regime rather than
+# feeding them through the open-water threshold. We were feeding a suburb
+# through a rice-paddy detector.
+#
+# WHY IT NEEDS TIGHT CONSTRAINTS. Backscatter increases for many reasons that
+# are not floods: construction, vehicles, harvest, even soil moisture on rough
+# ground. So brightening is only accepted where a flood is independently
+# plausible:
+#   - inside built-up pixels only (GHSL), where the dihedral geometry exists
+#   - HAND below the plausible threshold, so water could physically reach
+#   - a large z against the pixel's own multi-temporal baseline
+#   - not permanent water
+# Double-bounce is strongly geometry-dependent — it needs the wall roughly
+# perpendicular to the look direction — so a given orbit sees only some of the
+# flooded blocks. That argues for UNION across orbits (a flood seen by one
+# pass is still a flood), never agreement.
+#
+# MEASURED RESULT: IT DOES NOT WORK, AND IS DISABLED. Same contract as 4a.
+#
+# Run on Brazos, 4,000 properties, against the same NFIP claim truth as
+# everything else (validation/double_bounce_probe.py, reproducible).
+#
+# It did mechanically what it was designed to do. The previously-blind urban
+# zips lit up: 77450 (92.7% urban, flooded-truth) went from 0.000% detection
+# under the darkening detector to 73.1%. All four blind flooded zips gained
+# signal. Firing rate rose from 0.53% of properties to 15.2%, and recall from
+# 0.8% to 14.5%.
+#
+# None of that was accuracy:
+#
+#   property-level AUC   0.4975 (p=0.73)   -- darkening was 0.5020 (p=0.16)
+#   precision            19.9%             -- BELOW the 20.9% base rate
+#   zip-level Spearman   +0.018 (p=0.95)
+#
+# The encouraging group means (flooded zips 23.9% vs dry 14.6%) are one zip.
+# Drop 77450 and they invert: 11.6% flooded vs 14.6% dry. The MEDIANS were
+# always inverted -- 10.1% flooded vs 14.0% dry. Mann-Whitney p=0.500, which
+# is not weak evidence, it is none.
+#
+# A threshold sweep found precision 26.4% at score>0.05 (p=0.035), but eight
+# thresholds were tested, so the Bonferroni-adjusted p is ~0.28, and
+# significance is not monotone in the threshold (0.077, 0.103, 0.472 above it).
+# That is the shape of noise, not of a signal with a cut point.
+#
+# What it is actually detecting: correlation with `urban` is +0.197, with
+# flood truth +0.018. Urban brightening has many causes -- vehicles, harvest,
+# construction, changing moisture on rough surfaces -- and firing on 15% of
+# properties when real inundation touched a few percent means the gates admit
+# most of them. The physics is right; the constraints available at 10 m
+# resolution do not isolate it.
+#
+# THE LARGER CAVEAT, which matters more than this result. Brazos ground truth
+# is 14 zips, every property in a zip sharing one label. The DARKENING detector
+# also scores AUC 0.502 on it. This test cannot distinguish a good detector
+# from a bad one, so the honest statement is not "double-bounce failed" but
+# "double-bounce cannot be validated with the ground truth we have, and the
+# evidence that exists does not support it." Shipping a band that fires on 15%
+# of properties on that basis would be exactly the plausible-looking number
+# this codebase refuses everywhere else.
+#
+# Kept, not deleted: the physics is real and standard in the literature, the
+# unit tests pin it, and it is the right method at finer resolution or with
+# per-property ground truth to tune the gates against. Re-enabling is one line
+# plus a re-validation.
+DOUBLE_BOUNCE = {
+    'enabled': False,
+    # Standard deviations ABOVE the pixel's own baseline mean. Deliberately
+    # stricter than the darkening gate (2.0): brightening has more benign
+    # causes than darkening does, so it must clear a higher bar.
+    'z_threshold': 3.0,
+    # Ramp to full confidence, for the graded score.
+    'z_full': 6.0,
+    # GHSL built surface (m² per 100m cell) above which dihedral geometry is
+    # assumed to exist. 1000 is the same cutoff the `urban` band already uses,
+    # kept identical so the two cannot disagree about what "urban" means.
+    'min_built_surface_m2': 1000,
+    # Water cannot reach an arbitrary height above the drainage network. Reuses
+    # HAND['plausible_ft'] by default; set a number here to override.
+    'max_hand_ft': None,
+    # Minimum absolute backscatter for a double-bounce return. A dihedral is a
+    # strong reflector; a "bright" pixel still sitting at -18 dB is noise, not
+    # a corner reflector.
+    'min_backscatter_db': -12.0,
+    'min_score': 0.05,
+}
+
+# ─── HAND — HEIGHT ABOVE NEAREST DRAINAGE (Phase 1) ──────────────────────────
+# Replaces `rel_elev_ft` (elevation minus the minimum within a 300-600m circle)
+# as the DEM-hydrology ensemble vote.
+#
+# The old heuristic answers "is this pixel low compared to its neighbours?",
+# which on flat coastal terrain is nearly meaningless — every parcel is within
+# a few feet of its neighbourhood minimum, so the vote abstained constantly.
+# HAND answers the hydrologically correct question: "how high is this point
+# above the drainage channel that water would actually have to rise from?"
+# It is the standard terrain descriptor for flood susceptibility and is used
+# operationally by NOAA/OWP and in FEMA-adjacent flood modelling.
+#
+# Source: MERIT Hydro (`hnd` band), global, ~90m, already in Earth Engine.
+# Resolution caveat: 90m is coarser than a parcel, which is exactly why HAND
+# votes on PLAUSIBILITY ("could water physically reach here?") and never
+# detects flooding on its own.
+HAND = {
+    'enabled':      True,
+    'asset':        'MERIT/Hydro/v1_0_1',
+    'band':         'hnd',
+    # Thresholds in feet. ~5 m and ~15 m above nearest drainage: below 5m is
+    # routinely inundated by extreme events, above 15m essentially is not.
+    'plausible_ft':   16.0,
+    'implausible_ft': 49.0,
+}
+
+# ─── CROSS-ORBIT STACKING (Phase 1) ──────────────────────────────────────────
+# The detector previously picked the single dominant orbit and discarded every
+# scene from the other pass, throwing away up to half the available
+# observations. That directly worsens the revisit-gap problem: a flood peaking
+# between two same-orbit passes may well have been seen by the other orbit.
+#
+# Scenes from different orbits are NOT directly comparable (different incidence
+# angle and look direction), so we never merge them into one composite. Each
+# orbit gets its own Otsu threshold and its own baseline, produces its own
+# independent flood mask, and only the finished BOOLEAN masks are combined.
+CROSS_ORBIT = {
+    'enabled':    True,
+    # 'union'  — flooded if any orbit saw water. Maximises temporal coverage,
+    #            which is the point of the exercise; a real flood seen by one
+    #            pass is still a real flood.
+    # 'agree'   — flooded only where every observing orbit agrees. Higher
+    #            precision, but discards the revisit benefit.
+    'combine':    'union',
+    # Minimum scenes for an orbit to contribute a mask at all.
+    'min_scenes_per_orbit': 1,
 }
 
 # ─── OPTICAL CROSS-CHECK PARAMETERS (Round 2) ────────────────────────────────
@@ -247,11 +687,15 @@ VEGETATION = {
     'loss_flag_delta': 0.15,   # ndvi_delta above this flags notable vegetation loss
 }
 
-# ─── CLAIM SEVERITY (Round 7) ────────────────────────────────────────────────
+# ─── CLAIM SEVERITY (Round 7, extended by Phase 3) ───────────────────────────
 # USACE/FEMA-style generic one-story residential depth-damage curve:
 # (depth_ft, % of structure value damaged). Piecewise-linear interpolation.
 # This produces a defensible reserving RANGE, not an adjuster's estimate —
 # the range endpoints come from the depth uncertainty interval.
+#
+# `depth_damage_curve` remains the GENERIC fallback, used whenever the
+# structure attributes needed to pick a specific curve are unknown (outside
+# CONUS, or no NSI match). SEVERITY_CURVES below supersedes it when they are.
 SEVERITY = {
     'depth_damage_curve': [
         (0.0, 0.0), (0.5, 8.0), (1.0, 14.0), (2.0, 22.0), (3.0, 29.0),
@@ -259,6 +703,274 @@ SEVERITY = {
         (15.0, 70.0), (20.0, 80.0),
     ],
     'min_depth_ft': 0.1,      # below this, no loss estimate is produced
+
+    # Prefer curves fitted to this book's own claims (SEVERITY_CURVES_FITTED)
+    # over the published national shapes, where a fitted curve exists.
+    #
+    # DEFAULT FALSE, AND THE REASON MATTERS MORE THAN THE FLAG.
+    #
+    # The fitted curves are better than the national shapes on held-out data —
+    # ~8 percentage points of MAE on single-family homes — but they measure a
+    # DIFFERENT QUANTITY. HAZUS curves are the fraction of structure value
+    # physically damaged. The fitted curves are the fraction of building value
+    # PAID, conditional on a claim having been filed, which is systematically
+    # higher (trivial damage never becomes a claim).
+    #
+    # Only RES1 no-basement and two coarse commercial/multi-family segments
+    # could be fitted; RES2 (manufactured homes), the basement variants and
+    # every contents curve had too few claims. Turning this on therefore mixes
+    # two calibration scales inside one curve set, and two physically true
+    # invariants invert as a direct result:
+    #
+    #   - manufactured homes stop being more vulnerable than site-built ones
+    #     (RES2 stays national at 27.0% while RES1-1S-NB is fitted at 38.1%)
+    #   - contents damage stops exceeding structure damage at shallow depth
+    #
+    # Both are caught by tests/test_severity_phase3.py, which is how this was
+    # found. Cross-segment comparisons are meaningless while the scales differ,
+    # and triage ranks properties against each other.
+    #
+    # TO TURN THIS ON SAFELY, fit RES2, the basement variants and the contents
+    # curves on the same paid-claims basis, then re-run the phase-3 invariant
+    # tests. Until then the fitted curves are retained as measured evidence
+    # that the national shapes understate shallow-water loss by roughly 2x —
+    # see validation/fit_damage_curves.py — not as the shipped pricing model.
+    'use_fitted_curves': False,
+}
+
+# ─── PHASE 3: MULTI-CURVE DEPTH-DAMAGE LIBRARY ───────────────────────────────
+# One generic curve was the weakest scientific claim in the product. A
+# two-storey home loses a far smaller FRACTION of its value to two feet of
+# water than a one-storey home does — the water reaches the same rooms, but
+# those rooms are a smaller share of the structure. A home with a basement
+# starts taking damage BELOW grade, i.e. at negative depth relative to the
+# first floor. A generic curve gets all of that wrong in a signed, predictable
+# direction.
+#
+# DEPTH CONVENTION: these curves are indexed on depth above the FIRST FLOOR,
+# which is what published depth-damage functions actually take, and what
+# Phase 2 (NSI foundation height) lets us compute. Feeding them depth above
+# ground — the detector's raw output — overstates damage by roughly the
+# foundation height, worst on pier and crawlspace construction.
+#
+# STRUCTURE curves: % of structure replacement value.
+# Shape and anchor points follow the FEMA/USACE residential functions used in
+# HAZUS (FEMA Flood Model Technical Manual) — one-storey vs two-storey vs
+# manufactured housing, with and without basement. They are TYPICAL published
+# values, not a licensed copy of the HAZUS tables, and the basement variants
+# extend below zero because a basement floods before water reaches grade.
+#
+# HONEST LIMIT: these remain generic published curves, not curves fitted to
+# this book's own claims. Phase 4 (fitting on NFIP claim outcomes) is what
+# replaces borrowed shapes with empirical ones. Until then this is a better
+# structural prior, not a calibrated loss model.
+SEVERITY_CURVES = {
+    # occupancy / stories / basement -> [(depth_above_first_floor_ft, pct)]
+    'RES1-1S-NB': [   # single family, 1 storey, no basement
+        (0.0, 0.0), (0.5, 9.0), (1.0, 16.0), (2.0, 25.0), (3.0, 33.0),
+        (4.0, 40.0), (5.0, 45.0), (6.0, 50.0), (8.0, 58.0), (10.0, 64.0),
+        (15.0, 76.0), (20.0, 85.0),
+    ],
+    'RES1-2S-NB': [   # single family, 2+ storeys, no basement — same water,
+                      # smaller share of total structure value
+        (0.0, 0.0), (0.5, 5.0), (1.0, 9.0), (2.0, 15.0), (3.0, 20.0),
+        (4.0, 25.0), (5.0, 29.0), (6.0, 33.0), (8.0, 40.0), (10.0, 46.0),
+        (15.0, 58.0), (20.0, 68.0),
+    ],
+    'RES1-1S-B': [    # single family, 1 storey, WITH basement — damage starts
+                      # below grade, before water reaches the first floor
+        (-4.0, 3.0), (-2.0, 6.0), (0.0, 11.0), (0.5, 17.0), (1.0, 23.0),
+        (2.0, 31.0), (3.0, 38.0), (4.0, 44.0), (5.0, 49.0), (6.0, 54.0),
+        (8.0, 61.0), (10.0, 67.0), (15.0, 78.0), (20.0, 87.0),
+    ],
+    'RES1-2S-B': [    # single family, 2+ storeys, WITH basement
+        (-4.0, 2.0), (-2.0, 4.0), (0.0, 7.0), (0.5, 11.0), (1.0, 15.0),
+        (2.0, 20.0), (3.0, 25.0), (4.0, 30.0), (5.0, 34.0), (6.0, 38.0),
+        (8.0, 45.0), (10.0, 51.0), (15.0, 63.0), (20.0, 72.0),
+    ],
+    'RES2': [         # manufactured / mobile home — far more vulnerable, and
+                      # effectively a total loss at shallow depths
+        (0.0, 0.0), (0.5, 15.0), (1.0, 27.0), (2.0, 45.0), (3.0, 62.0),
+        (4.0, 75.0), (5.0, 85.0), (6.0, 92.0), (8.0, 100.0), (10.0, 100.0),
+        (15.0, 100.0), (20.0, 100.0),
+    ],
+    'RES3': [         # multi-family residential
+        (0.0, 0.0), (0.5, 6.0), (1.0, 11.0), (2.0, 18.0), (3.0, 24.0),
+        (4.0, 30.0), (5.0, 35.0), (6.0, 39.0), (8.0, 47.0), (10.0, 53.0),
+        (15.0, 65.0), (20.0, 74.0),
+    ],
+    'COM': [          # commercial
+        (0.0, 0.0), (0.5, 6.0), (1.0, 11.0), (2.0, 19.0), (3.0, 26.0),
+        (4.0, 32.0), (5.0, 37.0), (6.0, 42.0), (8.0, 50.0), (10.0, 56.0),
+        (15.0, 68.0), (20.0, 78.0),
+    ],
+}
+
+# CONTENTS curves: % of CONTENTS value, reported separately from structure.
+# ─── CREST TIMING ─────────────────────────────────────────────────────────────
+# Sentinel-1 revisits every 6-12 days; a flood crest lasts hours to days. When
+# they do not line up the detector correctly reports "no water" for a property
+# that was under three feet of it, and nothing in the output says so. That is
+# the failure mode that turns into a wrongly denied claim, and Hurricane Ian was
+# dropped as a demo event because of it (DETECTION_LIMITS section 4).
+#
+# pipeline/crest_timing.py reads USGS stream gauges - free, 15-minute stage -
+# and compares when each gauge crested against the acquisition times the
+# detector actually used.
+#
+# MEASURED ON OUR OWN EVENTS. Brazos at Richmond crested 55.19 ft at
+# 2017-09-01 05:15 UTC. The nearest Sentinel-1 pass was 2017-08-30 12:22 UTC,
+# about 41 hours EARLIER, and the next was 4.3 days later. We photographed the
+# rising limb and looked away while the water kept climbing. That is a partial
+# explanation for the -2.64 ft depth bias measured in DETECTION_LIMITS
+# section 10, and it was invisible before this module existed.
+CREST = {
+    # A pass within this many hours of the crest counts as having observed it.
+    # 24 h is deliberately generous: large-river flood peaks are broad, and a
+    # tighter window would report `missed` for passes that saw most of the
+    # water. Tighten it for flashy urban catchments, where a crest can pass in
+    # a few hours.
+    'tolerance_hours': 24,
+
+    # Refuse to convert "no flood detected" into a Remote-Deny unless the crest
+    # was actually observed. The asymmetry is the point: an unnecessary
+    # inspection costs a few hundred dollars, a wrongly denied claim costs a
+    # policyholder their recovery and the carrier its licence to operate that
+    # way. Set False only with a documented reason.
+    'gate_remote_deny': True,
+}
+
+# ─── SEVERITY CURVES FITTED TO REAL CLAIMS ───────────────────────────────────
+# The SEVERITY_CURVES above are published HAZUS-style NATIONAL shapes. They had
+# never been checked against a claim this project holds. These are fitted to
+# 25,011 real Hurricane Harvey NFIP claims across the 59 study-area zips:
+# median(amountPaidOnBuildingClaim / buildingPropertyValue) by depth bin.
+#
+# WHY THEY REPLACE THE NATIONAL SHAPES. Held-out mean absolute error, with
+# train and test ZIPS DISJOINT so a curve cannot score by memorising a zip's
+# average payout (validation/fit_damage_curves.py):
+#
+#   segment       fitted    shipped   improvement
+#   RES1-1S       19.17pp   27.12pp   +7.94pp
+#   RES1-2S       16.93pp   24.45pp   +7.53pp
+#   RES3-multi    13.93pp   14.93pp   +1.01pp
+#   NONRES        12.79pp   14.64pp   +1.84pp
+#
+# The national curves are wrong in BOTH directions. At 1 ft a single-storey
+# home actually lost 38.1% of value against HAZUS's 16.0%; at 12 ft it lost
+# 51.8% against HAZUS's 68.8%. Shallow water costs far more than the tables
+# say and deep water saturates instead of climbing.
+#
+# TWO DELIBERATE DEPARTURES FROM THE RAW FIT, both recorded so they can be
+# argued with rather than discovered:
+#
+#   1. MONOTONICITY IS ENFORCED. The raw fit falls above 6 ft (RES1-1S goes
+#      61.1% -> 49.5%), which is not physical. It is right-censoring: 15.0% of
+#      usable claims sit at the $250,000 NFIP building cap, and capped claims
+#      cluster in deep water, so the deep bins measure the cap rather than the
+#      loss. The curve is therefore held at its running maximum. That makes the
+#      deep end a LOWER BOUND on true damage, which is the safe direction for a
+#      reserving figure.
+#   2. ANCHORED AT (0.0, 0.0). The fit has no data below 1 ft, because trivial
+#      damage does not generate a claim. Without an anchor, interpolation would
+#      clamp to 38.1% at ZERO detected depth. The 0-1 ft segment is therefore
+#      INTERPOLATED, NOT MEASURED, and should not be quoted as evidence.
+#
+# THE CAVEAT THAT GOVERNS USE: this is P(damage | a claim was filed), not
+# P(damage | the property flooded). Applied to every detected property in a
+# portfolio — including ones that would never file — it will OVERSTATE loss.
+# It is a reserving curve for known claims, not an exposure curve for a book.
+#
+# Set SEVERITY['use_fitted_curves'] = False to fall back to the national shapes.
+SEVERITY_CURVES_FITTED = {
+    'RES1-1S-NB': [(0.0, 0.0), (1.0, 38.1), (2.0, 51.2), (3.0, 56.4),
+                   (4.0, 59.5), (6.0, 61.1), (8.0, 61.1), (12.0, 61.1)],
+    'RES1-2S-NB': [(0.0, 0.0), (1.0, 26.5), (2.0, 38.1), (3.0, 42.6),
+                   (4.0, 46.9), (6.0, 46.9), (8.0, 46.9), (12.0, 46.9)],
+    # No basement segment was fitted: only 8,539 of 25,011 claims report a
+    # basement type at all and the basemented subset is far too thin to bin by
+    # depth. The national basement curves above remain in use for those keys,
+    # which is why this dict does not simply replace SEVERITY_CURVES wholesale.
+    'RES3': [(0.0, 0.0), (1.0, 19.7), (2.0, 32.9), (3.0, 33.1), (6.0, 33.1)],
+    'COM': [(0.0, 0.0), (1.0, 10.4), (2.0, 14.8), (3.0, 19.6), (4.0, 19.6)],
+}
+
+# NFIP settles building and contents as separate coverages, and a carrier
+# reserves them separately, so blending them into one number — as the previous
+# single-curve estimate did — is not the shape of the answer a claims manager
+# needs. Contents damage rises FASTER than structure damage at shallow depths
+# (a few inches ruins flooring and furniture while the structure is largely
+# intact) and saturates earlier.
+SEVERITY_CONTENTS_CURVES = {
+    'RES1-1S-NB': [
+        (0.0, 0.0), (0.5, 12.0), (1.0, 22.0), (2.0, 37.0), (3.0, 50.0),
+        (4.0, 60.0), (5.0, 68.0), (6.0, 75.0), (8.0, 85.0), (10.0, 92.0),
+        (15.0, 98.0), (20.0, 100.0),
+    ],
+    'RES1-2S-NB': [
+        (0.0, 0.0), (0.5, 7.0), (1.0, 13.0), (2.0, 22.0), (3.0, 30.0),
+        (4.0, 37.0), (5.0, 43.0), (6.0, 49.0), (8.0, 59.0), (10.0, 67.0),
+        (15.0, 82.0), (20.0, 90.0),
+    ],
+    'RES1-1S-B': [
+        (-4.0, 5.0), (-2.0, 10.0), (0.0, 17.0), (0.5, 25.0), (1.0, 33.0),
+        (2.0, 46.0), (3.0, 57.0), (4.0, 66.0), (5.0, 73.0), (6.0, 79.0),
+        (8.0, 88.0), (10.0, 94.0), (15.0, 99.0), (20.0, 100.0),
+    ],
+    'RES1-2S-B': [
+        (-4.0, 3.0), (-2.0, 6.0), (0.0, 11.0), (0.5, 16.0), (1.0, 22.0),
+        (2.0, 31.0), (3.0, 39.0), (4.0, 46.0), (5.0, 52.0), (6.0, 58.0),
+        (8.0, 68.0), (10.0, 76.0), (15.0, 88.0), (20.0, 94.0),
+    ],
+    'RES2': [
+        (0.0, 0.0), (0.5, 20.0), (1.0, 35.0), (2.0, 57.0), (3.0, 74.0),
+        (4.0, 86.0), (5.0, 94.0), (6.0, 98.0), (8.0, 100.0), (10.0, 100.0),
+        (15.0, 100.0), (20.0, 100.0),
+    ],
+    'RES3': [
+        (0.0, 0.0), (0.5, 8.0), (1.0, 15.0), (2.0, 26.0), (3.0, 35.0),
+        (4.0, 43.0), (5.0, 50.0), (6.0, 56.0), (8.0, 67.0), (10.0, 75.0),
+        (15.0, 88.0), (20.0, 94.0),
+    ],
+    'COM': [
+        (0.0, 0.0), (0.5, 9.0), (1.0, 17.0), (2.0, 29.0), (3.0, 39.0),
+        (4.0, 48.0), (5.0, 55.0), (6.0, 61.0), (8.0, 72.0), (10.0, 80.0),
+        (15.0, 91.0), (20.0, 96.0),
+    ],
+}
+
+# ─── PHASE 3: DURATION-DEPENDENT DAMAGE ADJUSTMENT ───────────────────────────
+# Prolonged submersion does more damage than the same depth draining quickly —
+# drywall wicks, framing saturates, mould sets in. The pipeline already
+# computes inundation duration from the post-window slices, so this is nearly
+# free and is a genuinely differentiated signal: most competitors report peak
+# extent only.
+#
+# SOURCING CAVEAT — READ BEFORE QUOTING THIS EXTERNALLY. The roadmap cites a
+# ~2.6x multiplier at equal depth from a duration-dependent depth-damage study
+# calibrated on NFIP claims from three US hurricanes. That figure came from a
+# search-result summary; the paper itself is paywalled and unreachable from
+# this environment, so it has NOT been read in full and its exact conditions
+# (which depths, which duration cut, structure types) are unverified.
+#
+# Applying an unverified 2.6x to a customer's reserve number would be exactly
+# the kind of plausible-looking fabrication this codebase refuses elsewhere. So
+# the default here is DELIBERATELY CONSERVATIVE and explicitly a placeholder:
+# a modest ramp, capped well below the cited figure, applied only where
+# duration is actually MEASURED (never assumed), and reported as a labelled
+# adjustment rather than folded silently into the headline number. Replace
+# these values once the source is read, or once Phase 4 fits duration from
+# claims directly.
+SEVERITY_DURATION = {
+    'enabled':          True,
+    # Days of measured inundation -> multiplier on the structure damage pct.
+    # 1.0 below the first threshold means "no adjustment" is the default.
+    'multipliers':      [(0.0, 1.00), (2.0, 1.00), (4.0, 1.10), (7.0, 1.20),
+                         (14.0, 1.30)],
+    'max_multiplier':   1.30,
+    # Never adjust on an assumed duration. The pipeline reports duration as
+    # None when fewer than 2 post-window slices had a usable scene.
+    'require_measured': True,
 }
 
 # ─── PRE-EVENT FLOOD RISK SCORE (Round 7) ────────────────────────────────────
@@ -317,6 +1029,12 @@ ENSEMBLE = {
     # DEM-hydrology: relative elevation above the local neighborhood minimum.
     # Near the local low/drainage -> flooding plausible; perched well above it
     # -> flooding implausible (a confident SAR "flood" there is suspect).
+    #
+    # SUPERSEDED BY HAND (Phase 1): these thresholds are still used, unchanged,
+    # whenever a property has no HAND value — older pre-computed runs, and any
+    # location MERIT Hydro doesn't cover. When `hand_ft` is present the
+    # HAND thresholds above take precedence, because HAND measures height above
+    # the actual drainage network rather than above an arbitrary circle.
     'dem_plausible_rel_ft':     6.0,   # <= this ft above local min: flood plausible
     'dem_implausible_rel_ft':   15.0,  # >= this ft above local min: flood implausible
     'downgrade_to_review':      True,

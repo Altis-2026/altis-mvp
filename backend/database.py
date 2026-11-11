@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from pipeline.config import ASSUMED_COST_PER_FIELD_VISIT_USD
 from pathlib import Path
 
 BASE_DIR    = Path(__file__).parent.parent
@@ -65,7 +66,32 @@ def load_event_data(event_id: str) -> pd.DataFrame | None:
     # Drop rows without coordinates
     df = df.dropna(subset=['latitude', 'longitude'])
 
+    df = attach_gauge_depth(df, event_id)
+
     _event_cache[event_id] = df
+    return df
+
+
+GAUGE_CONFLICT_MIN_FT = 1.0   # river crest implies >= this much water...
+RADAR_DRY_MAX_PCT = 5.0       # ...where radar saw (almost) none
+
+
+def attach_gauge_depth(df: pd.DataFrame, event_id: str) -> pd.DataFrame:
+    """Merge the river-gauge depth (pipeline/05_gauge_depth.py) when present,
+    and flag gauge-radar conflicts: properties the river crest says were under
+    >= 1 ft of water but the radar called dry. These are the likeliest missed
+    claims, so they are surfaced for review; the triage class is not changed
+    automatically."""
+    path = OUTPUT_DIR / f"{event_id}_gauge_depth.csv"
+    if not path.exists() or 'property_id' not in df.columns:
+        return df
+    g = pd.read_csv(path)
+    keep = ['property_id', 'gauge_depth_ft', 'gauge_wse_ft', 'gauge_dist_m', 'gauge_river']
+    df = df.drop(columns=[c for c in keep[1:] if c in df.columns]).merge(
+        g[[c for c in keep if c in g.columns]], on='property_id', how='left')
+    radar_dry = pd.to_numeric(df.get('pct_flooded'), errors='coerce').fillna(0) <= RADAR_DRY_MAX_PCT
+    gauge_wet = pd.to_numeric(df['gauge_depth_ft'], errors='coerce').fillna(0) >= GAUGE_CONFLICT_MIN_FT
+    df['gauge_conflict'] = (radar_dry & gauge_wet).astype(int)
     return df
 
 
@@ -83,8 +109,9 @@ def get_event_stats(df: pd.DataFrame) -> dict:
         'remote_deny':      remote_deny,
         'review':           review,
         'remote_total':     remote_total,
-        'estimated_savings': remote_total * 750,
+        'estimated_savings': remote_total * ASSUMED_COST_PER_FIELD_VISIT_USD,
         'pct_remote':       round(remote_total / total * 100, 1) if total > 0 else 0,
+        'gauge_conflicts':  int(df['gauge_conflict'].sum()) if 'gauge_conflict' in df.columns else None,
     }
 
 
@@ -141,6 +168,12 @@ def init_db():
             conn.execute(f"ALTER TABLE portfolio_properties ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass
+    # Policy terms (deductible, replacement cost, valuation basis, contents) ride
+    # in one JSON column so older databases migrate without a table rebuild.
+    try:
+        conn.execute("ALTER TABLE portfolio_properties ADD COLUMN terms_json TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS analysis_meta (
             portfolio_id TEXT,
@@ -211,12 +244,13 @@ def save_portfolio(portfolio_id: str, properties: list, center: dict,
         INSERT OR REPLACE INTO portfolio_properties
         (portfolio_id, property_id, policy_number, address,
          coverage_amount, latitude, longitude, matched_address,
-         city, state, zip)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         city, state, zip, terms_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, [(portfolio_id, p['property_id'], p.get('policy_number', ''),
            p['address'], p.get('coverage_amount', 0),
            p['latitude'], p['longitude'], p.get('matched_address', ''),
-           p.get('city', ''), p.get('state', ''), p.get('zip', ''))
+           p.get('city', ''), p.get('state', ''), p.get('zip', ''),
+           json.dumps(p['terms']) if p.get('terms') else None)
           for p in properties])
 
     conn.commit()
@@ -244,7 +278,19 @@ def get_portfolio(portfolio_id: str) -> list | None:
         (portfolio_id,)
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows] if rows else None
+    if not rows:
+        return None
+    out = []
+    for r in rows:
+        d = dict(r)
+        raw = d.pop('terms_json', None)
+        if raw:
+            try:
+                d['terms'] = json.loads(raw)
+            except ValueError:
+                pass
+        out.append(d)
+    return out
 
 
 # Columns stored natively in analysis_results; everything else in a result row
@@ -254,7 +300,7 @@ _NATIVE_RESULT_KEYS = {
     'pct_flooded', 'confidence_score', 'adjuster_note',
     # portfolio_properties columns (re-joined on read, don't duplicate):
     'policy_number', 'address', 'coverage_amount', 'latitude', 'longitude',
-    'matched_address',
+    'matched_address', 'terms', 'terms_json',
 }
 
 
@@ -296,6 +342,12 @@ def get_analysis_results(portfolio_id: str, event_id: str) -> list | None:
     out = []
     for r in rows:
         d = dict(r)
+        raw_terms = d.pop('terms_json', None)
+        if raw_terms:
+            try:
+                d['terms'] = _json.loads(raw_terms)
+            except (ValueError, TypeError):
+                pass
         extra = d.pop('extra_json', None)
         if extra:
             try:

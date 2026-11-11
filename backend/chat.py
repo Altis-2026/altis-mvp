@@ -79,6 +79,13 @@ from radar and route to manual Review; FEMA NFHL flood zones exist only for US \
 properties; optical Sentinel-2 imagery requires a cloud-free pass.
 - Loss figures are depth-damage reserving estimates for claims operations, not \
 adjusted claims. Say so if the user treats them as final.
+- Two different numbers exist and must not be conflated. Confidence score is how \
+sure the model is about the triage decision; it is a model-internal score, not a \
+probability. Flood probability, when present, is a calibrated probability that the \
+property flooded, fitted against FEMA Individual Assistance ground truth at \
+zip-code resolution. If flood probability is absent, say calibration has not been \
+run for this event rather than presenting confidence as if it were validated \
+accuracy.
 - Never invent claims numbers, adjuster names, or addresses not present in CONTEXT.
 """
 
@@ -113,7 +120,8 @@ def _build_context(event_meta: dict | None, event_stats: dict | None,
         keep = ('property_id', 'address', 'impact_class', 'max_depth_ft',
                 'pct_flooded', 'confidence_score', 'adjuster_note', 'flood_zone',
                 'sfha_flag', 'severity_mid_usd', 'coverage_amount',
-                'subrogation_flag', 'surge_check_flag', 'duration_days')
+                'subrogation_flag', 'surge_check_flag', 'duration_days',
+                'flood_probability', 'flood_probability_source')
         snippet = {k: property_row.get(k) for k in keep if k in property_row}
         parts.append(f"SELECTED PROPERTY: {json.dumps(snippet, default=str)}")
     return "\n".join(parts) if parts else (
@@ -137,8 +145,17 @@ def _call_llm(messages: list[dict], max_tokens: int = 600,
     except requests.RequestException as e:
         raise ChatError(f"Couldn't reach the assistant: {e}")
 
+    if resp.status_code in (401, 403):
+        print(f"  [chat] provider rejected credentials ({resp.status_code}): {resp.text[:300]}")
+        raise ChatError("The assistant is unavailable right now: the AI provider rejected "
+                        "this server's API key. An administrator needs to update "
+                        "OPENROUTER_API_KEY.")
+    if resp.status_code == 429:
+        raise ChatError("The assistant is busy (rate limited). Try again in a minute.")
     if resp.status_code != 200:
-        raise ChatError(f"Assistant request failed ({resp.status_code}): {resp.text[:300]}")
+        print(f"  [chat] provider error {resp.status_code}: {resp.text[:300]}")
+        raise ChatError(f"The assistant request failed (provider error {resp.status_code}). "
+                        "Try again shortly.")
 
     data = resp.json()
     try:

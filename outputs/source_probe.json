@@ -1,0 +1,287 @@
+{
+ "checked": "2026-11-08T10:36:38Z",
+ "results": [
+  {
+   "name": "Sentinel-1 GRD (radar)",
+   "access": "ee:COPERNICUS/S1_GRD",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "Sentinel-2 L2A (optical)",
+   "access": "ee:COPERNICUS/S2_SR_HARMONIZED",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "Copernicus Data Space STAC catalogue",
+   "access": "https://catalogue.dataspace.copernicus.eu/stac/collections",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "NASA OPERA DSWx-S1 (water extent product)",
+   "access": "https://cmr.earthdata.nasa.gov/search/collections.json?short_name=OPERA_L3_DSWX-S1_V1",
+   "status": "blocked",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "ASF Sentinel-1 archive + HyP3 on-demand processing",
+   "access": "https://api.daac.asf.alaska.edu/services/search/param?platform=S1&maxResults=1&output=json",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "Microsoft Planetary Computer STAC",
+   "access": "https://planetarycomputer.microsoft.com/api/stac/v1/collections",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "Element 84 Earth Search (AWS open data)",
+   "access": "https://earth-search.aws.element84.com/v1/collections",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "USGS 3DEP 1 m lidar DEM",
+   "access": "ee:USGS/3DEP/1m",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "USGS 3DEP 10 m DEM",
+   "access": "ee:USGS/3DEP/10m",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "Copernicus GLO-30 DEM",
+   "access": "ee:COPERNICUS/DEM/GLO30",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "FABDEM (forest and buildings removed)",
+   "access": "ee:projects/sat-io/open-datasets/FABDEM",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "MERIT Hydro (HAND, flow direction)",
+   "access": "ee:MERIT/Hydro/v1_0_1",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "JRC Global Surface Water",
+   "access": "ee:JRC/GSW1_4/GlobalSurfaceWater",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "USGS NLDI river network",
+   "access": "https://api.water.usgs.gov/nldi/linked-data/nwissite/USGS-08114000",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "HydroSHEDS free-flowing rivers",
+   "access": "ee:WWF/HydroSHEDS/v1/FreeFlowingRivers",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "NOAA National Water Prediction Service (NWPS)",
+   "access": "https://api.water.noaa.gov/nwps/v1/gauges/RMOT2",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "USGS NWIS water data",
+   "access": "https://waterservices.usgs.gov/nwis/site/?format=rdb&sites=08114000",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "NOAA National Water Model (AWS)",
+   "access": "https://noaa-nwm-pds.s3.amazonaws.com/",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "NOAA MRMS radar rainfall",
+   "access": "https://mrms.ncep.noaa.gov/data/2D/",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "GPM IMERG rainfall",
+   "access": "ee:NASA/GPM_L3/IMERG_V07",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "CHIRPS daily rainfall",
+   "access": "ee:UCSB-CHG/CHIRPS/DAILY",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "ERA5-Land daily",
+   "access": "ee:ECMWF/ERA5_LAND/DAILY_AGGR",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "NOAA National Hurricane Center",
+   "access": "https://www.nhc.noaa.gov/CurrentStorms.json",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "Australian Bureau of Meteorology Water Data (KiWIS)",
+   "access": "http://www.bom.gov.au/waterdata/services?service=kisters&type=queryServices&request=getrequestinfo&datasource=0&format=json",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "USACE National Structure Inventory",
+   "access": "https://nsi.sec.usace.army.mil/nsiapi/structures?bbox=-95.8,29.6,-95.79,29.61",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "Microsoft US building footprints",
+   "access": "ee:projects/sat-io/open-datasets/MSBuildings/US",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "Google Open Buildings v3",
+   "access": "ee:GOOGLE/Research/open-buildings/v3/polygons",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "Overture Maps (buildings, places)",
+   "access": "https://overturemaps-us-west-2.s3.amazonaws.com/",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "ESA WorldCover 10 m",
+   "access": "ee:ESA/WorldCover/v200",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "GHSL built-up surface",
+   "access": "ee:JRC/GHSL/P2023A/GHS_BUILT_S",
+   "status": "ready",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "FEMA National Flood Hazard Layer",
+   "access": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer?f=json",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "OpenFEMA NFIP claims v3",
+   "access": "https://www.fema.gov/api/open/v3/NfipClaims?$top=1",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "OpenFEMA disaster declarations",
+   "access": "https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$top=1",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "USGS STN high-water marks",
+   "access": "https://stn.wim.usgs.gov/STNServices/Events.json",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "Global Flood Database",
+   "access": "ee:GLOBAL_FLOOD_DB/MODIS_EVENTS/V1",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "asset found"
+  },
+  {
+   "name": "Sen1Floods11 hand labels",
+   "access": "https://storage.googleapis.com/sen1floods11/v1.1/Sen1Floods11_Metadata.geojson",
+   "status": "in_use",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "UrbanSARFloods benchmark",
+   "access": "https://zenodo.org/api/records?q=UrbanSARFloods",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "Copernicus EMS rapid mapping",
+   "access": "https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations/?limit=1",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "NOAA Emergency Response Imagery",
+   "access": "https://storms.ngs.noaa.gov/",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  },
+  {
+   "name": "Dartmouth Flood Observatory archive",
+   "access": "https://floodobservatory.colorado.edu/",
+   "status": "ready",
+   "reachable": true,
+   "detail": "HTTP 200"
+  }
+ ],
+ "n_ok": 40,
+ "n": 40
+}
