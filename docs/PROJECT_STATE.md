@@ -567,3 +567,8 @@ python validation/phase4_probe.py harvey     # re-rank the shelved detectors
 
 pytest tests/ -q      # 274 passing, 1 skipped
 ```
+
+## Update 2026-11-22: conformal band, and two ideas dropped on inspection
+- **Conformal claim band** (`docs/PREREG_CONFORMAL.md`): tested once on Ian, Sally, Michael. Strict criteria FAILED (P1 1/4, P4 2/4; P2 and P3 passed). Widening helps (raw 58-73% vs widened 70-77% at nominal 80%) but a band fitted on past storms does not hold its level on a new storm; Ian is the weak case. The product labels it a typical range, not a guarantee. Next experiment: does storm calibration from a storm's own settled claims restore coverage (not yet tested, not pre-registered).
+- **Depth from flood edges (FwDET-style):** dropped as a new item. The pipeline already computes it (`build_flood_depth_image`: focal percentile of flooded-pixel elevation minus DEM, with `wse_spread_ft`). A connected-component refinement is possible but unproven.
+- **Day-0 nowcast:** not built. With about ten events that have outcomes, a backtest has almost no power, so a nowcast could not be validated; building it would break the never-quote-an-unmeasured-number rule. It needs more event outcomes (carrier pilot, more NFIP storms) first.
