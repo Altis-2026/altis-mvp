@@ -657,7 +657,8 @@ export default function PropertyDrawer({ property, eventId, liveEventDate, onClo
                 <>
                   {claimP10 != null && claimP90 != null && (
                     <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
-                      a single claim at this depth: ${claimP10.toLocaleString()} – ${claimP90.toLocaleString()} (10th–90th percentile)
+                      a single claim at this depth: typically ${claimP10.toLocaleString()} – ${claimP90.toLocaleString()}
+                      {property.net_claim_band ? ' (widened using past settled claims; on storms it had not seen it held roughly 6 to 8 times in 10, so treat it as a typical range, not a guarantee)' : ' (10th–90th percentile)'}
                     </div>
                   )}
                   {stormFactor != null && (

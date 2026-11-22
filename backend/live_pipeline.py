@@ -75,6 +75,16 @@ def _net_loss(prop, nsi, row, sev_ci, duration_days):
                            segment=seg, model=model)
     if not out:
         return None
+    try:
+        from pipeline.conformal import widen_band
+        known = all(v is not None for v in (t.get('deductible'), t.get('valuation_basis'),
+                                            t.get('acv_value'), t.get('replacement_cost')))
+        lo, hi, info = widen_band(out['claim_p10'], out['claim_p90'], cov, known, basis)
+        if info:
+            out['claim_p10_raw'], out['claim_p90_raw'] = out['claim_p10'], out['claim_p90']
+            out['claim_p10'], out['claim_p90'], out['claim_band'] = lo, hi, info
+    except Exception:  # noqa: BLE001 - the band is advisory; never block the estimate
+        pass
     # The model is calibrated on US NFIP claims; say so when it is applied elsewhere.
     lat, lon = prop.get('latitude'), prop.get('longitude')
     try:
@@ -679,6 +689,7 @@ def analyze_portfolio_live(props: list, event_date: str = None,
             'loss_method':       ('claims_calibrated_net_of_terms' if net else ('national_curve_gross' if sev else None)),
             'net_claim_p10_usd': net['claim_p10'] if net else None,
             'net_claim_p90_usd': net['claim_p90'] if net else None,
+            'net_claim_band': net.get('claim_band') if net else None,
             'net_terms_provenance': net['terms_provenance'] if net else None,
             'net_support_claims': net['support_claims'] if net else None,
             'net_depth_basis':   net['depth_basis'] if net else None,

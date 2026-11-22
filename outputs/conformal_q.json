@@ -1,0 +1,28 @@
+{
+ "source": "docs/PREREG_CONFORMAL.md",
+ "calibrated_on": [
+  "florence",
+  "imelda",
+  "ida",
+  "helene"
+ ],
+ "w_floor_usd": 1000.0,
+ "q": {
+  "full/above_first_floor": {
+   "0.8": 0.0086,
+   "0.9": 0.1081
+  },
+  "full/above_ground": {
+   "0.8": 0.0019,
+   "0.9": 0.0601
+  },
+  "min/above_first_floor": {
+   "0.8": 0.1038,
+   "0.9": 0.425
+  },
+  "min/above_ground": {
+   "0.8": 0.0508,
+   "0.9": 0.3427
+  }
+ }
+}

@@ -103,3 +103,30 @@ protocol: `docs/PREREG_LOSS_MODEL.md`.
 3. Add flood duration from the carrier's claims, once it is recorded.
 4. Re-run the same test on a new set of storms (Ian 2022, Sally 2020, Michael
    2018 were reserved for this) and on the carrier's data.
+
+## Uncertainty band: conformal test (pre-registered, result: FAIL on the strict criteria)
+Protocol `docs/PREREG_CONFORMAL.md`; script `validation/conformal_check.py`; results
+`outputs/conformal_check.json`; widening constants `outputs/conformal_q.json`.
+
+The claim-level 10th-90th percentile band was widened with a split-conformal
+correction calibrated on Florence, Imelda, Ida and Helene, then scored once on three
+storms never used before (Ian, Sally, Michael), nominal 80%:
+
+| cell | raw band | widened band |
+|---|---|---|
+| all terms known, above first floor | 68.1% | 70.4% |
+| all terms known, above ground | 73.1% | 73.8% |
+| limit only, above first floor | 58.2% | 72.3% |
+| limit only, above ground | 62.1% | 76.5% |
+
+Criteria: P1 (pooled within 75-85% in every cell) 1 of 4, FAIL; P2 (no storm badly
+under-covered) 9 of 12, pass; P3 (closer to 80% than raw) 4 of 4, pass; P4 (90%
+level pooled within 85-95%) 2 of 4, FAIL. Overall: fail.
+
+What this means: widening always helps, but a band fitted on past storms does not
+keep its promised coverage on a new storm. Ian is the weak one (about 66% at the 80%
+level) and dominates the pooled number; Sally and Michael over-cover. Storm-to-storm
+shifts are larger than within-storm scatter. The product therefore labels the band a
+typical range, not a guarantee, and shows the storm-calibration factor (learned from
+a storm's own settled claims) as the way to tighten it. Whether storm calibration also
+restores band coverage has not been tested and is the natural next experiment.
