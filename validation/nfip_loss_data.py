@@ -34,6 +34,11 @@ EVENTS = {
     "imelda":   ("floodEvent eq 'Tropical Storm Imelda'", "test"),
     "ida":      ("floodEvent eq 'Hurricane Ida'", "test"),
     "helene":   ("floodEvent eq 'Hurricane Helene'", "test"),
+    # Reserved: never used to fit or to score the loss model; used once, for the
+    # conformal-interval coverage test (docs/PREREG_CONFORMAL.md).
+    "ian":      ("floodEvent eq 'Hurricane Ian'", "reserve"),
+    "sally":    ("floodEvent eq 'Hurricane Sally'", "reserve"),
+    "michael":  ("floodEvent eq 'Hurricane Michael'", "reserve"),
 }
 FIELDS = ("dateOfLoss,state,countyCode,reportedZipCode,latitude,longitude,floodEvent,causeOfDamage,"
           "waterDepth,exteriorWaterDepth,interiorWaterDepth,floodWaterDuration,"
@@ -80,7 +85,7 @@ def fetch(name):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--events", default="train", choices=["train", "test", "all"])
+    ap.add_argument("--events", default="train", choices=["train", "test", "reserve", "all"])
     a = ap.parse_args()
     for n, (_, split) in EVENTS.items():
         if a.events in ("all", split):
